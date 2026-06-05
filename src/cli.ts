@@ -31,12 +31,12 @@ export async function runCli(rawArgs: string[]): Promise<void> {
   }
 
   if (commandName === 'install') {
-    await runInstallCommand();
+    await runInstallCommand(commandArgs);
     return;
   }
 
   if (commandName === 'update' || commandName === 'upgrade') {
-    await runUpdateCommand();
+    await runUpdateCommand(commandArgs);
     return;
   }
 
@@ -84,9 +84,11 @@ function printHelp(role: Role, commands: string[]): void {
     '  zentao version',
     '  zentao update',
     '  npx -y @cloudglab/zentao-cli@latest install',
+    '  zentao install --skill-source npm',
     '',
     '示例：',
     '  zentao install',
+    '  zentao install --skill-source npm',
     '  zentao update',
     '  zentao getMyTasks --status all --limit 20',
     '  zentao --role qa getMyBugs --limit 50',

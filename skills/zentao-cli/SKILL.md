@@ -80,6 +80,18 @@ argument-hint: "[command]"
 npx -y @cloudglab/zentao-cli@latest install
 ```
 
+不能访问远程 `.git` 仓库但可以访问 npm 时：
+
+```bash
+npx -y @cloudglab/zentao-cli@latest install --skill-source npm
+```
+
+已经提前下载并解压 npm 静态包时：
+
+```bash
+zentao install --skill-local-path ./package
+```
+
 更新 CLI + skill：
 
 ```bash
@@ -95,7 +107,15 @@ npx -y @cloudglab/zentao-cli@latest --help
 安装 skill：
 
 ```bash
-npx skills add @cloudglab/zentao-cli -g
+npx -y skills add -g cloudglab/zentao-cli
+```
+
+只能访问 npm 时：
+
+```bash
+npm pack @cloudglab/zentao-cli@latest
+tar -xzf cloudglab-zentao-cli-*.tgz
+npx -y skills add -g ./package
 ```
 
 检查是否已安装：

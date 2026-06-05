@@ -1,26 +1,100 @@
 import { spawn } from 'node:child_process';
+import { mkdtemp, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import readline from 'node:readline';
 import { ZentaoApi } from './api/index.js';
 import { loadConfig, maskConfig, normalizeConfig, saveConfig } from './core/config.js';
 import type { ZentaoConfig } from './types/common.js';
 
 const PACKAGE_NAME = '@cloudglab/zentao-cli';
+const GIT_SKILL_SOURCE = 'cloudglab/zentao-cli';
 
-export async function runInstallCommand(): Promise<void> {
-  await installPackageAndSkill('安装');
+type SkillSource = 'git' | 'npm';
+
+interface InstallOptions {
+  skillSource: SkillSource;
+  skillLocalPath?: string;
+}
+
+export async function runInstallCommand(args: string[] = []): Promise<void> {
+  await installPackageAndSkill('安装', parseInstallOptions(args));
   await ensureValidZentaoConfig();
   process.stdout.write('安装完成，禅道配置校验通过。\n');
 }
 
-export async function runUpdateCommand(): Promise<void> {
-  await installPackageAndSkill('更新');
+export async function runUpdateCommand(args: string[] = []): Promise<void> {
+  await installPackageAndSkill('更新', parseInstallOptions(args));
   await ensureValidZentaoConfig();
   process.stdout.write('更新完成，禅道配置校验通过。\n');
 }
 
-async function installPackageAndSkill(action: '安装' | '更新'): Promise<void> {
+function parseInstallOptions(args: string[]): InstallOptions {
+  let skillSource: SkillSource = 'git';
+  let skillLocalPath: string | undefined;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === '--skill-source') {
+      const value = args[index + 1];
+      if (value !== 'git' && value !== 'npm') {
+        throw new Error('--skill-source 只支持 git 或 npm');
+      }
+      skillSource = value;
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--skill-local-path') {
+      const value = args[index + 1];
+      if (!value) {
+        throw new Error('--skill-local-path 需要传入本地目录路径');
+      }
+      skillLocalPath = value;
+      index += 1;
+      continue;
+    }
+
+    throw new Error(`未知安装参数: ${arg}`);
+  }
+
+  return { skillSource, skillLocalPath };
+}
+
+async function installPackageAndSkill(action: '安装' | '更新', options: InstallOptions): Promise<void> {
   await runStep(`${action} zentao CLI`, 'npm', ['install', '-g', `${PACKAGE_NAME}@latest`]);
-  await runStep(`${action} zentao skill`, 'npx', ['-y', 'skills', 'add', '-g', PACKAGE_NAME]);
+  await installSkill(action, options);
+}
+
+async function installSkill(action: '安装' | '更新', options: InstallOptions): Promise<void> {
+  if (options.skillLocalPath) {
+    await runStep(`${action} zentao skill`, 'npx', ['-y', 'skills', 'add', '-g', path.resolve(options.skillLocalPath)]);
+    return;
+  }
+
+  if (options.skillSource === 'git') {
+    await runStep(`${action} zentao skill`, 'npx', ['-y', 'skills', 'add', '-g', GIT_SKILL_SOURCE]);
+    return;
+  }
+
+  await installSkillFromNpmPackage(action);
+}
+
+async function installSkillFromNpmPackage(action: '安装' | '更新'): Promise<void> {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'zentao-cli-skill-'));
+  try {
+    const stdout = await runCommandOutput('npm', ['pack', `${PACKAGE_NAME}@latest`, '--pack-destination', tempDir, '--silent']);
+    const tarballName = stdout.trim().split('\n').filter(Boolean).at(-1);
+    if (!tarballName) {
+      throw new Error('npm pack 没有返回包文件名');
+    }
+
+    const tarballPath = path.join(tempDir, tarballName);
+    await runStep('解压 zentao npm 包', 'tar', ['-xzf', tarballPath, '-C', tempDir]);
+    await runStep(`${action} zentao skill`, 'npx', ['-y', 'skills', 'add', '-g', path.join(tempDir, 'package')]);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
 }
 
 async function runStep(title: string, command: string, args: string[]): Promise<void> {
@@ -39,6 +113,29 @@ function runCommand(command: string, args: string[]): Promise<void> {
         return;
       }
       reject(new Error(`${command} ${args.join(' ')} 执行失败，退出码 ${String(code)}`));
+    });
+  });
+}
+
+function runCommandOutput(command: string, args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { shell: process.platform === 'win32' });
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout?.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString('utf8');
+    });
+    child.stderr?.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString('utf8');
+    });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve(stdout);
+        return;
+      }
+      reject(new Error(`${command} ${args.join(' ')} 执行失败，退出码 ${String(code)}${stderr ? `：${stderr.trim()}` : ''}`));
     });
   });
 }

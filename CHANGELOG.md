@@ -2,7 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.6 - 2026-06-06
+
+### Fixed
+
+- 修正 `zentao install` / `zentao update` 的 skill 安装源，默认使用 `cloudglab/zentao-cli` GitHub 仓库源，避免把 npm 包名误解析为错误仓库地址。
+
+### Added
+
+- 新增 `--skill-source npm` 安装模式：在不能访问远程 `.git` 仓库但可以访问 npm 的环境中，自动下载 `@cloudglab/zentao-cli` 静态包、解压并通过本地路径安装 skill。
+- 新增 `--skill-local-path` 参数，支持直接从已解压的本地 skill 包目录安装。
+- 新增安装流程测试，覆盖默认 GitHub 源和 npm 静态包本地路径安装流程。
+
+### Changed
+
+- README、skill 文档和安装参考文档补充 GitHub 源、npm 静态包、本地路径三种 skill 安装方式。
+
 ## 0.1.5 - 2026-06-06
+
+### Fixed
+
+- 修正 skill 安装源：默认使用 `cloudglab/zentao-cli` GitHub 仓库源；不能访问远程 `.git` 仓库时，支持通过 npm 静态包解压后的本地路径安装 skill。
 
 ### Added
 

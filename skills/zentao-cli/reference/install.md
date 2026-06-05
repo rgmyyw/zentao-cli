@@ -9,8 +9,20 @@ npx -y @cloudglab/zentao-cli@latest install
 它会依次执行：
 
 1. 安装全局 CLI：`npm install -g @cloudglab/zentao-cli@latest`
-2. 安装 skill：`npx -y skills add -g @cloudglab/zentao-cli`
+2. 安装 skill：`npx -y skills add -g cloudglab/zentao-cli`
 3. 如果没有禅道配置，或已有配置登录失败，则提示输入配置并校验
+
+默认通过 GitHub 仓库安装 skill。如果当前环境不能访问远程 `.git` 仓库，但可以访问 npm 包，可改用 npm 静态包模式：
+
+```bash
+npx -y @cloudglab/zentao-cli@latest install --skill-source npm
+```
+
+如果已经提前下载并解压好了 npm 静态包，也可以直接指定本地目录：
+
+```bash
+zentao install --skill-local-path ./package
+```
 
 后续更新可运行：
 
@@ -35,8 +47,18 @@ npx -y @cloudglab/zentao-cli@latest --help
 
 ## 安装 Skill
 
+默认 GitHub 仓库方式：
+
 ```bash
-npx skills add @cloudglab/zentao-cli -g
+npx -y skills add -g cloudglab/zentao-cli
+```
+
+只能访问 npm、不能 clone `.git` 仓库时：
+
+```bash
+npm pack @cloudglab/zentao-cli@latest
+tar -xzf cloudglab-zentao-cli-*.tgz
+npx -y skills add -g ./package
 ```
 
 ## 检查是否已安装
