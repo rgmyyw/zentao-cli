@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.4 - 2026-06-05
+
+### Changed
+
+- 触发一次真实的 npm trusted publishing 自动发布验证。
+
 ## 0.1.3 - 2026-06-05
 
 ### Fixed
