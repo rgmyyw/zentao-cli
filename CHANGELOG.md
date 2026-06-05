@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.3 - 2026-06-05
+
+### Fixed
+
+- 修复构建前未清理 `dist` 导致 npm 包可能混入旧 MCP 产物的问题；构建现会先清空 `dist` 再重新编译。
+
 ## 0.1.2 - 2026-06-05
 
 ### Changed
