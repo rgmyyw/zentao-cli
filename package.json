@@ -1,7 +1,11 @@
 {
   "name": "@cloudglab/zentao-cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "ZenTao CLI rebuilt for ZenTao 18.5 REST v1 API",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cloudglab/zentao-cli.git"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.2 - 2026-06-05
+
+### Changed
+
+- 为 npm trusted publishing 补齐 `package.json.repository.url`，明确绑定到 `https://github.com/cloudglab/zentao-cli.git`。
+- 版本提升到 `0.1.2`，用于重新触发自动发布链路。
+
 ## 0.1.1 - 2026-06-05
 
 ### Changed
