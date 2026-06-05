@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.1 - 2026-06-05
+
+### Changed
+
+- 发布工作流切换为 npm trusted publishing，去掉 `NPM_TOKEN` 发布依赖。
+- GitHub Actions 发布环境升级为 Node.js 24，以满足 npm OIDC trusted publishing 运行要求。
+
 ## 0.1.0 - 2026-06-05
 
 ### Added

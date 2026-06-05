@@ -273,8 +273,7 @@ pnpm build
 ### 使用前准备
 
 1. 先把代码推到 GitHub 仓库
-2. 在 GitHub 仓库 `Settings -> Secrets and variables -> Actions` 中新增：
-   - `NPM_TOKEN`：npm access token（需要有对应 scope 的发布权限）
+2. 在 npm 上为 `@cloudglab/zentao-cli` 配置 GitHub Actions trusted publisher，绑定仓库 `cloudglab/zentao-cli`
 3. 确保 `package.json` 中的 `version` 与你要打的 tag 一致
 
 ### 发版方式
@@ -311,7 +310,7 @@ git push origin v0.1.0
 - 初始化本地 git 仓库
 - 首次 commit
 - 创建 GitHub 仓库并 push 上去
-- 登录 npm，并确认对 `@glab` 或后续目标 scope 有发布权限
+- 在 npm 包侧完成 trusted publisher 绑定
 
 ## 启动
 
