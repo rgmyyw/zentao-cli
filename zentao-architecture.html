@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>zentao-cli 原理架构图</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-deep: #f3f4f6;
+    --bg-box: #ffffff;
+    --bg-source: #f0fdfa;
+    --bg-dashed: #f8fafb;
+    --border: #d1d5db;
+    --border-source: #5eead4;
+    --text: #1e293b;
+    --text-dim: #64748b;
+    --text-muted: #94a3b8;
+    --text-tech: #94a3b8;
+    --arrow: #94a3b8;
+    --arrow-signal: #0d9488;
+    --arrow-state: #059669;
+    --arrow-guard: #d97706;
+    --arrow-risk: #e11d48;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg-deep);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 24px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  }
+  .wrapper { width: 100%; max-width: 1480px; }
+  .canvas {
+    width: 1440px;
+    height: 1180px;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    transform-origin: top left;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.04);
+  }
+  .title {
+    position: absolute;
+    left: 40px;
+    top: 24px;
+    color: #0f172a;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: .2px;
+  }
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    margin-left: 10px;
+  }
+  .spectrum {
+    position: absolute;
+    left: 40px;
+    right: 40px;
+    top: 72px;
+    height: 34px;
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1.25fr 1fr 1fr;
+    gap: 10px;
+  }
+  .spec {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+    color: #0f172a;
+    border: 1px solid #e5e7eb;
+    background: linear-gradient(180deg, #fff, #f8fafc);
+  }
+  .spec.teal { background: linear-gradient(180deg, #f0fdfa, #ecfeff); border-color: #99f6e4; }
+  .spec.amber { background: linear-gradient(180deg, #fffbeb, #fef3c7); border-color: #fcd34d; }
+  .spec.violet { background: linear-gradient(180deg, #f5f3ff, #ede9fe); border-color: #c4b5fd; }
+  .spec.green { background: linear-gradient(180deg, #ecfdf5, #d1fae5); border-color: #86efac; }
+  .box {
+    position: absolute;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-box);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    line-height: 1.36;
+    padding: 6px 14px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .box.source { background: var(--bg-source); border-color: var(--border-source); }
+  .box.dashed { border-style: dashed; border-color: #cbd5e1; background: var(--bg-dashed); font-weight: 600; box-shadow: none; }
+  .sub { font-size: 10px; color: var(--text-dim); font-weight: 500; margin-top: 3px; }
+  .tech { font-size: 9.5px; color: var(--text-tech); font-weight: 500; margin-top: 2px; font-family: 'SF Mono', 'Menlo', monospace; }
+  .group {
+    position: absolute;
+    border: 1.5px dashed #cbd5e1;
+    border-radius: 16px;
+    background: rgba(248,250,252,.62);
+  }
+  .tag {
+    position: absolute;
+    top: -11px;
+    left: 16px;
+    font-size: 9.5px;
+    font-weight: 800;
+    padding: 3px 11px;
+    border-radius: 999px;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+    color: #fff;
+    white-space: nowrap;
+  }
+  .tag.teal { background:#0d9488; }
+  .tag.rose { background:#e11d48; }
+  .tag.amber { background:#d97706; }
+  .tag.blue { background:#2563eb; }
+  .tag.violet { background:#7c3aed; }
+  .tag.green { background:#059669; }
+  .tag.slate { background:#475569; }
+  .legend {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  .legend-line { width: 30px; height: 0; }
+</style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="canvas" id="canvas">
+      <div class="title">zentao-cli 原理架构图 <span class="subtitle">TypeScript 重建 · 18.5 REST v1 · MCP/CLI 双入口</span></div>
+
+      <div class="spectrum">
+        <div class="spec teal">CLI / role entry</div>
+        <div class="spec amber">config & auth</div>
+        <div class="spec violet">MCP register & routing</div>
+        <div class="spec green">HTTP / REST API</div>
+        <div class="spec rose">write preview & guard</div>
+      </div>
+
+      <svg style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none" viewBox="0 0 1440 1180">
+        <title>zentao-cli 原理架构图</title>
+        <defs>
+          <marker id="ah" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+            <polygon points="0 0, 7 2.5, 0 5" fill="#94a3b8" />
+          </marker>
+          <marker id="ah-teal" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+            <polygon points="0 0, 7 2.5, 0 5" fill="#0d9488" />
+          </marker>
+          <marker id="ah-green" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+            <polygon points="0 0, 7 2.5, 0 5" fill="#059669" />
+          </marker>
+          <marker id="ah-amber" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+            <polygon points="0 0, 7 2.5, 0 5" fill="#d97706" />
+          </marker>
+          <marker id="ah-rose" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+            <polygon points="0 0, 7 2.5, 0 5" fill="#e11d48" />
+          </marker>
+        </defs>
+
+        <!-- runtime bootstrap -->
+        <line data-edge-id="cli-runserver" data-from="cli-entry" data-to="run-server" x1="260" y1="212" x2="290" y2="212" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ah)" />
+        <line data-edge-id="runserver-mcp" data-from="run-server" data-to="mcp-server" x1="500" y1="212" x2="540" y2="212" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ah)" />
+        <line data-edge-id="mcp-transport" data-from="mcp-server" data-to="stdio-transport" x1="750" y1="212" x2="790" y2="212" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ah)" />
+        <polyline data-edge-id="runserver-register" data-from="run-server" data-to="register-tools" points="395,212 395,220 1000,220 1000,329 960,329" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ah)" />
+        <polyline data-edge-id="role-register" data-from="role-selector" data-to="register-tools" points="1210,212 1210,224 1016,224 1016,329 960,329" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ah)" />
+
+        <!-- config/auth chain -->
+        <line data-edge-id="load-normalize" data-from="load-config" data-to="normalize-config" x1="470" y1="345" x2="470" y2="405" stroke="#d97706" stroke-width="1.5" marker-end="url(#ah-amber)" />
+        <line data-edge-id="normalize-getapi" data-from="normalize-config" data-to="get-api" x1="250" y1="433" x2="250" y2="475" stroke="#d97706" stroke-width="1.5" marker-end="url(#ah-amber)" />
+        <line data-edge-id="getapi-api" data-from="get-api" data-to="zentao-api" x1="470" y1="505" x2="470" y2="545" stroke="#059669" stroke-width="1.5" marker-end="url(#ah-green)" />
+        <line data-edge-id="api-http" data-from="zentao-api" data-to="http-client" x1="250" y1="575" x2="250" y2="627" stroke="#059669" stroke-width="1.5" marker-end="url(#ah-green)" />
+        <line data-edge-id="http-auth" data-from="http-client" data-to="zentao-auth" x1="470" y1="657" x2="470" y2="707" stroke="#059669" stroke-width="1.5" marker-end="url(#ah-green)" />
+        <line data-edge-id="auth-rest" data-from="zentao-auth" data-to="rest-api" x1="470" y1="737" x2="470" y2="793" stroke="#059669" stroke-width="1.5" marker-end="url(#ah-green)" />
+
+        <!-- api surface fan-out -->
+        <circle data-node-id="api-surface-bus" cx="610" cy="573" r="3.5" fill="#0d9488" opacity=".72" />
+        <line data-edge-id="api-to-bus" data-from="zentao-api" data-to="api-surface-bus" x1="490" y1="573" x2="610" y2="573" stroke="#0d9488" stroke-width="1.5" />
+        <polyline data-edge-id="bus-read-surface" data-from="api-surface-bus" data-to="read-surface" points="610,573 610,428 860,428" fill="none" stroke="#0d9488" stroke-width="1.5" marker-end="url(#ah-teal)" />
+        <polyline data-edge-id="bus-derived-surface" data-from="api-surface-bus" data-to="derived-surface" points="610,573 580,573 580,520 620,520" fill="none" stroke="#0d9488" stroke-width="1.5" marker-end="url(#ah-teal)" />
+        <polyline data-edge-id="bus-write-surface" data-from="api-surface-bus" data-to="write-surface" points="610,573 625,573 625,560 990,560 990,520 1000,520" fill="none" stroke="#e11d48" stroke-width="1.5" marker-end="url(#ah-rose)" />
+
+        <!-- registration and guardrails -->
+        <line data-edge-id="register-role-scope" data-from="register-tools" data-to="role-scope" x1="790" y1="358" x2="790" y2="400" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ah)" />
+        <line data-edge-id="scope-read" data-from="role-scope" data-to="read-surface" x1="840" y1="428" x2="860" y2="428" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ah)" />
+        <polyline data-edge-id="scope-derived" data-from="role-scope" data-to="derived-surface" points="730,456 730,468 800,468 800,492" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ah)" />
+        <polyline data-edge-id="scope-write" data-from="role-scope" data-to="write-surface" points="840,442 850,442 850,480 1185,480 1185,492" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ah)" />
+        <line data-edge-id="guard-write" data-from="write-guard" data-to="write-surface" x1="1185" y1="600" x2="1185" y2="548" stroke="#d97706" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#ah-amber)" />
+      </svg>
+
+      <div class="group" style="left:40px; top:128px; width:1360px; height:92px;">
+        <span class="tag teal">BOOTSTRAP</span>
+      </div>
+
+      <div class="box source" data-node-id="cli-entry" style="left:60px; top:150px; width:200px; height:62px;">
+        CLI 入口
+        <div class="sub">zentao / zentao-cli / zentao-dev</div>
+        <div class="tech">npx · pnpm dev · bin/zentao.ts</div>
+      </div>
+      <div class="box" data-node-id="run-server" style="left:290px; top:150px; width:210px; height:62px;">
+        runServer(role)
+        <div class="sub">解析 --role / 默认 full</div>
+      </div>
+      <div class="box" data-node-id="mcp-server" style="left:540px; top:150px; width:220px; height:62px;">
+        McpServer
+        <div class="sub">name: zentao-cli-{role}</div>
+      </div>
+      <div class="box" data-node-id="stdio-transport" style="left:790px; top:150px; width:220px; height:62px;">
+        StdioServerTransport
+        <div class="sub">server.connect(transport)</div>
+      </div>
+      <div class="box source" data-node-id="role-selector" style="left:1040px; top:150px; width:340px; height:62px;">
+        Role selector
+        <div class="sub">full · dev · pm · qa</div>
+        <div class="tech">tool scopes / MCP surface</div>
+      </div>
+
+      <div class="box dashed" data-node-id="register-tools" style="left:620px; top:300px; width:340px; height:58px; overflow:visible;">
+        <div style="position:absolute; top:-11px; left:16px; font-size:9.5px; font-weight:800; padding:3px 11px; border-radius:999px; background:#7c3aed; color:#fff; white-space:nowrap;">MCP registration</div>
+        registerTools(server, role)
+        <div class="sub">按 ToolGroup 组装工具面</div>
+      </div>
+
+      <div class="group" style="left:40px; top:250px; width:520px; height:560px;">
+        <span class="tag amber">CONFIG / AUTH / HTTP</span>
+      </div>
+      <div class="box source" data-node-id="load-config" style="left:60px; top:300px; width:430px; height:54px;">
+        loadConfig()
+        <div class="sub">env 优先，其次 ~/.zentao/config.json</div>
+      </div>
+      <div class="box" data-node-id="normalize-config" style="left:60px; top:382px; width:430px; height:54px;">
+        normalizeConfig()
+        <div class="sub">trim URL / 默认 apiVersion=v1</div>
+      </div>
+      <div class="box" data-node-id="get-api" style="left:60px; top:464px; width:430px; height:54px;">
+        getApi() / api-provider
+        <div class="sub">单例缓存，缺配置直接报错</div>
+      </div>
+      <div class="box" data-node-id="zentao-api" style="left:60px; top:546px; width:430px; height:54px;">
+        ZentaoApi
+        <div class="sub">聚合 task / bug / story / execution / ...</div>
+      </div>
+      <div class="box" data-node-id="http-client" style="left:60px; top:628px; width:430px; height:54px;">
+        ZentaoHttpClient
+        <div class="sub">axios baseURL + Token header + 401 retry</div>
+      </div>
+      <div class="box" data-node-id="zentao-auth" style="left:60px; top:710px; width:430px; height:54px;">
+        ZentaoAuth
+        <div class="sub">明文密码优先，MD5 回退获取 token</div>
+      </div>
+      <div class="box dashed" data-node-id="rest-api" style="left:60px; top:792px; width:430px; height:54px;">
+        ZenTao 18.5 REST v1
+        <div class="sub">/zentao/api.php/v1 · token 失效后自动重试一次</div>
+      </div>
+
+      <div class="group" style="left:590px; top:250px; width:810px; height:590px;">
+        <span class="tag violet">MCP SURFACE / TOOL FAMILIES</span>
+      </div>
+
+      <div class="box source" data-node-id="role-scope" style="left:620px; top:400px; width:220px; height:56px;">
+        Role scopes
+        <div class="sub">full / dev / pm / qa</div>
+        <div class="tech">ToolGroup routing</div>
+      </div>
+      <div class="box" data-node-id="read-surface" style="left:860px; top:400px; width:510px; height:56px;">
+        Read / query surface
+        <div class="sub">task · bug · story · execution · comment · user · product · project · testcase · testtask · program · plan · build · release · search</div>
+      </div>
+      <div class="box" data-node-id="derived-surface" style="left:620px; top:492px; width:360px; height:56px;">
+        Derived services
+        <div class="sub">statistics · relation · developmentContext · search</div>
+      </div>
+      <div class="box" data-node-id="write-surface" style="left:1000px; top:492px; width:370px; height:56px;">
+        Write / preview surface
+        <div class="sub">story-write · task-derived · execution-write · build-write · testcase-write · testtask-write</div>
+      </div>
+      <div class="box dashed" data-node-id="write-guard" style="left:620px; top:600px; width:750px; height:56px; overflow:visible;">
+        <div style="position:absolute; top:-11px; left:16px; font-size:9.5px; font-weight:800; padding:3px 11px; border-radius:999px; background:#d97706; color:#fff; white-space:nowrap;">Write guard</div>
+        ZENTAO_ENABLE_WRITE=true + confirm: true 才能落库；否则返回 preview
+        <div class="sub">默认禁用写操作，Phase 3A / 3B 写工具都走预览保护</div>
+      </div>
+
+      <div class="group" style="left:40px; top:866px; width:1360px; height:162px;">
+        <span class="tag slate">BOUNDARIES / NOTES</span>
+      </div>
+      <div class="box dashed" style="left:60px; top:910px; width:420px; height:76px;">
+        配置优先级
+        <div class="sub">环境变量 > 本地 config.json</div>
+        <div class="tech">ZENTAO_URL / USERNAME / PASSWORD / API_VERSION</div>
+      </div>
+      <div class="box dashed" style="left:510px; top:910px; width:420px; height:76px;">
+        认证策略
+        <div class="sub">Token 缓存 · 401 自动清理并重试一次</div>
+        <div class="tech">明文密码优先，失败后 MD5 回退</div>
+      </div>
+      <div class="box dashed" style="left:960px; top:910px; width:440px; height:76px;">
+        写入边界
+        <div class="sub">preview 默认返回；真实写入需要显式确认</div>
+        <div class="tech">dev / qa / pm / full 按 ToolGroup 控制面开放</div>
+      </div>
+
+      <div class="legend" style="right:40px; bottom:24px;">
+        <div class="legend-item"><div class="legend-line" style="border-top:1.5px solid #94a3b8;"></div>Bootstrap / routing</div>
+        <div class="legend-item"><div class="legend-line" style="border-top:1.5px solid #0d9488;"></div>API call fan-out</div>
+        <div class="legend-item"><div class="legend-line" style="border-top:1.5px solid #059669; border-top-style:dashed;"></div>HTTP / token / state</div>
+        <div class="legend-item"><div class="legend-line" style="border-top:1.5px solid #d97706; border-top-style:dashed;"></div>Write preview / guard</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function resize() {
+      const wrapper = document.querySelector('.wrapper');
+      const canvas = document.querySelector('.canvas');
+      const scale = Math.min(wrapper.clientWidth / 1440, 1);
+      canvas.style.transform = `scale(${scale})`;
+      wrapper.style.height = (1180 * scale) + 'px';
+    }
+    window.addEventListener('resize', resize);
+    resize();
+  </script>
+</body>
+</html>

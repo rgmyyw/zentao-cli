@@ -1,0 +1,44 @@
+{
+  "name": "@cloudglab/zentao-cli",
+  "version": "0.1.0",
+  "description": "ZenTao CLI rebuilt for ZenTao 18.5 REST v1 API",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "zentao": "dist/bin/zentao.js",
+    "zentao-cli": "dist/bin/zentao.js",
+    "zentao-dev": "dist/bin/zentao-dev.js",
+    "zentao-pm": "dist/bin/zentao-pm.js",
+    "zentao-qa": "dist/bin/zentao-qa.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "MCP_ZENTAO_REBUILD_PLAN.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/bin/zentao.ts",
+    "lint": "oxlint src",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "axios": "^1.13.2",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25",
+    "oxlint": "^1.31.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "packageManager": "pnpm@10.24.0"
+}

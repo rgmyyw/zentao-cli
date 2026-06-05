@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.codegraph/
+.codex/
+.cursor/
+.DS_Store
+*.log
+.env
+.slim/deepwork/

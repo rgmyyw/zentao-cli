@@ -1,0 +1,85 @@
+export interface WriteGuardInput {
+  action: string;
+  confirm?: boolean;
+  payload: unknown;
+}
+
+export interface WritePreview {
+  ok: false;
+  preview: true;
+  reason: string;
+  action: string;
+  payload: unknown;
+}
+
+export interface UnsupportedWriteDiagnostic {
+  ok: false;
+  supported: false;
+  error: string;
+  action: string;
+  diagnostic: string;
+  payload: unknown;
+}
+
+const UNSUPPORTED_WRITE_ACTIONS: Record<string, string> = {
+  updateExecution: '禅道 18.5 v1 executionEntry::put() 在启用迭代代号时存在字段拼接缺逗号问题，code 不会进入服务端 $_POST，客户端无法稳定绕过。',
+  updateTestTask: '禅道 18.5 v1 testtaskEntry 只有 get/delete，没有 put 更新入口。',
+  addComment: '禅道 18.5 v1 没有 comment/comments API entry；只能通过对象详情 actions 读取评论，不能用 REST v1 新增评论。',
+};
+
+export function isWriteEnabled(): boolean {
+  return process.env.ZENTAO_ENABLE_WRITE === 'true';
+}
+
+export function getWritePreview(input: WriteGuardInput, reason: string): WritePreview {
+  return {
+    ok: false,
+    preview: true,
+    reason,
+    action: input.action,
+    payload: input.payload,
+  };
+}
+
+export function getUnsupportedWriteDiagnostic(input: WriteGuardInput, diagnostic: string): UnsupportedWriteDiagnostic {
+  return {
+    ok: false,
+    supported: false,
+    error: `写操作 ${input.action} 当前不能真实执行`,
+    action: input.action,
+    diagnostic,
+    payload: input.payload,
+  };
+}
+
+export function assertWriteAllowed(input: WriteGuardInput): void {
+  const unsupportedReason = UNSUPPORTED_WRITE_ACTIONS[input.action];
+  if (unsupportedReason) {
+    throw new Error(`写操作 ${input.action} 当前不支持真实执行：${unsupportedReason}`);
+  }
+
+  if (!isWriteEnabled()) {
+    throw new Error(`写操作已禁用。若要执行 ${input.action}，需要设置 ZENTAO_ENABLE_WRITE=true。`);
+  }
+
+  if (input.confirm !== true) {
+    throw new Error(`写操作缺少确认。若要执行 ${input.action}，需要传入 confirm: true。`);
+  }
+}
+
+export function previewOrAssertWriteAllowed(input: WriteGuardInput): WritePreview | UnsupportedWriteDiagnostic | null {
+  const unsupportedReason = UNSUPPORTED_WRITE_ACTIONS[input.action];
+  if (unsupportedReason) {
+    return getUnsupportedWriteDiagnostic(input, unsupportedReason);
+  }
+
+  if (!isWriteEnabled()) {
+    return getWritePreview(input, `写操作已禁用。若要执行 ${input.action}，需要设置 ZENTAO_ENABLE_WRITE=true。`);
+  }
+
+  if (input.confirm !== true) {
+    return getWritePreview(input, `写操作缺少确认。若要执行 ${input.action}，需要传入 confirm: true。`);
+  }
+
+  return null;
+}
