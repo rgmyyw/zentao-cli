@@ -1,5 +1,6 @@
 import { InMemoryCliRegistry, parseCommandInput } from './core/cli-registry.js';
 import { registerTools } from './core/tool-registry.js';
+import { runInstallCommand, runUpdateCommand } from './install.js';
 import type { Role } from './types/common.js';
 import { CLI_VERSION } from './version.js';
 
@@ -9,9 +10,11 @@ export async function runCli(rawArgs: string[]): Promise<void> {
   const { role, commandName, commandArgs } = parseCliArgs(rawArgs);
   const registry = new InMemoryCliRegistry();
   registerTools(registry, role);
+  const builtinCommandNames = ['help', 'list', 'version', 'install', 'update'];
+  const commandNames = [...builtinCommandNames, ...registry.listCommands().map((item) => item.name)];
 
   if (!commandName || commandName === 'help' || commandName === '--help' || commandName === '-h') {
-    printHelp(role, registry.listCommands().map((item) => item.name));
+    printHelp(role, commandNames);
     return;
   }
 
@@ -21,9 +24,19 @@ export async function runCli(rawArgs: string[]): Promise<void> {
   }
 
   if (commandName === 'list') {
-    for (const item of registry.listCommands()) {
-      process.stdout.write(`${item.name}\n`);
+    for (const item of commandNames) {
+      process.stdout.write(`${item}\n`);
     }
+    return;
+  }
+
+  if (commandName === 'install') {
+    await runInstallCommand();
+    return;
+  }
+
+  if (commandName === 'update' || commandName === 'upgrade') {
+    await runUpdateCommand();
     return;
   }
 
@@ -68,8 +81,13 @@ function printHelp(role: Role, commands: string[]): void {
     '  zentao [--role full|dev|pm|qa] <command> [--key value ...]',
     '  zentao list',
     '  zentao help',
+    '  zentao version',
+    '  zentao update',
+    '  npx -y @cloudglab/zentao-cli@latest install',
     '',
     '示例：',
+    '  zentao install',
+    '  zentao update',
     '  zentao getMyTasks --status all --limit 20',
     '  zentao --role qa getMyBugs --limit 50',
     '  zentao initZentao --url https://host --username xxx --password yyy',

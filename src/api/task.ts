@@ -1,5 +1,5 @@
 import type { ZentaoHttpClient } from '../core/http.js';
-import { toServerListResult } from '../core/list-result.js';
+import { extractItems, toClientPaginatedListResult, toServerListResult } from '../core/list-result.js';
 import { normalizePagination, type PaginationInput } from '../core/pagination.js';
 import type { ZentaoTask } from '../types/zentao.js';
 
@@ -12,15 +12,37 @@ export class TaskApi {
 
   async getMyTasks(input: MyTaskListInput = {}): Promise<unknown> {
     const pagination = normalizePagination(input);
-    const response = await this.http.request<{ tasks?: ZentaoTask[] } | ZentaoTask[]>('GET', '/tasks', {
+
+    // ZenTao's /tasks endpoint ignores status/limit in some deployments, and its
+    // page query behaves like "return the first N tasks". Fetch the user's full
+    // task list, then apply status filtering and pagination on the client.
+    const firstResponse = await this.http.request<{ tasks?: ZentaoTask[] } | ZentaoTask[]>('GET', '/tasks', {
       params: {
         assignedTo: this.http.username,
-        status: input.status ?? 'all',
-        ...pagination,
+        page: 1,
       },
     });
 
-    return toServerListResult(response, ['tasks'], pagination);
+    const firstPage = toServerListResult<ZentaoTask>(firstResponse, ['tasks'], { page: 1, limit: 1 });
+    const total = Math.max(firstPage.total, firstPage.items.length);
+    const response = total > firstPage.items.length
+      ? await this.http.request<{ tasks?: ZentaoTask[] } | ZentaoTask[]>('GET', '/tasks', {
+        params: {
+          assignedTo: this.http.username,
+          page: total,
+        },
+      })
+      : firstResponse;
+
+    const allTasks = extractItems<ZentaoTask>(response, ['tasks']);
+    const filteredTasks = input.status && input.status !== 'all'
+      ? allTasks.filter(task => task.status === input.status)
+      : allTasks;
+
+    return {
+      ...toClientPaginatedListResult({ tasks: filteredTasks }, ['tasks'], pagination),
+      scanned: allTasks.length,
+    };
   }
 
   async getTaskDetail(taskId: number): Promise<ZentaoTask> {

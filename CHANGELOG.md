@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.5 - 2026-06-06
+
+### Added
+
+- 新增 `zentao install` / `zentao update` 内置命令，一键安装或更新 CLI 与 skill，并校验禅道配置。
+- 新增 `getExecutionDynamic`，支持按执行 ID 近似读取执行动态摘要。
+- 新增 `getExecutionDailyBugStats`，输出迭代每日 Bug、任务、参与人员和问题明细统计报告。
+- 新增 `getMyWeeklyActivity`，支持上周、本周、最近 N 天、单日和自定义日期范围的个人阶段性工作清单。
+- 新增 Vitest 测试体系、覆盖率配置和 lefthook pre-commit 检查入口。
+- 新增核心函数、API 封装、工具注册、配置、认证和 HTTP 客户端测试。
+
+### Changed
+
+- `getMyTasks` 改为尽量拉取完整任务列表后在客户端按状态和分页过滤，以适配部分禅道部署忽略查询参数的问题。
+- QA 角色新增任务相关命令入口。
+- npm 发布文件列表加入 `skills` 目录，确保 skill 随包发布。
+- README、skill 和 reference 文档同步到新增安装、动态和统计能力。
+
 ## 0.1.4 - 2026-06-05
 
 ### Changed

@@ -27,6 +27,34 @@ export class ZentaoHttpClient {
     return this.requestWithRetry<T>(method, url, options, false);
   }
 
+  async legacyRequest<T = unknown>(method: string, path: string, options: AxiosRequestConfig = {}): Promise<T> {
+    const token = await this.auth.getToken();
+    const baseURL = `${this.config.url.replace(/\/$/, '')}/zentao`;
+
+    try {
+      const response = await axios.request({
+        ...options,
+        method,
+        baseURL,
+        url: path,
+        timeout: 30_000,
+        headers: {
+          ...options.headers,
+          Token: token,
+        },
+      });
+
+      return sanitizeJsonLikeResponse(response.data) as T;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const data = error.response?.data;
+        const message = typeof data === 'string' ? data.slice(0, 500) : JSON.stringify(data ?? error.message);
+        throw new Error(`旧版页面请求失败: ${error.response?.status ?? 'NO_STATUS'} - ${message}`);
+      }
+      throw error;
+    }
+  }
+
   private async requestWithRetry<T = unknown>(method: string, url: string, options: AxiosRequestConfig, retried: boolean): Promise<T> {
     const token = await this.auth.getToken();
 

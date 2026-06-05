@@ -74,6 +74,18 @@ argument-hint: "[command]"
 
 ## 安装 / 更新
 
+一键安装 CLI + skill，并校验禅道配置：
+
+```bash
+npx -y @cloudglab/zentao-cli@latest install
+```
+
+更新 CLI + skill：
+
+```bash
+zentao update
+```
+
 ```bash
 npm i -g @cloudglab/zentao-cli@latest
 zentao --version
@@ -91,6 +103,7 @@ npx skills add @cloudglab/zentao-cli -g
 ```bash
 command -v zentao
 zentao --version
+zentao version
 ```
 
 ## 启动方式
@@ -98,6 +111,7 @@ zentao --version
 ```bash
 zentao help
 zentao list
+zentao version
 zentao --role qa getMyBugs --limit 50
 ```
 

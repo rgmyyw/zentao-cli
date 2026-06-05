@@ -48,7 +48,7 @@ export class ZentaoApi {
     this.execution = new ExecutionApi(this.http);
     this.comment = new CommentApi(this.http);
     this.user = new UserApi(this.http);
-    this.statistics = new StatisticsApi(this.task, this.bug);
+    this.statistics = new StatisticsApi(this.task, this.bug, this.http);
     this.relation = new RelationApi(this.bug, this.story);
     this.developmentContext = new DevelopmentContextApi(this.bug, this.story, this.relation);
     this.product = new ProductApi(this.http);
