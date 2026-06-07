@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.8 - 2026-06-07
+
+### Fixed
+
+- 同步 `src/version.ts` 的 CLI 运行时版本号，确保 `zentao --version` 输出与 npm 包版本一致。
+
 ## 0.1.7 - 2026-06-07
 
 ### Added
