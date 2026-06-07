@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.7 - 2026-06-07
+
+### Added
+
+- README 和 skill 文档新增“场景命中链路”规则，按用户表达路由到 Bug、任务、需求、项目/执行、排期和父子任务场景。
+- 补充拆任务/排任务默认链路：确认 `executionId` 和排期限制、查询父任务、必要时创建父任务、创建子任务并汇总。
+
 ## 0.1.6 - 2026-06-06
 
 ### Fixed
