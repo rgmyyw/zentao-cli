@@ -267,7 +267,8 @@ async function promptForConfig(defaults?: ZentaoConfig): Promise<ZentaoConfig> {
     const url = await ask(rl, '禅道地址', defaults?.url);
     const username = await ask(rl, '禅道用户名', defaults?.username);
     const password = await askPassword(rl, defaults?.password ? '禅道密码（直接回车保留原密码）' : '禅道密码');
-    const apiVersion = await ask(rl, 'API 版本', defaults?.apiVersion ?? 'v1');
+    const defaultApiVersion = defaults?.apiVersion === 'legacy' ? 'v1' : defaults?.apiVersion ?? 'v1';
+    const apiVersion = await ask(rl, 'API 版本', defaultApiVersion);
     const apiBaseUrl = await ask(rl, 'API 基础地址（可选，直接回车跳过）', defaults?.apiBaseUrl ?? '');
 
     return normalizeConfig({

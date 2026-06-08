@@ -55,6 +55,12 @@ describe('config helpers', () => {
     expect(normalizeConfig({ ...base, url: 'http://zentao.example.com:8080/zentao/api.php/v1?x=1#top' }).url).toBe('http://zentao.example.com:8080');
   });
 
+  it('maps deprecated legacy API version to v1', async () => {
+    const { normalizeConfig } = await loadConfigModule();
+
+    expect(normalizeConfig({ url: 'https://zentao.example.com', username: 'me', password: 'secret', apiVersion: 'legacy' }).apiVersion).toBe('v1');
+  });
+
   it('validates required config fields', async () => {
     const { normalizeConfig } = await loadConfigModule();
 

@@ -27,6 +27,12 @@ function normalizeApiBaseUrl(apiBaseUrl?: string): string | undefined {
   return apiBaseUrl.trim().replace(/\/+$/, '');
 }
 
+function normalizeApiVersion(apiVersion?: string): string {
+  const normalized = apiVersion?.trim();
+  if (!normalized || normalized === 'legacy') return 'v1';
+  return normalized;
+}
+
 export function maskConfig(config: ZentaoConfig): Omit<ZentaoConfig, 'password'> & { password: string } {
   return {
     ...config,
@@ -43,7 +49,7 @@ export function normalizeConfig(config: Partial<ZentaoConfig>): ZentaoConfig {
     url: normalizeServerUrl(config.url),
     username: config.username,
     password: config.password,
-    apiVersion: config.apiVersion || 'v1',
+    apiVersion: normalizeApiVersion(config.apiVersion),
     apiBaseUrl: normalizeApiBaseUrl(config.apiBaseUrl),
   };
 }
@@ -53,7 +59,7 @@ export function loadConfig(): ZentaoConfig | null {
     url: process.env.ZENTAO_URL,
     username: process.env.ZENTAO_USERNAME || process.env.ZENTAO_ACCOUNT,
     password: process.env.ZENTAO_PASSWORD,
-    apiVersion: process.env.ZENTAO_API_VERSION || 'v1',
+    apiVersion: normalizeApiVersion(process.env.ZENTAO_API_VERSION),
     apiBaseUrl: process.env.ZENTAO_API_BASE_URL,
   };
 

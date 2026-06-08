@@ -1,6 +1,6 @@
 {
   "name": "@cloudglab/zentao-cli",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "ZenTao CLI rebuilt for ZenTao 18.5 REST v1 API",
   "repository": {
     "type": "git",
