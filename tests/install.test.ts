@@ -1,6 +1,5 @@
 import { EventEmitter } from 'node:events';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const commandCalls: Array<{ command: string; args: string[] }> = [];
@@ -54,17 +53,57 @@ describe('install command', () => {
     vi.restoreAllMocks();
   });
 
-  it('installs the bundled skill by default', async () => {
-    mockSpawn();
+  it('installs the globally installed package skill by default', async () => {
+    mockSpawn(new Map([['npm root -g', '/usr/local/lib/node_modules\n']]));
     mockInstallDependencies();
     const { runInstallCommand } = await import('../src/install.js');
-    const expectedSkillPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'skills', 'zentao-cli');
+    const expectedSkillPath = path.join('/usr/local/lib/node_modules', '@cloudglab/zentao-cli', 'skills', 'zentao-cli');
 
     await runInstallCommand([]);
 
     expect(commandCalls).toEqual([
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
+      { command: 'npm', args: ['root', '-g'] },
       { command: 'npx', args: ['-y', 'skills', 'add', '-g', expectedSkillPath] },
+    ]);
+  });
+
+  it('updates the CLI and skill from the globally installed package', async () => {
+    mockSpawn(new Map([['npm root -g', '/usr/local/lib/node_modules\n']]));
+    mockInstallDependencies();
+    const { runUpdateCommand } = await import('../src/install.js');
+
+    await runUpdateCommand(['--skip-config-check']);
+
+    expect(commandCalls).toEqual([
+      { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
+      { command: 'npm', args: ['root', '-g'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', '-g', path.join('/usr/local/lib/node_modules', '@cloudglab/zentao-cli', 'skills', 'zentao-cli')] },
+    ]);
+  });
+
+  it('updates only the CLI when requested', async () => {
+    mockSpawn();
+    mockInstallDependencies();
+    const { runUpdateCommand } = await import('../src/install.js');
+
+    await runUpdateCommand(['--cli-only', '--skip-config-check']);
+
+    expect(commandCalls).toEqual([
+      { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
+    ]);
+  });
+
+  it('updates only the skill when requested', async () => {
+    mockSpawn(new Map([['npm root -g', '/usr/local/lib/node_modules\n']]));
+    mockInstallDependencies();
+    const { runUpdateCommand } = await import('../src/install.js');
+
+    await runUpdateCommand(['--skill-only', '--skip-config-check']);
+
+    expect(commandCalls).toEqual([
+      { command: 'npm', args: ['root', '-g'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', '-g', path.join('/usr/local/lib/node_modules', '@cloudglab/zentao-cli', 'skills', 'zentao-cli')] },
     ]);
   });
 

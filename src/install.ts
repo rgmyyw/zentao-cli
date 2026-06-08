@@ -3,7 +3,6 @@ import { access, mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
-import { fileURLToPath } from 'node:url';
 import { ZentaoApi } from './api/index.js';
 import { loadConfig, maskConfig, normalizeConfig, saveConfig } from './core/config.js';
 import type { ZentaoConfig } from './types/common.js';
@@ -16,16 +15,29 @@ type SkillSource = 'local' | 'git' | 'npm';
 interface InstallOptions {
   skillSource: SkillSource;
   skillLocalPath?: string;
+  skipConfigCheck: boolean;
+  cliOnly: boolean;
+  skillOnly: boolean;
 }
 
 export async function runInstallCommand(args: string[] = []): Promise<void> {
-  await installPackageAndSkill('安装', parseInstallOptions(args));
+  const options = parseInstallOptions(args);
+  await installPackageAndSkill('安装', options);
+  if (options.skipConfigCheck) {
+    process.stdout.write('安装完成，已跳过禅道配置校验。\n');
+    return;
+  }
   await ensureValidZentaoConfig();
   process.stdout.write('安装完成，禅道配置校验通过。\n');
 }
 
 export async function runUpdateCommand(args: string[] = []): Promise<void> {
-  await installPackageAndSkill('更新', parseInstallOptions(args));
+  const options = parseInstallOptions(args);
+  await installPackageAndSkill('更新', options);
+  if (options.skipConfigCheck) {
+    process.stdout.write('更新完成，已跳过禅道配置校验。\n');
+    return;
+  }
   await ensureValidZentaoConfig();
   process.stdout.write('更新完成，禅道配置校验通过。\n');
 }
@@ -33,6 +45,9 @@ export async function runUpdateCommand(args: string[] = []): Promise<void> {
 function parseInstallOptions(args: string[]): InstallOptions {
   let skillSource: SkillSource = 'local';
   let skillLocalPath: string | undefined;
+  let skipConfigCheck = false;
+  let cliOnly = false;
+  let skillOnly = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -56,15 +71,38 @@ function parseInstallOptions(args: string[]): InstallOptions {
       continue;
     }
 
+    if (arg === '--skip-config-check') {
+      skipConfigCheck = true;
+      continue;
+    }
+
+    if (arg === '--cli-only') {
+      cliOnly = true;
+      continue;
+    }
+
+    if (arg === '--skill-only') {
+      skillOnly = true;
+      continue;
+    }
+
     throw new Error(`未知安装参数: ${arg}`);
   }
 
-  return { skillSource, skillLocalPath };
+  if (cliOnly && skillOnly) {
+    throw new Error('--cli-only 和 --skill-only 不能同时使用');
+  }
+
+  return { skillSource, skillLocalPath, skipConfigCheck, cliOnly, skillOnly };
 }
 
 async function installPackageAndSkill(action: '安装' | '更新', options: InstallOptions): Promise<void> {
-  await runStep(`${action} zentao CLI`, 'npm', ['install', '-g', `${PACKAGE_NAME}@latest`]);
-  await installSkill(action, options);
+  if (!options.skillOnly) {
+    await runStep(`${action} zentao CLI`, 'npm', ['install', '-g', `${PACKAGE_NAME}@latest`]);
+  }
+  if (!options.cliOnly) {
+    await installSkill(action, options);
+  }
 }
 
 async function installSkill(action: '安装' | '更新', options: InstallOptions): Promise<void> {
@@ -74,7 +112,7 @@ async function installSkill(action: '安装' | '更新', options: InstallOptions
   }
 
   if (options.skillSource === 'local') {
-    await installSkillFromBundledPackage(action);
+    await installSkillFromInstalledPackage(action);
     return;
   }
 
@@ -86,15 +124,23 @@ async function installSkill(action: '安装' | '更新', options: InstallOptions
   await installSkillFromNpmPackage(action);
 }
 
-async function installSkillFromBundledPackage(action: '安装' | '更新'): Promise<void> {
-  const skillPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'skills', 'zentao-cli');
+async function installSkillFromInstalledPackage(action: '安装' | '更新'): Promise<void> {
+  const skillPath = await getInstalledPackageSkillPath();
   try {
     await access(skillPath);
   } catch {
-    throw new Error(`未找到包内 zentao skill：${skillPath}。可重试 --skill-source npm 或 --skill-source git。`);
+    throw new Error(`未找到已安装包内的 zentao skill：${skillPath}。可重试 --skill-source npm 或 --skill-source git。`);
   }
 
   await runStep(`${action} zentao skill`, 'npx', ['-y', 'skills', 'add', '-g', skillPath]);
+}
+
+async function getInstalledPackageSkillPath(): Promise<string> {
+  const globalNodeModules = (await runCommandOutput('npm', ['root', '-g'])).trim();
+  if (!globalNodeModules) {
+    throw new Error('npm root -g 没有返回全局 node_modules 路径');
+  }
+  return path.join(globalNodeModules, PACKAGE_NAME, 'skills', 'zentao-cli');
 }
 
 async function installSkillFromNpmPackage(action: '安装' | '更新'): Promise<void> {

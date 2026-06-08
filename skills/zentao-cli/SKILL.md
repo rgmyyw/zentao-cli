@@ -104,6 +104,10 @@ zentao install --skill-local-path ./package
 
 ```bash
 zentao update
+npx -y @cloudglab/zentao-cli@latest update
+zentao update --skip-config-check
+zentao update --cli-only
+zentao update --skill-only
 ```
 
 ```bash

@@ -37,7 +37,26 @@ zentao install --skill-local-path ./package
 zentao update
 ```
 
-`zentao update` 会重新安装最新 CLI 和 skill，并再次校验禅道配置。
+`zentao update` 会重新安装最新 CLI，然后从全局已安装的最新 CLI 包内安装 skill，并再次校验禅道配置。
+
+只是更新 CLI / skill，不想被配置校验阻塞时：
+
+```bash
+zentao update --skip-config-check
+```
+
+如果本机旧版 `zentao update` 行为异常，可用最新 npm 包自举更新：
+
+```bash
+npx -y @cloudglab/zentao-cli@latest update
+```
+
+只更新其中一部分时：
+
+```bash
+zentao update --cli-only
+zentao update --skill-only
+```
 
 ## 安装 CLI
 
@@ -82,6 +101,7 @@ zentao whoami
 
 ```bash
 zentao update
+npx -y @cloudglab/zentao-cli@latest update
 ```
 
 skill 内推荐优先调用本地 `zentao`；只有在当前环境不方便安装时，才退回 `npx -y @cloudglab/zentao-cli@latest`。

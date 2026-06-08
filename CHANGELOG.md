@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.10 - 2026-06-08
+
+### Added
+
+- `zentao update` 新增 `--skip-config-check`，支持只更新 CLI / skill 时跳过禅道登录校验。
+- `zentao update` 新增 `--cli-only` 和 `--skill-only`，支持分开更新 CLI 或 skill。
+- 文档新增 `npx -y @cloudglab/zentao-cli@latest update` 自举更新方式，避免本机旧版 update 行为异常时无法升级。
+
+### Changed
+
+- 默认 skill 更新链路改为从全局已安装的最新 `@cloudglab/zentao-cli` 包内读取 `skills/zentao-cli`，确保 `zentao update` 安装的是新版本 skill，而不是旧进程所在包内的旧 skill。
+
 ## 0.1.9 - 2026-06-08
 
 ### Added
