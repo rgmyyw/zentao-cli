@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.13 - 2026-06-08
+
+### Added
+
+- 新增项目级 `/release` 命令模板，固定发布顺序：检查状态、更新文档、提升版本、验证、提交、打 tag、推送、手动创建 GitHub Release、检查 Actions 和 npm。
+
+### Changed
+
+- GitHub Actions 发布链路只负责 tag push 后校验、构建和发布 npm；GitHub Release 统一由 `/release` 命令手动创建，避免多个来源同时创建 Release。
+
 ## 0.1.12 - 2026-06-08
 
 ### Added

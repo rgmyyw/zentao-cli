@@ -274,3 +274,9 @@ zentao help
 zentao list
 zentao --role qa list
 ```
+
+## 发布说明
+
+项目内置 `/release` 命令作为唯一 GitHub Release 创建入口。发布时先更新 `CHANGELOG.md` 和 `README.md`，再提升版本、运行 `pnpm check`、提交、创建 annotated tag、推送 main 和 tag，最后手动创建 GitHub Release 并检查 npm 发布结果。
+
+GitHub Actions 只在 `v*` tag push 后校验版本、执行 typecheck/build 并发布 npm，不再自动创建 GitHub Release，避免和 `/release` 重复创建 Release。
