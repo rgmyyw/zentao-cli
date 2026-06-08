@@ -12,6 +12,12 @@ describe('sanitizeJsonLikeResponse', () => {
     expect(sanitizeJsonLikeResponse('debug => [1, 2, 3]')).toEqual([1, 2, 3]);
   });
 
+  it('能剔除禅道旧 PHP 警告 HTML 并解析中间 JSON', () => {
+    const response = '<br />\n<b>Deprecated</b>: Automatically populating $HTTP_RAW_POST_DATA is deprecated<br />\n{"token":"abc","user":{"account":"lixm1"}}<br />\n<b>Fatal error</b>: legacy warning';
+
+    expect(sanitizeJsonLikeResponse(response)).toEqual({ token: 'abc', user: { account: 'lixm1' } });
+  });
+
   it('对不支持的类型和无 JSON 文本抛错', () => {
     expect(() => sanitizeJsonLikeResponse(123)).toThrow('响应格式不支持: number');
     expect(() => sanitizeJsonLikeResponse('plain text only')).toThrow('响应中未找到 JSON');

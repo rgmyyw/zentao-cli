@@ -67,7 +67,11 @@ function parseCliArgs(rawArgs: string[]): { role: Role; commandName?: string; co
     role = args.shift() as Role;
   }
 
-  const commandName = args.shift();
+  let commandName = args.shift();
+  if (commandName === 'who' && args[0] === 'am' && args[1] === 'i') {
+    commandName = 'whoami';
+    args.splice(0, 2);
+  }
   return { role, commandName, commandArgs: args };
 }
 
@@ -91,6 +95,8 @@ function printHelp(role: Role, commands: string[]): void {
     '  zentao install --skill-source npm',
     '  zentao update',
     '  zentao getMyTasks --status all --limit 20',
+    '  zentao whoami',
+    '  zentao who am i',
     '  zentao --role qa getMyBugs --limit 50',
     '  zentao initZentao --url https://host --username xxx --password yyy',
     '  zentao --version',

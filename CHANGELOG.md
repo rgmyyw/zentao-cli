@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.9 - 2026-06-08
+
+### Added
+
+- 新增 `zentao whoami`、`zentao who-am-i` 和 `zentao who am i`，用于查看当前登录用户信息。
+- `zentao install` / `zentao update` 配置校验通过后会明确说明写操作状态：默认支持写，真实写入仍需 `confirm=true`，可用 `ZENTAO_DISABLE_WRITE=true` 禁用。
+
+### Changed
+
+- `zentao install` / `zentao update` 默认从 CLI 包内自带的 `skills/zentao-cli` 安装 skill；保留 `--skill-source git` 和 `--skill-source npm` 作为显式兜底。
+- 禅道地址输入会自动提取协议、域名/IP 和端口，支持从完整页面 URL 中提取根地址。
+- 写操作默认支持真实写入能力，仍保留 `confirm=true` 防误操作；显式禁用改为 `ZENTAO_DISABLE_WRITE=true`。
+- README、skill 和安装参考文档同步安装链路、whoami、URL 处理、默认写状态和已拆分任务调整链路。
+
+### Fixed
+
+- 修复禅道旧 PHP 警告 HTML 混入 JSON 响应时的解析失败问题，可从警告文本中提取完整 JSON。
+
 ## 0.1.8 - 2026-06-07
 
 ### Fixed

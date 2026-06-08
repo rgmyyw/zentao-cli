@@ -14,7 +14,7 @@
 - 未安装时，优先推荐一键安装：`npx -y @cloudglab/zentao-cli@latest install`。
 - 当前环境不方便安装时，才临时使用 `npx -y @cloudglab/zentao-cli@latest`。
 - 查询旧版禅道页面 URL 时，先解析路径里的对象类型和 ID，再调用 CLI 查询结构化数据。
-- 默认只读；写操作必须显式开启 `ZENTAO_ENABLE_WRITE=true` 并传 `confirm=true`。
+- 默认支持写操作；真实写入仍必须传 `confirm=true`。如需禁用写操作，可设置 `ZENTAO_DISABLE_WRITE=true`。
 - 如果遇到 `ECONNRESET` / TLS 断开，可重试一次；连续失败两次先报告网络阻塞。
 
 ## 角色入口
@@ -97,13 +97,9 @@
 
 ## 写操作保护
 
-真实写操作需要同时满足：
+默认支持写操作；真实写入仍必须传 `confirm=true`。
 
-```bash
-export ZENTAO_ENABLE_WRITE=true
-```
-
-并传入 `confirm=true`。
+如需禁用写操作，可设置 `ZENTAO_DISABLE_WRITE=true`。
 
 默认 preview 或直接返回诊断，不应静默写入线上。
 

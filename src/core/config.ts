@@ -7,8 +7,19 @@ const CONFIG_DIR = path.join(homedir(), '.zentao');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 
 function normalizeServerUrl(url: string): string {
-  const trimmed = url.trim().replace(/\/+$/, '');
-  return trimmed.endsWith('/zentao') ? trimmed.slice(0, -'/zentao'.length) : trimmed;
+  const trimmed = url.trim();
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+  try {
+    const parsed = new URL(withProtocol);
+    return `${parsed.protocol}//${parsed.host}`.replace(/\/+$/, '');
+  } catch {
+    const fallback = trimmed.replace(/\/+$/, '');
+    const zentaoIndex = fallback.indexOf('/zentao');
+    if (zentaoIndex >= 0) return fallback.slice(0, zentaoIndex);
+    const pathIndex = fallback.indexOf('/', fallback.indexOf('://') >= 0 ? fallback.indexOf('://') + 3 : 0);
+    return pathIndex >= 0 ? fallback.slice(0, pathIndex) : fallback;
+  }
 }
 
 function normalizeApiBaseUrl(apiBaseUrl?: string): string | undefined {

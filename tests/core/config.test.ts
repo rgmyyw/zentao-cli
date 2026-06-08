@@ -46,6 +46,15 @@ describe('config helpers', () => {
     expect(maskConfig({ ...config, password: '' })).toMatchObject({ password: '' });
   });
 
+  it('extracts the zentao root URL from IP, host and full URL inputs', async () => {
+    const { normalizeConfig } = await loadConfigModule();
+
+    const base = { username: 'me', password: 'secret' };
+    expect(normalizeConfig({ ...base, url: '192.168.1.10:8080/zentao/' }).url).toBe('https://192.168.1.10:8080');
+    expect(normalizeConfig({ ...base, url: 'zentao.example.com:8443/foo/bar' }).url).toBe('https://zentao.example.com:8443');
+    expect(normalizeConfig({ ...base, url: 'http://zentao.example.com:8080/zentao/api.php/v1?x=1#top' }).url).toBe('http://zentao.example.com:8080');
+  });
+
   it('validates required config fields', async () => {
     const { normalizeConfig } = await loadConfigModule();
 

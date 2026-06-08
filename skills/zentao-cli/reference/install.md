@@ -9,13 +9,20 @@ npx -y @cloudglab/zentao-cli@latest install
 它会依次执行：
 
 1. 安装全局 CLI：`npm install -g @cloudglab/zentao-cli@latest`
-2. 安装 skill：`npx -y skills add -g cloudglab/zentao-cli`
+2. 从 CLI 包内自带的 `skills/zentao-cli` 安装 skill
 3. 如果没有禅道配置，或已有配置登录失败，则提示输入配置并校验
+4. 配置校验通过后说明写保护状态：默认支持写操作；真实写入仍需要 `confirm=true`，如需禁用写操作可设置 `ZENTAO_DISABLE_WRITE=true`
 
-默认通过 GitHub 仓库安装 skill。如果当前环境不能访问远程 `.git` 仓库，但可以访问 npm 包，可改用 npm 静态包模式：
+需要强制重新下载 npm 静态包时，可改用 npm 模式：
 
 ```bash
 npx -y @cloudglab/zentao-cli@latest install --skill-source npm
+```
+
+需要从 GitHub 仓库安装 skill 时，可显式指定：
+
+```bash
+npx -y @cloudglab/zentao-cli@latest install --skill-source git
 ```
 
 如果已经提前下载并解压好了 npm 静态包，也可以直接指定本地目录：
@@ -47,7 +54,7 @@ npx -y @cloudglab/zentao-cli@latest --help
 
 ## 安装 Skill
 
-默认 GitHub 仓库方式：
+默认一键安装会使用 CLI 包内自带 skill。手动从 GitHub 仓库安装：
 
 ```bash
 npx -y skills add -g cloudglab/zentao-cli
@@ -68,6 +75,7 @@ command -v zentao
 zentao --version
 zentao version
 zentao help
+zentao whoami
 ```
 
 ## 更新
@@ -84,7 +92,8 @@ skill 内推荐优先调用本地 `zentao`；只有在当前环境不方便安�
 npx -y @cloudglab/zentao-cli@latest
 ```
 
-## 写操作前置条件
+## 写操作说明
 
-- `ZENTAO_ENABLE_WRITE=true`
-- `confirm=true`
+默认支持写操作；真实写入仍需要在命令参数中传 `confirm=true`。
+
+如需禁用写操作，可设置 `ZENTAO_DISABLE_WRITE=true`。

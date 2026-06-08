@@ -80,10 +80,18 @@ argument-hint: "[command]"
 npx -y @cloudglab/zentao-cli@latest install
 ```
 
-不能访问远程 `.git` 仓库但可以访问 npm 时：
+默认会从 CLI 包内自带的 `skills/zentao-cli` 安装 skill，并随配置校验一起说明写保护状态：配置完成后默认支持写操作；真实写入仍需要在命令参数中传 `confirm=true`，如需禁用写操作可设置 `ZENTAO_DISABLE_WRITE=true`。
+
+需要强制重新下载 npm 静态包时：
 
 ```bash
 npx -y @cloudglab/zentao-cli@latest install --skill-source npm
+```
+
+需要从 GitHub 仓库安装 skill 时：
+
+```bash
+npx -y @cloudglab/zentao-cli@latest install --skill-source git
 ```
 
 已经提前下载并解压 npm 静态包时：
@@ -104,7 +112,7 @@ zentao --version
 npx -y @cloudglab/zentao-cli@latest --help
 ```
 
-安装 skill：
+手动从 GitHub 仓库安装 skill：
 
 ```bash
 npx -y skills add -g cloudglab/zentao-cli
@@ -132,6 +140,7 @@ zentao version
 zentao help
 zentao list
 zentao version
+zentao whoami
 zentao --role qa getMyBugs --limit 50
 ```
 
@@ -162,6 +171,7 @@ npx -y @cloudglab/zentao-cli@latest --role qa
 ## 典型能力
 
 - 查任务、Bug、需求、项目、执行、构建
+- 查看当前登录用户信息：`whoami` / `who-am-i` / `who am i`
 - 创建 / 更新任务、构建、测试用例、测试单
 - 从 Bug 派生任务
 - 生成统计和开发上下文
@@ -183,6 +193,7 @@ npx -y @cloudglab/zentao-cli@latest --role qa
 
 - 查任务：查任务、我的任务、某人的任务、任务进度、父子任务 → 确认 `executionId` 或负责人 → 查询任务 → 按父子结构汇总。
 - 拆任务/排任务：拆任务、排任务、按需求建任务、给执行排期 → 确认 `executionId`/请假/周末加班/节假日 → 查询执行任务 → 判断父任务 → 必要时创建父任务 → 创建子任务 → 汇总。
+- 调整已拆分任务：用户已给出迭代 / 父任务 / 子任务，且表达“调整、重排、延期、换人、增删其中几项” → 不再走“拆任务/排任务” → 先查 `executionId` 下现有任务 → 定位父任务和受影响子任务 → 给出调整清单 → 写操作确认后调用 `updateTask` / 必要时 `createTask`。
 - 创建/更新任务：建任务、新增任务、挂到父任务下、改负责人/工时/截止时间、完成/关闭任务 → 补齐字段 → 写操作确认 → 调对应命令 → 汇总。
 
 ### 需求和执行类
@@ -195,15 +206,18 @@ npx -y @cloudglab/zentao-cli@latest --role qa
 
 - 默认跳过周末和节假日；只有用户明确周末/节假日加班时才排。
 - 创建任务前先查父任务，优先复用“技术方案”和“任务实施”父任务。
+- 已拆分任务的调整不是重新拆任务：只有新增独立工作项时才补建任务；改时间、负责人、工时、状态、父子归属时优先更新原任务。
 - 最多只创建父子两层，不创建孙任务。
 
 ## 写保护
 
-默认不写入线上。
-真实写操作需要同时满足：
+默认支持写操作；真实写入仍需要显式确认：
 
-- `ZENTAO_ENABLE_WRITE=true`
 - `confirm=true`
+
+如需禁用写操作，设置：
+
+- `ZENTAO_DISABLE_WRITE=true`
 
 ## 运行时要求
 

@@ -12,15 +12,21 @@
 npx -y @cloudglab/zentao-cli@latest install
 ```
 
-该命令会依次安装全局 CLI、安装 skill，并在禅道配置缺失或登录校验失败时引导输入配置。
+该命令会依次安装全局 CLI、从 CLI 包内自带的 `skills/zentao-cli` 安装 skill，并在禅道配置缺失或登录校验失败时引导输入配置。配置完成后默认支持写操作；真实写入仍需要在命令参数中传 `confirm=true`，如需禁用写操作可设置 `ZENTAO_DISABLE_WRITE=true`。
 
-默认通过 GitHub 仓库安装 skill。如果当前环境不能访问远程 `.git` 仓库，但可以访问 npm 包，可改用 npm 静态包模式：
+如果需要强制重新下载 npm 静态包，可改用 npm 模式：
 
 ```bash
 npx -y @cloudglab/zentao-cli@latest install --skill-source npm
 ```
 
 npm 模式会下载 `@cloudglab/zentao-cli` 包，解压其中的 `skills/` 目录，再通过本地路径安装 skill。
+
+如果需要从 GitHub 仓库安装 skill，可显式指定：
+
+```bash
+npx -y @cloudglab/zentao-cli@latest install --skill-source git
+```
 
 如果已经提前下载并解压好了 npm 静态包，也可以直接指定本地目录：
 
@@ -48,11 +54,12 @@ npm i -g @cloudglab/zentao-cli@latest
 zentao --version
 zentao version
 zentao help
+zentao whoami
 ```
 
 ### Skill 安装
 
-默认 GitHub 仓库方式：
+默认一键安装会使用 CLI 包内自带 skill。手动从 GitHub 仓库安装：
 
 ```bash
 npx -y skills add -g cloudglab/zentao-cli
@@ -101,6 +108,8 @@ export ZENTAO_API_VERSION="v1"
 - 我今天的 Bug 有多少？
 - 我今天的任务有多少？
 - 获取我的所有任务。
+- 我当前登录的是谁？
+- 查看当前禅道登录用户信息。
 - 看我等待中的任务。
 - 看我进行中的任务。
 - 看我已取消的任务。
@@ -177,6 +186,7 @@ Skill / Agent 处理禅道请求时，优先按下面格式路由：
 
 - 查任务：查任务、我的任务、某人的任务、任务进度、父子任务 → 确认 `executionId` 或负责人 → 查询任务 → 按父子结构汇总。
 - 拆任务/排任务：拆任务、排任务、按需求建任务、给执行排期 → 确认 `executionId`/请假/周末加班/节假日 → 查询执行任务 → 判断父任务 → 必要时创建父任务 → 创建子任务 → 汇总。
+- 调整已拆分任务：用户已给出迭代 / 父任务 / 子任务，且表达“调整、重排、延期、换人、增删其中几项” → 不再走“拆任务/排任务” → 先查 `executionId` 下现有任务 → 定位父任务和受影响子任务 → 给出调整清单 → 写操作确认后调用 `updateTask` / 必要时 `createTask`。
 - 创建/更新任务：建任务、新增任务、挂到父任务下、改负责人/工时/截止时间、完成/关闭任务 → 补齐字段 → 写操作确认 → 调对应命令 → 汇总。
 
 ### 需求和执行类
@@ -189,12 +199,15 @@ Skill / Agent 处理禅道请求时，优先按下面格式路由：
 
 - 默认跳过周末和节假日；只有用户明确周末/节假日加班时才排。
 - 创建任务前先查父任务，优先复用“技术方案”和“任务实施”父任务。
+- 已拆分任务的调整不是重新拆任务：只有新增独立工作项时才补建任务；改时间、负责人、工时、状态、父子归属时优先更新原任务。
 - 最多只创建父子两层，不创建孙任务。
 
 ## 常用命令示例
 
 ```bash
 # 我的任务
+zentao whoami
+zentao who am i
 zentao --role qa getMyTasks --status all --limit 100
 zentao --role qa getMyTasks --status wait --limit 50
 
@@ -215,13 +228,13 @@ zentao --role qa getExecutionDailyBugStats --executionId 2067 --iterationName 1.
 
 ## 写操作保护
 
-默认不写入线上。真实写操作需要同时满足：
+默认支持写操作；真实写入仍需要在命令参数里显式传入 `confirm=true`。
+
+如需临时禁用写操作，可设置：
 
 ```bash
-export ZENTAO_ENABLE_WRITE=true
+export ZENTAO_DISABLE_WRITE=true
 ```
-
-并且命令参数里显式传入 `confirm=true`。
 
 ## 更多命令
 

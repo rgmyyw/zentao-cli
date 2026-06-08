@@ -1,8 +1,9 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { access, mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
+import { fileURLToPath } from 'node:url';
 import { ZentaoApi } from './api/index.js';
 import { loadConfig, maskConfig, normalizeConfig, saveConfig } from './core/config.js';
 import type { ZentaoConfig } from './types/common.js';
@@ -10,7 +11,7 @@ import type { ZentaoConfig } from './types/common.js';
 const PACKAGE_NAME = '@cloudglab/zentao-cli';
 const GIT_SKILL_SOURCE = 'cloudglab/zentao-cli';
 
-type SkillSource = 'git' | 'npm';
+type SkillSource = 'local' | 'git' | 'npm';
 
 interface InstallOptions {
   skillSource: SkillSource;
@@ -30,15 +31,15 @@ export async function runUpdateCommand(args: string[] = []): Promise<void> {
 }
 
 function parseInstallOptions(args: string[]): InstallOptions {
-  let skillSource: SkillSource = 'git';
+  let skillSource: SkillSource = 'local';
   let skillLocalPath: string | undefined;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === '--skill-source') {
       const value = args[index + 1];
-      if (value !== 'git' && value !== 'npm') {
-        throw new Error('--skill-source 只支持 git 或 npm');
+      if (value !== 'local' && value !== 'git' && value !== 'npm') {
+        throw new Error('--skill-source 只支持 local、git 或 npm');
       }
       skillSource = value;
       index += 1;
@@ -72,12 +73,28 @@ async function installSkill(action: '安装' | '更新', options: InstallOptions
     return;
   }
 
+  if (options.skillSource === 'local') {
+    await installSkillFromBundledPackage(action);
+    return;
+  }
+
   if (options.skillSource === 'git') {
     await runStep(`${action} zentao skill`, 'npx', ['-y', 'skills', 'add', '-g', GIT_SKILL_SOURCE]);
     return;
   }
 
   await installSkillFromNpmPackage(action);
+}
+
+async function installSkillFromBundledPackage(action: '安装' | '更新'): Promise<void> {
+  const skillPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'skills', 'zentao-cli');
+  try {
+    await access(skillPath);
+  } catch {
+    throw new Error(`未找到包内 zentao skill：${skillPath}。可重试 --skill-source npm 或 --skill-source git。`);
+  }
+
+  await runStep(`${action} zentao skill`, 'npx', ['-y', 'skills', 'add', '-g', skillPath]);
 }
 
 async function installSkillFromNpmPackage(action: '安装' | '更新'): Promise<void> {
@@ -144,6 +161,7 @@ async function ensureValidZentaoConfig(): Promise<void> {
   const existing = tryLoadConfig();
   if (existing && await validateConfig(existing)) {
     process.stdout.write(`\n检测到已有禅道配置，校验通过：${JSON.stringify(maskConfig(existing))}\n`);
+    printWriteGuardNotice();
     return;
   }
 
@@ -157,9 +175,14 @@ async function ensureValidZentaoConfig(): Promise<void> {
   await validateConfigOrThrow(config);
   saveConfig(config);
   process.stdout.write(`已保存禅道配置：${JSON.stringify(maskConfig(config))}\n`);
+  printWriteGuardNotice();
   if (hasZentaoEnvConfig()) {
     process.stdout.write('提示：当前 shell 存在 ZENTAO_* 环境变量，后续命令会优先使用环境变量；如果仍登录失败，请同步更新或清除这些环境变量。\n');
   }
+}
+
+function printWriteGuardNotice(): void {
+  process.stdout.write('写操作默认支持；真实写入仍需在命令参数中传 confirm=true。如需禁用写操作，请设置 ZENTAO_DISABLE_WRITE=true。\n');
 }
 
 function tryLoadConfig(): ZentaoConfig | null {

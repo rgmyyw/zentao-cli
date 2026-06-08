@@ -5,6 +5,8 @@
 ```bash
 zentao help
 zentao list
+zentao whoami
+zentao who am i
 zentao --role qa getMyBugs --limit 50
 ```
 
@@ -17,6 +19,7 @@ zentao --role qa getMyBugs --limit 50
 
 - `zentao <command> --key value`
 - `zentao --role qa <command> --key value`
+- `zentao whoami` / `zentao who-am-i` / `zentao who am i` 查看当前登录用户
 
 ## 场景
 

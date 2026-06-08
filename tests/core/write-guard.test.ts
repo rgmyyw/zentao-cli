@@ -8,10 +8,14 @@ import {
 } from '../../src/core/write-guard.js';
 
 const ORIGINAL_WRITE_ENV = process.env.ZENTAO_ENABLE_WRITE;
+const ORIGINAL_DISABLE_WRITE_ENV = process.env.ZENTAO_DISABLE_WRITE;
 
 function restoreWriteEnv(): void {
   if (ORIGINAL_WRITE_ENV === undefined) delete process.env.ZENTAO_ENABLE_WRITE;
   else process.env.ZENTAO_ENABLE_WRITE = ORIGINAL_WRITE_ENV;
+
+  if (ORIGINAL_DISABLE_WRITE_ENV === undefined) delete process.env.ZENTAO_DISABLE_WRITE;
+  else process.env.ZENTAO_DISABLE_WRITE = ORIGINAL_DISABLE_WRITE_ENV;
 }
 
 afterEach(() => {
@@ -19,15 +23,16 @@ afterEach(() => {
 });
 
 describe('write-guard', () => {
-  it('isWriteEnabled 仅在环境变量为 true 时开启', () => {
+  it('isWriteEnabled 默认开启，仅在显式禁用时关闭', () => {
     delete process.env.ZENTAO_ENABLE_WRITE;
-    expect(isWriteEnabled()).toBe(false);
-
-    process.env.ZENTAO_ENABLE_WRITE = 'false';
-    expect(isWriteEnabled()).toBe(false);
-
-    process.env.ZENTAO_ENABLE_WRITE = 'true';
+    delete process.env.ZENTAO_DISABLE_WRITE;
     expect(isWriteEnabled()).toBe(true);
+
+    process.env.ZENTAO_DISABLE_WRITE = 'false';
+    expect(isWriteEnabled()).toBe(true);
+
+    process.env.ZENTAO_DISABLE_WRITE = 'true';
+    expect(isWriteEnabled()).toBe(false);
   });
 
   it('getWritePreview 返回预览信息', () => {
@@ -51,30 +56,30 @@ describe('write-guard', () => {
     });
   });
 
-  it('assertWriteAllowed 按顺序校验不支持、开关和确认', () => {
-    process.env.ZENTAO_ENABLE_WRITE = 'true';
+  it('assertWriteAllowed 按顺序校验不支持、显式禁用和确认', () => {
+    delete process.env.ZENTAO_DISABLE_WRITE;
     expect(() => assertWriteAllowed({ action: 'updateExecution', confirm: true, payload: {} })).toThrow(
       '写操作 updateExecution 当前不支持真实执行',
     );
 
-    delete process.env.ZENTAO_ENABLE_WRITE;
+    process.env.ZENTAO_DISABLE_WRITE = 'true';
     expect(() => assertWriteAllowed({ action: 'updateTask', confirm: true, payload: {} })).toThrow(
-      '写操作已禁用。若要执行 updateTask，需要设置 ZENTAO_ENABLE_WRITE=true。',
+      '写操作已禁用。若要执行 updateTask，需要移除 ZENTAO_DISABLE_WRITE=true。',
     );
 
-    process.env.ZENTAO_ENABLE_WRITE = 'true';
+    delete process.env.ZENTAO_DISABLE_WRITE;
     expect(() => assertWriteAllowed({ action: 'updateTask', payload: {} })).toThrow(
       '写操作缺少确认。若要执行 updateTask，需要传入 confirm: true。',
     );
   });
 
   it('assertWriteAllowed 在允许时不抛错', () => {
-    process.env.ZENTAO_ENABLE_WRITE = 'true';
+    delete process.env.ZENTAO_DISABLE_WRITE;
     expect(() => assertWriteAllowed({ action: 'updateTask', confirm: true, payload: { id: 3 } })).not.toThrow();
   });
 
   it('previewOrAssertWriteAllowed 返回不支持、预览或 null', () => {
-    delete process.env.ZENTAO_ENABLE_WRITE;
+    delete process.env.ZENTAO_DISABLE_WRITE;
     expect(previewOrAssertWriteAllowed({ action: 'updateExecution', confirm: true, payload: { id: 1 } })).toEqual({
       ok: false,
       supported: false,
@@ -84,15 +89,16 @@ describe('write-guard', () => {
       payload: { id: 1 },
     });
 
+    process.env.ZENTAO_DISABLE_WRITE = 'true';
     expect(previewOrAssertWriteAllowed({ action: 'updateTask', confirm: true, payload: { id: 2 } })).toEqual({
       ok: false,
       preview: true,
-      reason: '写操作已禁用。若要执行 updateTask，需要设置 ZENTAO_ENABLE_WRITE=true。',
+      reason: '写操作已禁用。若要执行 updateTask，需要移除 ZENTAO_DISABLE_WRITE=true。',
       action: 'updateTask',
       payload: { id: 2 },
     });
 
-    process.env.ZENTAO_ENABLE_WRITE = 'true';
+    delete process.env.ZENTAO_DISABLE_WRITE;
     expect(previewOrAssertWriteAllowed({ action: 'updateTask', payload: { id: 3 } })).toEqual({
       ok: false,
       preview: true,

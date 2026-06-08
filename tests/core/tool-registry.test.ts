@@ -10,6 +10,7 @@ function parseResult(result: { content: Array<{ text: string }> }) {
 describe('registerTools', () => {
   beforeEach(() => {
     delete process.env.ZENTAO_ENABLE_WRITE;
+    delete process.env.ZENTAO_DISABLE_WRITE;
   });
 
   it('registers the full role command surface', () => {
@@ -81,6 +82,8 @@ describe('registerTools', () => {
       'updateTask',
       'updateTestCase',
       'updateTestTask',
+      'who-am-i',
+      'whoami',
     ]);
   });
 
@@ -113,7 +116,7 @@ describe('registerTools', () => {
     expect(parseResult(result)).toEqual({ ok: true, input: { status: 'doing', page: 2, limit: 5 } });
   });
 
-  it('returns write previews before calling write handlers', async () => {
+  it('returns confirm previews before calling write handlers', async () => {
     const registry = new InMemoryCliRegistry();
     const updateTask = vi.fn();
     setApi({ task: { updateTask } } as never);
@@ -128,7 +131,27 @@ describe('registerTools', () => {
       ok: false,
       preview: true,
       action: 'updateTask',
-      reason: expect.stringContaining('ZENTAO_ENABLE_WRITE=true'),
+      reason: expect.stringContaining('confirm: true'),
+    });
+  });
+
+  it('returns disabled previews when write is explicitly disabled', async () => {
+    process.env.ZENTAO_DISABLE_WRITE = 'true';
+    const registry = new InMemoryCliRegistry();
+    const updateTask = vi.fn();
+    setApi({ task: { updateTask } } as never);
+
+    registerTools(registry, 'dev');
+    const command = registry.getCommand('updateTask');
+    const input = parseCommandInput(command!.schema, ['--taskId', '9', '--name', 'next', '--confirm']);
+    const result = await command!.handler(input);
+
+    expect(updateTask).not.toHaveBeenCalled();
+    expect(parseResult(result)).toMatchObject({
+      ok: false,
+      preview: true,
+      action: 'updateTask',
+      reason: expect.stringContaining('ZENTAO_DISABLE_WRITE=true'),
     });
   });
 
@@ -193,7 +216,7 @@ describe('registerTools', () => {
       ['getProjectReleases', { projectId: 1 }], ['searchStories', { keyword: 'a', productId: 1 }], ['searchStoriesByProductName', { productName: 'p', keyword: 'a' }],
       ['getMyTaskStatistics', {}], ['getMyBugStatistics', { productId: 1 }], ['getMyWeeklyActivity', { week: 'this' }],
       ['getProductStories', { productId: 1 }], ['getStoryDetail', { storyId: 1 }], ['getMyTasks', { status: 'all' }], ['getTaskDetail', { taskId: 1 }],
-      ['getProductTestCases', { productId: 1 }], ['getTestCaseDetail', { testCaseId: 1 }], ['getTestTasks', { productId: 1 }], ['getTestTaskDetail', { testTaskId: 1 }], ['getMyProfile', {}],
+      ['getProductTestCases', { productId: 1 }], ['getTestCaseDetail', { testCaseId: 1 }], ['getTestTasks', { productId: 1 }], ['getTestTaskDetail', { testTaskId: 1 }], ['getMyProfile', {}], ['whoami', {}], ['who-am-i', {}],
     ];
 
     for (const [name, input] of calls) {
@@ -204,8 +227,7 @@ describe('registerTools', () => {
     expect(api.program.getPrograms).toHaveBeenCalledWith('id_desc');
   });
 
-  it('executes supported write tool handlers when write is enabled and confirmed', async () => {
-    process.env.ZENTAO_ENABLE_WRITE = 'true';
+  it('executes supported write tool handlers by default when confirmed', async () => {
     const registry = new InMemoryCliRegistry();
     const api = {
       bug: { getBugDetail: vi.fn(async () => ({ title: 'b', steps: 's' })), resolveBug: vi.fn(async () => ({ name: 'resolveBug' })) },

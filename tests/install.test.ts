@@ -1,4 +1,6 @@
 import { EventEmitter } from 'node:events';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const commandCalls: Array<{ command: string; args: string[] }> = [];
@@ -27,6 +29,7 @@ function mockSpawn(stdoutByCommand = new Map<string, string>()) {
 
 function mockInstallDependencies() {
   vi.doMock('node:fs/promises', () => ({
+    access: vi.fn(async () => undefined),
     mkdtemp: vi.fn(async () => '/tmp/zentao-cli-skill-abc'),
     rm: vi.fn(async () => undefined),
   }));
@@ -38,7 +41,7 @@ function mockInstallDependencies() {
   }));
   vi.doMock('../src/core/config.js', () => ({
     loadConfig: vi.fn(() => ({ url: 'https://zentao.example.com', username: 'me', password: 'secret', apiVersion: 'v1' })),
-    maskConfig: vi.fn((config: unknown) => config),
+    maskConfig: vi.fn((config: { password?: string }) => ({ ...config, password: config.password ? '******' : config.password })),
     normalizeConfig: vi.fn((config: unknown) => config),
     saveConfig: vi.fn(),
   }));
@@ -51,12 +54,26 @@ describe('install command', () => {
     vi.restoreAllMocks();
   });
 
-  it('installs the skill from the GitHub source by default', async () => {
+  it('installs the bundled skill by default', async () => {
+    mockSpawn();
+    mockInstallDependencies();
+    const { runInstallCommand } = await import('../src/install.js');
+    const expectedSkillPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'skills', 'zentao-cli');
+
+    await runInstallCommand([]);
+
+    expect(commandCalls).toEqual([
+      { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', '-g', expectedSkillPath] },
+    ]);
+  });
+
+  it('installs the skill from the GitHub source explicitly', async () => {
     mockSpawn();
     mockInstallDependencies();
     const { runInstallCommand } = await import('../src/install.js');
 
-    await runInstallCommand([]);
+    await runInstallCommand(['--skill-source', 'git']);
 
     expect(commandCalls).toEqual([
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },

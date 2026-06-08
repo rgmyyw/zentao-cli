@@ -28,7 +28,7 @@ const UNSUPPORTED_WRITE_ACTIONS: Record<string, string> = {
 };
 
 export function isWriteEnabled(): boolean {
-  return process.env.ZENTAO_ENABLE_WRITE === 'true';
+  return process.env.ZENTAO_DISABLE_WRITE !== 'true';
 }
 
 export function getWritePreview(input: WriteGuardInput, reason: string): WritePreview {
@@ -59,7 +59,7 @@ export function assertWriteAllowed(input: WriteGuardInput): void {
   }
 
   if (!isWriteEnabled()) {
-    throw new Error(`写操作已禁用。若要执行 ${input.action}，需要设置 ZENTAO_ENABLE_WRITE=true。`);
+    throw new Error(`写操作已禁用。若要执行 ${input.action}，需要移除 ZENTAO_DISABLE_WRITE=true。`);
   }
 
   if (input.confirm !== true) {
@@ -74,7 +74,7 @@ export function previewOrAssertWriteAllowed(input: WriteGuardInput): WritePrevie
   }
 
   if (!isWriteEnabled()) {
-    return getWritePreview(input, `写操作已禁用。若要执行 ${input.action}，需要设置 ZENTAO_ENABLE_WRITE=true。`);
+    return getWritePreview(input, `写操作已禁用。若要执行 ${input.action}，需要移除 ZENTAO_DISABLE_WRITE=true。`);
   }
 
   if (input.confirm !== true) {

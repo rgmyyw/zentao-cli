@@ -5,19 +5,63 @@ export function sanitizeJsonLikeResponse(data: unknown): unknown {
     throw new Error(`响应格式不支持: ${typeof data}`);
   }
 
-  const objectIndex = data.indexOf('{');
-  const arrayIndex = data.indexOf('[');
+  for (let index = 0; index < data.length; index += 1) {
+    const char = data[index];
+    if (char !== '{' && char !== '[') continue;
 
-  let startIndex = -1;
-  if (objectIndex >= 0 && arrayIndex >= 0) startIndex = Math.min(objectIndex, arrayIndex);
-  else if (objectIndex >= 0) startIndex = objectIndex;
-  else startIndex = arrayIndex;
+    const endIndex = findJsonEnd(data, index);
+    if (endIndex < 0) continue;
 
-  if (startIndex < 0) {
-    throw new Error(`响应中未找到 JSON: ${data.slice(0, 300)}`);
+    try {
+      return JSON.parse(data.slice(index, endIndex + 1)) as unknown;
+    } catch {
+      continue;
+    }
   }
 
-  return JSON.parse(data.slice(startIndex).trim()) as unknown;
+  throw new Error(`响应中未找到 JSON: ${data.slice(0, 300)}`);
+}
+
+function findJsonEnd(text: string, startIndex: number): number {
+  const stack: string[] = [];
+  let inString = false;
+  let escaped = false;
+
+  for (let index = startIndex; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (char === '{') {
+      stack.push('}');
+      continue;
+    }
+
+    if (char === '[') {
+      stack.push(']');
+      continue;
+    }
+
+    if (char !== '}' && char !== ']') continue;
+    if (stack.pop() !== char) return -1;
+    if (stack.length === 0) return index;
+  }
+
+  return -1;
 }
 
 export function asRecord(value: unknown): Record<string, unknown> {
