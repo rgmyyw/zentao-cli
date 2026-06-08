@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.12 - 2026-06-08
+
+### Added
+
+- 新增 Task 状态流转与删除工具：`startTask`、`pauseTask`、`restartTask`、`closeTask`、`activateTask`、`assignTask`、`deleteTask`。
+- 新增 Bug 写操作工具：`createBug`、`updateBug`、`assignBug`、`confirmBug`、`closeBug`、`activateBug`、`deleteBug`。
+- 新增 Story 写操作工具：`createStory`、`closeStory`、`assignStory`、`activateStory`、`reviewStory`。
+- 新增 Todo 完整能力：`getMyTodos`、`getTodoDetail`、`createTodo`、`updateTodo`、`deleteTodo`、`finishTodo`、`activateTodo`。
+
+### Changed
+
+- `addComment` 改为通过旧版 `action-comment-{type}-{id}.json` 控制器写入备注，适配禅道 18.5 REST v1 无独立 comment entry 的限制。
+- `updateExecution` 和 `updateTestTask` 改为通过旧版编辑控制器提交表单，绕过禅道 18.5 REST v1 对应入口缺失或字段拼接问题。
+- `updateTask` 补充 `type`、`desc`、`estStarted`、`module`、`story`、`status`、`closedReason`、`mailto` 等字段，并移除 REST PUT 不支持的 `comment` 字段。
+
+## 0.1.11 - 2026-06-08
+
+### Fixed
+
+- 修复旧配置中 `apiVersion: legacy` 会在安装校验时继续沿用旧接口的问题；旧值和空值现在统一归一化为 `v1`。
+
 ## 0.1.10 - 2026-06-08
 
 ### Added

@@ -21,11 +21,31 @@ export class StoryApi {
     return this.http.request<ZentaoStory>('GET', `/stories/${storyId}`);
   }
 
+  async createStory(data: Record<string, unknown> & { product: number }): Promise<unknown> {
+    return this.http.request('POST', `/products/${data.product}/stories`, { data });
+  }
+
   async updateStory(storyId: number, update: Record<string, unknown>): Promise<unknown> {
     return this.http.request('PUT', `/stories/${storyId}`, { data: update });
   }
 
   async changeStory(storyId: number, update: Record<string, unknown>): Promise<unknown> {
     return this.http.request('POST', `/stories/${storyId}/change`, { data: update });
+  }
+
+  async closeStory(storyId: number, data: Record<string, unknown> = {}): Promise<unknown> {
+    return this.http.request('POST', `/stories/${storyId}/close`, { data });
+  }
+
+  async assignStory(storyId: number, data: Record<string, unknown>): Promise<unknown> {
+    return this.http.request('POST', `/stories/${storyId}/assignto`, { data });
+  }
+
+  async activateStory(storyId: number, data: Record<string, unknown> = {}): Promise<unknown> {
+    return this.http.request('POST', `/stories/${storyId}/activate`, { data });
+  }
+
+  async reviewStory(storyId: number, data: Record<string, unknown> = {}): Promise<unknown> {
+    return this.http.request('POST', `/stories/${storyId}/review`, { data });
   }
 }

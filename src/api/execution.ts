@@ -2,6 +2,7 @@ import type { ZentaoHttpClient } from '../core/http.js';
 import { toServerListResult } from '../core/list-result.js';
 import { normalizePagination } from '../core/pagination.js';
 import type { ZentaoBug, ZentaoExecution, ZentaoListResponse, ZentaoTask } from '../types/zentao.js';
+import { toFormUrlEncoded } from '../utils/form.js';
 
 export interface UpdateExecutionInput {
   project?: number;
@@ -134,7 +135,16 @@ export class ExecutionApi {
   }
 
   async updateExecution(executionId: number, update: UpdateExecutionInput): Promise<unknown> {
-    return this.http.request('PUT', `/executions/${executionId}`, { data: update });
+    /**
+     * 禅道 18.5 v1 executionEntry::put() 在启用迭代代号时 code 字段拼接缺逗号。
+     * 旧版 execution::edit() 控制器直接调用模型 update()，绕过该 bug。
+     * 通过 $this->send() 返回 JSON，走 .json 扩展。
+     */
+    const formData = toFormUrlEncoded(update as Record<string, unknown>);
+    return this.http.legacyRequest('POST', `/execution-edit-${executionId}.json`, {
+      data: formData.toString(),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
   }
 
   async startExecution(executionId: number, payload: ExecutionActionInput = {}): Promise<unknown> {

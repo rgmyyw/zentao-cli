@@ -21,11 +21,7 @@ export interface UnsupportedWriteDiagnostic {
   payload: unknown;
 }
 
-const UNSUPPORTED_WRITE_ACTIONS: Record<string, string> = {
-  updateExecution: '禅道 18.5 v1 executionEntry::put() 在启用迭代代号时存在字段拼接缺逗号问题，code 不会进入服务端 $_POST，客户端无法稳定绕过。',
-  updateTestTask: '禅道 18.5 v1 testtaskEntry 只有 get/delete，没有 put 更新入口。',
-  addComment: '禅道 18.5 v1 没有 comment/comments API entry；只能通过对象详情 actions 读取评论，不能用 REST v1 新增评论。',
-};
+const UNSUPPORTED_WRITE_ACTIONS: Record<string, string> = {};
 
 export function isWriteEnabled(): boolean {
   return process.env.ZENTAO_DISABLE_WRITE !== 'true';

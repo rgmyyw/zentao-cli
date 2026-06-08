@@ -1,6 +1,7 @@
 import type { ZentaoHttpClient } from '../core/http.js';
 import { toServerListResult } from '../core/list-result.js';
 import { normalizePagination, type PaginationInput } from '../core/pagination.js';
+import { toFormUrlEncoded } from '../utils/form.js';
 
 export interface TestTaskListInput extends PaginationInput {
   productId: number;
@@ -64,8 +65,14 @@ export class TestTaskApi {
   }
 
   async updateTestTask(testTaskId: number, update: UpdateTestTaskInput): Promise<unknown> {
-    return this.http.request('PUT', `/testtasks/${testTaskId}`, {
-      data: update,
+    /**
+     * 禅道 18.5 v1 testtaskEntry 只有 get/delete，没有 put 更新入口。
+     * 旧版 testtask::edit() 控制器通过 $this->send() 返回 JSON，走 .json 扩展。
+     */
+    const formData = toFormUrlEncoded(update as Record<string, unknown>);
+    return this.http.legacyRequest('POST', `/testtask-edit-${testTaskId}.json`, {
+      data: formData.toString(),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   }
 }

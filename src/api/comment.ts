@@ -29,7 +29,32 @@ export class CommentApi {
   }
 
   async addComment(input: AddCommentInput): Promise<unknown> {
-    return this.http.request('POST', '/comment', { data: input });
+    /**
+     * 禅道 18.5 v1 没有 REST comment entry。
+     * 旧版 action::comment() 控制器仅当 RUN_MODE == 'api' 时返回 JSON，
+     * 而 RUN_MODE 只在 api.php 入口被定义。
+     *
+     * 通过旧版 URL (action-comment-{type}-{id}.json) 触发控制器。
+     * 非 API 模式返回 HTML：js::reload('parent') = 成功，其他 = 失败。
+     * 备注实际已写入数据库，这里通过检查 HTML 模式判断成功与否。
+     */
+    const url = `/action-comment-${input.objectType}-${input.objectID}.json`;
+    const formData = new URLSearchParams();
+    formData.append('comment', input.comment);
+
+    try {
+      return await this.http.legacyRequest('POST', url, {
+        data: formData.toString(),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      const isSuccess = message.includes('parent.location.reload');
+      if (isSuccess) {
+        return { status: 'success', message: '已添加备注' };
+      }
+      throw error;
+    }
   }
 
   private async getActionsFromObjectDetail(objectType: CommentObjectType, objectID: number): Promise<CommentsFallbackResult> {

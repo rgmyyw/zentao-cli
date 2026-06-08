@@ -90,9 +90,10 @@
 
 - `getExecutionDynamic` 是近似读取：调用 `GET /executions/{id}?fields=dynamics`，不是旧版 `execution-dynamic` 页面完整等价实现。
 - `getComments` 在禅道 18.5 上会 fallback 到对象详情里的 `actions`，返回结果会标注 `source: "actions-fallback"`。
-- `addComment`：禅道 18.5 v1 没有 `comment/comments` entry，工具保留但会返回诊断错误。
-- `updateExecution`：禅道 18.5 且后台启用代号时，服务端 `api/v1/entries/execution.php` 中 `$fields .= 'code'` 缺少前置逗号，可能误报 `『迭代代号』不能为空。`。
-- `updateTestTask`：禅道 18.5 v1 `api/v1/entries/testtask.php` 没有 `put` 更新入口，工具保留但会返回诊断错误。
+- `addComment`：禅道 18.5 v1 没有 `/comment` REST entry，已改为走旧版 `action-comment-{type}-{id}.json` 控制器。非 API 模式返回 HTML（js::reload），客户端通过响应模式判定成功。
+- `updateTask` 和 `updateStory`：禅道 18.5 Task PUT / Story PUT 的 `batchSetPost` 字段列表不包含 `comment`，无法直接通过 PUT 写备注，备注请通过 `finishTask` / `resolveBug` / `changeStory` 等状态变更操作附带。
+- `updateExecution`：禅道 18.5 REST PUT 在启用迭代代号时 `code` 字段拼接缺逗号，已改为走旧版 `execution-edit-{id}.json` 控制器。
+- `updateTestTask`：禅道 18.5 v1 没有 testtask PUT 入口，已改为走旧版 `testtask-edit-{id}.json` 控制器。
 - `createTaskFromBug` 只保证基于 Bug 预填任务内容并尝试创建任务，不保证创建后自动建立 Bug 关联。
 
 ## 写操作保护

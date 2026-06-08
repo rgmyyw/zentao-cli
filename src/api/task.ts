@@ -55,6 +55,34 @@ export class TaskApi {
     });
   }
 
+  async startTask(taskId: number, data: Record<string, unknown> = {}): Promise<unknown> {
+    return this.http.request('POST', `/tasks/${taskId}/start`, { data });
+  }
+
+  async pauseTask(taskId: number, data: Record<string, unknown> = {}): Promise<unknown> {
+    return this.http.request('POST', `/tasks/${taskId}/pause`, { data });
+  }
+
+  async restartTask(taskId: number, data: Record<string, unknown> = {}): Promise<unknown> {
+    return this.http.request('POST', `/tasks/${taskId}/restart`, { data });
+  }
+
+  async closeTask(taskId: number, data: Record<string, unknown> = {}): Promise<unknown> {
+    return this.http.request('POST', `/tasks/${taskId}/close`, { data });
+  }
+
+  async activateTask(taskId: number, data: Record<string, unknown> = {}): Promise<unknown> {
+    return this.http.request('POST', `/tasks/${taskId}/activate`, { data });
+  }
+
+  async assignTask(taskId: number, data: Record<string, unknown>): Promise<unknown> {
+    return this.http.request('POST', `/tasks/${taskId}/assignto`, { data });
+  }
+
+  async deleteTask(taskId: number): Promise<unknown> {
+    return this.http.request('DELETE', `/tasks/${taskId}`);
+  }
+
   async finishTask(taskId: number, update: Record<string, unknown> = {}): Promise<unknown> {
     return this.http.request('POST', `/tasks/${taskId}/finish`, {
       data: update,

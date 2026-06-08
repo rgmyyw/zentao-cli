@@ -22,10 +22,12 @@ import { registerTaskTools } from '../tools/task.js';
 import { registerTestCaseTools } from '../tools/testcase.js';
 import { registerTestTaskTools } from '../tools/testtask.js';
 import { registerSearchTools } from '../tools/search.js';
+import { registerTodoTools } from '../tools/todo.js';
 
 export function registerTools(server: CliRegistry, role: Role): void {
   if (hasToolGroup(role, 'init')) registerInitTools(server);
   if (hasToolGroup(role, 'task')) registerTaskTools(server);
+  if (hasToolGroup(role, 'todo')) registerTodoTools(server);
   if (hasToolGroup(role, 'bug')) registerBugTools(server);
   if (hasToolGroup(role, 'story')) registerStoryTools(server);
   if (hasToolGroup(role, 'execution')) registerExecutionTools(server);

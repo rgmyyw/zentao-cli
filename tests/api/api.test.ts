@@ -16,6 +16,7 @@ import { StoryApi } from '../../src/api/story.js';
 import { TaskApi } from '../../src/api/task.js';
 import { TestCaseApi } from '../../src/api/testcase.js';
 import { TestTaskApi } from '../../src/api/testtask.js';
+import { TodoApi } from '../../src/api/todo.js';
 import { UserApi } from '../../src/api/user.js';
 
 function createHttp(responses: unknown[] = []) {
@@ -156,18 +157,28 @@ describe('BugApi', () => {
 });
 
 describe('StoryApi, TestCaseApi and TestTaskApi', () => {
-  it('StoryApi calls list/detail/update/change endpoints', async () => {
-    const http = createHttp([{ stories: [{ id: 1 }], total: 1 }, { id: 1 }, {}, {}]);
+  it('StoryApi calls list/detail/write endpoints', async () => {
+    const http = createHttp([{ stories: [{ id: 1 }], total: 1 }, { id: 1 }, {}, {}, {}, {}, {}, {}]);
     const api = new StoryApi(http as never);
     await api.getProductStories({ productId: 2, page: 1, limit: 3 });
     await api.getStoryDetail(1);
+    await api.createStory({ product: 2, title: 'new' });
     await api.updateStory(1, { title: 'a' });
     await api.changeStory(1, { title: 'b' });
+    await api.closeStory(1, { comment: 'c' });
+    await api.assignStory(1, { assignedTo: 'me' });
+    await api.activateStory(1, { comment: 'a' });
+    await api.reviewStory(1, { result: 'pass' });
 
     expect(http.request).toHaveBeenNthCalledWith(1, 'GET', '/products/2/stories', { params: { page: 1, limit: 3 } });
     expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/stories/1');
-    expect(http.request).toHaveBeenNthCalledWith(3, 'PUT', '/stories/1', { data: { title: 'a' } });
-    expect(http.request).toHaveBeenNthCalledWith(4, 'POST', '/stories/1/change', { data: { title: 'b' } });
+    expect(http.request).toHaveBeenNthCalledWith(3, 'POST', '/products/2/stories', { data: { product: 2, title: 'new' } });
+    expect(http.request).toHaveBeenNthCalledWith(4, 'PUT', '/stories/1', { data: { title: 'a' } });
+    expect(http.request).toHaveBeenNthCalledWith(5, 'POST', '/stories/1/change', { data: { title: 'b' } });
+    expect(http.request).toHaveBeenNthCalledWith(6, 'POST', '/stories/1/close', { data: { comment: 'c' } });
+    expect(http.request).toHaveBeenNthCalledWith(7, 'POST', '/stories/1/assignto', { data: { assignedTo: 'me' } });
+    expect(http.request).toHaveBeenNthCalledWith(8, 'POST', '/stories/1/activate', { data: { comment: 'a' } });
+    expect(http.request).toHaveBeenNthCalledWith(9, 'POST', '/stories/1/review', { data: { result: 'pass' } });
   });
 
   it('TestCaseApi client-paginates cases and writes cases', async () => {
@@ -195,7 +206,33 @@ describe('StoryApi, TestCaseApi and TestTaskApi', () => {
     expect(http.request).toHaveBeenNthCalledWith(1, 'GET', '/testtasks', { params: { page: 1, limit: 10, product: 4 } });
     expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/testtasks/5');
     expect(http.request).toHaveBeenNthCalledWith(3, 'POST', '/projects/1/testtasks', { data: { product: 4, name: 'tt', build: 2, begin: '2026-01-01', end: '2026-01-02' } });
-    expect(http.request).toHaveBeenNthCalledWith(4, 'PUT', '/testtasks/5', { data: { name: 'next' } });
+    expect(http.legacyRequest).toHaveBeenLastCalledWith('POST', '/testtask-edit-5.json', {
+      data: 'name=next',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+});
+
+describe('TodoApi', () => {
+  it('calls todo read and write endpoints', async () => {
+    const http = createHttp([{ todos: [{ id: 1 }] }, { id: 1 }, {}, {}, {}, {}, {}]);
+    const api = new TodoApi(http as never);
+
+    await api.getTodos();
+    await api.getTodoDetail(1);
+    await api.createTodo({ name: 'a' });
+    await api.updateTodo(1, { name: 'b' });
+    await api.deleteTodo(1);
+    await api.finishTodo(1);
+    await api.activateTodo(1);
+
+    expect(http.request).toHaveBeenNthCalledWith(1, 'GET', '/todos');
+    expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/todos/1');
+    expect(http.request).toHaveBeenNthCalledWith(3, 'POST', '/todos', { data: { name: 'a' } });
+    expect(http.request).toHaveBeenNthCalledWith(4, 'PUT', '/todos/1', { data: { name: 'b' } });
+    expect(http.request).toHaveBeenNthCalledWith(5, 'DELETE', '/todos/1');
+    expect(http.request).toHaveBeenNthCalledWith(6, 'GET', '/todos/1/finish');
+    expect(http.request).toHaveBeenNthCalledWith(7, 'GET', '/todos/1/activate');
   });
 });
 
@@ -219,7 +256,10 @@ describe('CommentApi', () => {
 
     const api = new CommentApi(http as never);
     await api.addComment({ objectType: 'bug', objectID: 1, comment: 'hi' });
-    expect(http.request).toHaveBeenLastCalledWith('POST', '/comment', { data: { objectType: 'bug', objectID: 1, comment: 'hi' } });
+    expect(http.legacyRequest).toHaveBeenLastCalledWith('POST', '/action-comment-bug-1.json', {
+      data: 'comment=hi',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
   });
 });
 
@@ -304,7 +344,11 @@ describe('ExecutionApi', () => {
 
     expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/executions/1', { params: { fields: 'dynamics' } });
     expect(http.request).toHaveBeenNthCalledWith(5, 'GET', '/executions/1/bugs', { params: { page: 1, limit: 2, status: 'active' } });
-    expect(http.request).toHaveBeenNthCalledWith(11, 'POST', '/executions/1/putoff', { data: { days: 2 } });
+    expect(http.request).toHaveBeenNthCalledWith(10, 'POST', '/executions/1/putoff', { data: { days: 2 } });
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/execution-edit-1.json', {
+      data: 'name=n',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
   });
 
   it('builds daily bug stats from paged bugs and tasks', async () => {

@@ -4,6 +4,12 @@ import { getApi } from '../core/api-provider.js';
 import { previewOrAssertWriteAllowed } from '../core/write-guard.js';
 import { jsonResult } from './shared.js';
 
+const runActioned = async (action: string, confirm: boolean, params: Record<string, unknown>, fn: () => Promise<unknown>) => {
+  const preview = previewOrAssertWriteAllowed({ action, confirm, payload: params });
+  if (preview) return jsonResult(preview);
+  return jsonResult(await fn());
+};
+
 export function registerBugTools(server: CliRegistry): void {
   server.tool(
     'getMyBugs',
@@ -51,10 +57,108 @@ export function registerBugTools(server: CliRegistry): void {
       confirm: z.boolean().optional().default(false),
     },
     async ({ bugId, confirm, ...resolution }) => {
-      const payload = { bugId, resolution };
-      const preview = previewOrAssertWriteAllowed({ action: 'resolveBug', confirm, payload });
-      if (preview) return jsonResult(preview);
-      return jsonResult(await getApi().bug.resolveBug(bugId, resolution));
+      return runActioned('resolveBug', confirm, { bugId, resolution }, () => getApi().bug.resolveBug(bugId, resolution));
     },
+  );
+
+  server.tool(
+    'createBug',
+    {
+      product: z.number().int().positive(),
+      title: z.string(),
+      project: z.number().int().positive().optional(),
+      execution: z.number().int().positive().optional(),
+      openedBuild: z.string().optional(),
+      assignedTo: z.string().optional(),
+      pri: z.number().optional(),
+      severity: z.number().optional(),
+      type: z.string().optional(),
+      module: z.number().int().positive().optional(),
+      story: z.number().int().positive().optional(),
+      task: z.number().int().positive().optional(),
+      steps: z.string().optional(),
+      keywords: z.string().optional(),
+      mailto: z.string().optional(),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ confirm, ...data }) => runActioned('createBug', confirm, data, () => getApi().bug.createBug(data)),
+  );
+
+  server.tool(
+    'updateBug',
+    {
+      bugId: z.number().int().positive(),
+      title: z.string().optional(),
+      assignedTo: z.string().optional(),
+      pri: z.number().optional(),
+      severity: z.number().optional(),
+      type: z.string().optional(),
+      status: z.string().optional(),
+      resolution: z.string().optional(),
+      resolvedBuild: z.string().optional(),
+      module: z.number().int().positive().optional(),
+      story: z.number().int().positive().optional(),
+      task: z.number().int().positive().optional(),
+      steps: z.string().optional(),
+      keywords: z.string().optional(),
+      mailto: z.string().optional(),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ bugId, confirm, ...update }) => runActioned('updateBug', confirm, { bugId, update }, () => getApi().bug.updateBug(bugId, update)),
+  );
+
+  server.tool(
+    'assignBug',
+    {
+      bugId: z.number().int().positive(),
+      assignedTo: z.string(),
+      comment: z.string().optional(),
+      mailto: z.string().optional(),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ bugId, confirm, ...data }) => runActioned('assignBug', confirm, { bugId, data }, () => getApi().bug.assignBug(bugId, data)),
+  );
+
+  server.tool(
+    'confirmBug',
+    {
+      bugId: z.number().int().positive(),
+      assignedTo: z.string().optional(),
+      pri: z.number().optional(),
+      type: z.string().optional(),
+      comment: z.string().optional(),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ bugId, confirm, ...data }) => runActioned('confirmBug', confirm, { bugId, data }, () => getApi().bug.confirmBug(bugId, data)),
+  );
+
+  server.tool(
+    'closeBug',
+    {
+      bugId: z.number().int().positive(),
+      comment: z.string().optional(),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ bugId, confirm, ...data }) => runActioned('closeBug', confirm, { bugId, data }, () => getApi().bug.closeBug(bugId, data)),
+  );
+
+  server.tool(
+    'activateBug',
+    {
+      bugId: z.number().int().positive(),
+      assignedTo: z.string().optional(),
+      comment: z.string().optional(),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ bugId, confirm, ...data }) => runActioned('activateBug', confirm, { bugId, data }, () => getApi().bug.activateBug(bugId, data)),
+  );
+
+  server.tool(
+    'deleteBug',
+    {
+      bugId: z.number().int().positive(),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ bugId, confirm }) => runActioned('deleteBug', confirm, { bugId }, () => getApi().bug.deleteBug(bugId)),
   );
 }

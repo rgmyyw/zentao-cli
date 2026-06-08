@@ -56,11 +56,8 @@ describe('write-guard', () => {
     });
   });
 
-  it('assertWriteAllowed 按顺序校验不支持、显式禁用和确认', () => {
+  it('assertWriteAllowed 按顺序校验显式禁用和确认', () => {
     delete process.env.ZENTAO_DISABLE_WRITE;
-    expect(() => assertWriteAllowed({ action: 'updateExecution', confirm: true, payload: {} })).toThrow(
-      '写操作 updateExecution 当前不支持真实执行',
-    );
 
     process.env.ZENTAO_DISABLE_WRITE = 'true';
     expect(() => assertWriteAllowed({ action: 'updateTask', confirm: true, payload: {} })).toThrow(
@@ -78,16 +75,8 @@ describe('write-guard', () => {
     expect(() => assertWriteAllowed({ action: 'updateTask', confirm: true, payload: { id: 3 } })).not.toThrow();
   });
 
-  it('previewOrAssertWriteAllowed 返回不支持、预览或 null', () => {
+  it('previewOrAssertWriteAllowed 返回预览或 null', () => {
     delete process.env.ZENTAO_DISABLE_WRITE;
-    expect(previewOrAssertWriteAllowed({ action: 'updateExecution', confirm: true, payload: { id: 1 } })).toEqual({
-      ok: false,
-      supported: false,
-      error: '写操作 updateExecution 当前不能真实执行',
-      action: 'updateExecution',
-      diagnostic: expect.stringContaining('字段拼接缺逗号问题'),
-      payload: { id: 1 },
-    });
 
     process.env.ZENTAO_DISABLE_WRITE = 'true';
     expect(previewOrAssertWriteAllowed({ action: 'updateTask', confirm: true, payload: { id: 2 } })).toEqual({

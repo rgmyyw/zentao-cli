@@ -15,6 +15,7 @@ import { StoryApi } from './story.js';
 import { TaskApi } from './task.js';
 import { TestCaseApi } from './testcase.js';
 import { TestTaskApi } from './testtask.js';
+import { TodoApi } from './todo.js';
 import { UserApi } from './user.js';
 import { ZentaoHttpClient } from '../core/http.js';
 import type { ZentaoConfig } from '../types/common.js';
@@ -22,6 +23,7 @@ import type { ZentaoConfig } from '../types/common.js';
 export class ZentaoApi {
   readonly http: ZentaoHttpClient;
   readonly task: TaskApi;
+  readonly todo: TodoApi;
   readonly bug: BugApi;
   readonly story: StoryApi;
   readonly execution: ExecutionApi;
@@ -43,6 +45,7 @@ export class ZentaoApi {
   constructor(config: ZentaoConfig) {
     this.http = new ZentaoHttpClient(config);
     this.task = new TaskApi(this.http);
+    this.todo = new TodoApi(this.http);
     this.bug = new BugApi(this.http);
     this.story = new StoryApi(this.http);
     this.execution = new ExecutionApi(this.http);

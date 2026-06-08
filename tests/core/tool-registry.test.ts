@@ -19,16 +19,34 @@ describe('registerTools', () => {
     registerTools(registry, 'full');
 
     expect(registry.listCommands().map((command) => command.name)).toEqual([
+      'activateBug',
       'activateExecution',
+      'activateStory',
+      'activateTask',
+      'activateTodo',
       'addComment',
+      'assignBug',
+      'assignStory',
+      'assignTask',
       'changeStory',
+      'closeBug',
       'closeExecution',
+      'closeStory',
+      'closeTask',
+      'confirmBug',
+      'createBug',
       'createBuild',
+      'createStory',
       'createTaskFromBug',
       'createTaskFromStory',
       'createTestCase',
       'createTestTask',
+      'createTodo',
+      'deleteBug',
+      'deleteTask',
+      'deleteTodo',
       'finishTask',
+      'finishTodo',
       'getBugDetail',
       'getBugRelatedStory',
       'getBuildDetail',
@@ -44,6 +62,7 @@ describe('registerTools', () => {
       'getMyProfile',
       'getMyTasks',
       'getMyTaskStatistics',
+      'getMyTodos',
       'getMyWeeklyActivity',
       'getPlanDetail',
       'getProductBugs',
@@ -65,23 +84,30 @@ describe('registerTools', () => {
       'getTestCaseDetail',
       'getTestTaskDetail',
       'getTestTasks',
+      'getTodoDetail',
       'initZentao',
       'linkBugsToPlan',
       'linkStoriesToPlan',
+      'pauseTask',
       'putoffExecution',
       'resolveBug',
+      'restartTask',
+      'reviewStory',
       'searchStories',
       'searchStoriesByProductName',
       'startExecution',
+      'startTask',
       'suspendExecution',
       'unlinkBugsFromPlan',
       'unlinkStoriesFromPlan',
+      'updateBug',
       'updateBuild',
       'updateExecution',
       'updateStory',
       'updateTask',
       'updateTestCase',
       'updateTestTask',
+      'updateTodo',
       'who-am-i',
       'whoami',
     ]);
@@ -155,22 +181,18 @@ describe('registerTools', () => {
     });
   });
 
-  it('returns diagnostics for unsupported write tools', async () => {
+  it('allow previously-unsupported write tools now routed through legacy controller', async () => {
     const registry = new InMemoryCliRegistry();
-    const addComment = vi.fn();
-    setApi({ comment: { addComment } } as never);
+    const updateTestTask = vi.fn(async () => ({ status: 'success' }));
+    setApi({ testtask: { updateTestTask } } as never);
 
     registerTools(registry, 'full');
-    const command = registry.getCommand('addComment');
-    const input = parseCommandInput(command!.schema, ['--objectType', 'bug', '--objectID', '1', '--comment', 'hi', '--confirm']);
+    const command = registry.getCommand('updateTestTask');
+    const input = parseCommandInput(command!.schema, ['--testTaskId', '1', '--name', 'test', '--confirm']);
     const result = await command!.handler(input);
 
-    expect(addComment).not.toHaveBeenCalled();
-    expect(parseResult(result)).toMatchObject({
-      action: 'addComment',
-      supported: false,
-      diagnostic: expect.stringContaining('没有'),
-    });
+    expect(updateTestTask).toHaveBeenCalled();
+    expect(parseResult(result)).toEqual({ status: 'success' });
   });
 
   it('dispatches registered read tools to their API methods', async () => {
@@ -200,6 +222,7 @@ describe('registerTools', () => {
       task: { getMyTasks: vi.fn(async () => ({ name: 'getMyTasks' })), getTaskDetail: vi.fn(async () => ({ name: 'getTaskDetail' })) },
       testcase: { getProductTestCases: vi.fn(async () => ({ name: 'getProductTestCases' })), getTestCaseDetail: vi.fn(async () => ({ name: 'getTestCaseDetail' })) },
       testtask: { getTestTasks: vi.fn(async () => ({ name: 'getTestTasks' })), getTestTaskDetail: vi.fn(async () => ({ name: 'getTestTaskDetail' })) },
+      todo: { getTodos: vi.fn(async () => ({ name: 'getTodos' })), getTodoDetail: vi.fn(async () => ({ name: 'getTodoDetail' })) },
       user: { getMyProfile: vi.fn(async () => ({ name: 'getMyProfile' })) },
     };
     setApi(api as never);
@@ -215,7 +238,7 @@ describe('registerTools', () => {
       ['getProjects', { page: 1 }], ['getProjectDetail', { projectId: 1 }], ['getStoryRelatedBugs', { storyId: 1, productId: 1 }], ['getBugRelatedStory', { bugId: 1 }],
       ['getProjectReleases', { projectId: 1 }], ['searchStories', { keyword: 'a', productId: 1 }], ['searchStoriesByProductName', { productName: 'p', keyword: 'a' }],
       ['getMyTaskStatistics', {}], ['getMyBugStatistics', { productId: 1 }], ['getMyWeeklyActivity', { week: 'this' }],
-      ['getProductStories', { productId: 1 }], ['getStoryDetail', { storyId: 1 }], ['getMyTasks', { status: 'all' }], ['getTaskDetail', { taskId: 1 }],
+      ['getProductStories', { productId: 1 }], ['getStoryDetail', { storyId: 1 }], ['getMyTasks', { status: 'all' }], ['getTaskDetail', { taskId: 1 }], ['getMyTodos', {}], ['getTodoDetail', { todoId: 1 }],
       ['getProductTestCases', { productId: 1 }], ['getTestCaseDetail', { testCaseId: 1 }], ['getTestTasks', { productId: 1 }], ['getTestTaskDetail', { testTaskId: 1 }], ['getMyProfile', {}], ['whoami', {}], ['who-am-i', {}],
     ];
 
@@ -240,10 +263,26 @@ describe('registerTools', () => {
         linkStoriesToPlan: vi.fn(async () => ({ name: 'linkStoriesToPlan' })), unlinkStoriesFromPlan: vi.fn(async () => ({ name: 'unlinkStoriesFromPlan' })),
         linkBugsToPlan: vi.fn(async () => ({ name: 'linkBugsToPlan' })), unlinkBugsFromPlan: vi.fn(async () => ({ name: 'unlinkBugsFromPlan' })),
       },
-      story: { getStoryDetail: vi.fn(async () => ({ title: 's' })), updateStory: vi.fn(async () => ({ name: 'updateStory' })), changeStory: vi.fn(async () => ({ name: 'changeStory' })) },
+      story: {
+        getStoryDetail: vi.fn(async () => ({ title: 's' })),
+        updateStory: vi.fn(async () => ({ name: 'updateStory' })),
+        changeStory: vi.fn(async () => ({ name: 'changeStory' })),
+        createStory: vi.fn(async () => ({ name: 'createStory' })),
+        closeStory: vi.fn(async () => ({ name: 'closeStory' })),
+        assignStory: vi.fn(async () => ({ name: 'assignStory' })),
+        activateStory: vi.fn(async () => ({ name: 'activateStory' })),
+        reviewStory: vi.fn(async () => ({ name: 'reviewStory' })),
+      },
       task: { updateTask: vi.fn(async () => ({ name: 'updateTask' })), finishTask: vi.fn(async () => ({ name: 'finishTask' })), createTask: vi.fn(async () => ({ name: 'createTask' })) },
       testcase: { createTestCase: vi.fn(async () => ({ name: 'createTestCase' })), updateTestCase: vi.fn(async () => ({ name: 'updateTestCase' })) },
       testtask: { createTestTask: vi.fn(async () => ({ name: 'createTestTask' })) },
+      todo: {
+        createTodo: vi.fn(async () => ({ name: 'createTodo' })),
+        updateTodo: vi.fn(async () => ({ name: 'updateTodo' })),
+        deleteTodo: vi.fn(async () => ({ name: 'deleteTodo' })),
+        finishTodo: vi.fn(async () => ({ name: 'finishTodo' })),
+        activateTodo: vi.fn(async () => ({ name: 'activateTodo' })),
+      },
     };
     setApi(api as never);
     registerTools(registry, 'full');
@@ -254,8 +293,18 @@ describe('registerTools', () => {
       ['resolveBug', { bugId: 1, resolution: 'fixed', confirm: true }],
       ['updateStory', { storyId: 1, title: 's', confirm: true }],
       ['changeStory', { storyId: 1, title: 's2', confirm: true }],
+      ['createStory', { product: 1, title: 's3', confirm: true }],
+      ['closeStory', { storyId: 1, comment: 'c', confirm: true }],
+      ['assignStory', { storyId: 1, assignedTo: 'me', confirm: true }],
+      ['activateStory', { storyId: 1, comment: 'a', confirm: true }],
+      ['reviewStory', { storyId: 1, result: 'pass', confirm: true }],
       ['createTaskFromStory', { storyId: 1, execution: 2, taskName: 't', assignedTo: 'me', estStarted: '2026-01-01', deadline: '2026-01-02', confirm: true }],
       ['createTaskFromBug', { bugId: 1, execution: 2, assignedTo: 'me', estStarted: '2026-01-01', deadline: '2026-01-02', confirm: true }],
+      ['createTodo', { name: 'todo', confirm: true }],
+      ['updateTodo', { todoId: 1, name: 'todo2', confirm: true }],
+      ['deleteTodo', { todoId: 1, confirm: true }],
+      ['finishTodo', { todoId: 1, confirm: true }],
+      ['activateTodo', { todoId: 1, confirm: true }],
       ['linkStoriesToPlan', { planId: 1, storyIds: [1], confirm: true }],
       ['unlinkStoriesFromPlan', { planId: 1, storyIds: [1], confirm: true }],
       ['linkBugsToPlan', { planId: 1, bugIds: [1], confirm: true }],

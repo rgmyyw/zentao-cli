@@ -10,6 +10,7 @@ describe('roles', () => {
   it('getToolGroups 返回角色对应工具组列表', () => {
     expect(getToolGroups('pm')).toEqual([
       'init',
+      'todo',
       'story',
       'execution',
       'comment',

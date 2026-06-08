@@ -28,6 +28,10 @@ export interface MyBugListParams extends PaginationInput {
 export class BugApi {
   constructor(private readonly http: ZentaoHttpClient) {}
 
+  async createBug(data: Record<string, unknown> & { product: number }): Promise<unknown> {
+    return this.http.request('POST', `/products/${data.product}/bugs`, { data });
+  }
+
   async getMyBugs(params: MyBugListParams = {}): Promise<unknown> {
     if (params.productId) {
       return this.getProductBugs({ ...params, productId: params.productId, status: 'assigntome' });
@@ -79,6 +83,30 @@ export class BugApi {
 
   async getBugDetail(bugId: number): Promise<ZentaoBug> {
     return this.http.request<ZentaoBug>('GET', `/bugs/${bugId}`);
+  }
+
+  async updateBug(bugId: number, update: Record<string, unknown>): Promise<unknown> {
+    return this.http.request('PUT', `/bugs/${bugId}`, { data: update });
+  }
+
+  async assignBug(bugId: number, data: Record<string, unknown>): Promise<unknown> {
+    return this.http.request('POST', `/bugs/${bugId}/assign`, { data });
+  }
+
+  async confirmBug(bugId: number, data: Record<string, unknown> = {}): Promise<unknown> {
+    return this.http.request('POST', `/bugs/${bugId}/confirm`, { data });
+  }
+
+  async closeBug(bugId: number, data: Record<string, unknown> = {}): Promise<unknown> {
+    return this.http.request('POST', `/bugs/${bugId}/close`, { data });
+  }
+
+  async activateBug(bugId: number, data: Record<string, unknown> = {}): Promise<unknown> {
+    return this.http.request('POST', `/bugs/${bugId}/activate`, { data });
+  }
+
+  async deleteBug(bugId: number): Promise<unknown> {
+    return this.http.request('DELETE', `/bugs/${bugId}`);
   }
 
   async resolveBug(bugId: number, input: ResolveBugInput): Promise<unknown> {
