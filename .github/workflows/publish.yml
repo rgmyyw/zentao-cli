@@ -13,7 +13,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       id-token: write
     steps:
       - name: Checkout
@@ -43,11 +43,8 @@ jobs:
             exit 1
           fi
 
-      - name: Type check
-        run: pnpm typecheck
-
-      - name: Build
-        run: pnpm build
+      - name: Check
+        run: pnpm check
 
       - name: Publish to npm
         run: npm publish --provenance --access public

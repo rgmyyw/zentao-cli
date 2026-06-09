@@ -1,6 +1,6 @@
 import type { ZentaoHttpClient } from '../core/http.js';
 import { toServerListResult } from '../core/list-result.js';
-import { normalizePagination } from '../core/pagination.js';
+import { normalizePagination, normalizeTotalPages } from '../core/pagination.js';
 import type { ZentaoBug, ZentaoExecution, ZentaoListResponse, ZentaoTask } from '../types/zentao.js';
 import { toFormUrlEncoded } from '../utils/form.js';
 
@@ -171,7 +171,7 @@ export class ExecutionApi {
     const limit = 100;
     const firstPage = await this.getExecutionBugs(executionId, { page: 1, limit }) as { items?: ZentaoBug[]; total?: number };
     const bugs = [...(firstPage.items ?? [])];
-    const totalPages = Math.ceil((firstPage.total ?? bugs.length) / limit);
+    const totalPages = normalizeTotalPages(firstPage.total, limit, bugs.length);
 
     for (let page = 2; page <= totalPages; page += 1) {
       const response = await this.getExecutionBugs(executionId, { page, limit }) as { items?: ZentaoBug[] };
@@ -187,7 +187,7 @@ export class ExecutionApi {
       params: { page: 1, limit },
     });
     const tasks = [...(firstPage.tasks ?? [])];
-    const totalPages = Math.ceil((firstPage.total ?? tasks.length) / limit);
+    const totalPages = normalizeTotalPages(firstPage.total, limit, tasks.length);
 
     for (let page = 2; page <= totalPages; page += 1) {
       const response = await this.http.request<ZentaoListResponse<ZentaoTask> & { tasks?: ZentaoTask[] }>('GET', `/executions/${executionId}/tasks`, {

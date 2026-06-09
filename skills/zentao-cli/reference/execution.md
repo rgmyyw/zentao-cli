@@ -6,7 +6,7 @@
 zentao getExecutionDetail --executionId <id>
 zentao getExecutionDynamic --executionId <id>
 zentao getExecutionBugs --executionId <id>
-zentao getExecutionDailyBugStats --executionId <id> --iterationName 1.2.3迭代
+zentao getExecutionDailyBugStats --executionId <id> --iterationName 某个迭代
 zentao getExecutionBuilds --executionId <id>
 ```
 

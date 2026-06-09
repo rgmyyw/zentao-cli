@@ -66,10 +66,10 @@ describe('parseCommandInput', () => {
     });
   });
 
-  it('忽略 schema 外参数', () => {
+  it('拒绝 schema 外参数', () => {
     const schema = { name: z.string() };
 
-    expect(parseCommandInput(schema, ['--name', 'demo', '--ignored', 'value'])).toEqual({ name: 'demo' });
+    expect(() => parseCommandInput(schema, ['--name', 'demo', '--ignored', 'value'])).toThrow('未知参数: --ignored');
   });
 
   it('对位置参数和空参数名抛错', () => {

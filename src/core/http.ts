@@ -28,8 +28,18 @@ export class ZentaoHttpClient {
   }
 
   async legacyRequest<T = unknown>(method: string, path: string, options: AxiosRequestConfig = {}): Promise<T> {
+    return this.legacyRequestWithRetry<T>(method, path, options, false);
+  }
+
+  private getLegacyBaseURL(): string {
+    if (this.config.legacyBaseUrl) return this.config.legacyBaseUrl;
+    if (this.config.apiBaseUrl) return this.config.apiBaseUrl.replace(/\/api\.php(?:\/.*)?$/i, '');
+    return `${this.config.url.replace(/\/$/, '')}/zentao`;
+  }
+
+  private async legacyRequestWithRetry<T = unknown>(method: string, path: string, options: AxiosRequestConfig, retried: boolean): Promise<T> {
     const token = await this.auth.getToken();
-    const baseURL = `${this.config.url.replace(/\/$/, '')}/zentao`;
+    const baseURL = this.getLegacyBaseURL();
 
     try {
       const response = await axios.request({
@@ -47,6 +57,11 @@ export class ZentaoHttpClient {
       return sanitizeJsonLikeResponse(response.data) as T;
     } catch (error) {
       if (axios.isAxiosError(error)) {
+        if (!retried && error.response?.status === 401) {
+          this.auth.clearToken();
+          return this.legacyRequestWithRetry<T>(method, path, options, true);
+        }
+
         const data = error.response?.data;
         const message = typeof data === 'string' ? data.slice(0, 500) : JSON.stringify(data ?? error.message);
         throw new Error(`旧版页面请求失败: ${error.response?.status ?? 'NO_STATUS'} - ${message}`);

@@ -113,4 +113,26 @@ describe('ZentaoHttpClient', () => {
     await expect(http.request('GET', '/bad')).rejects.toThrow('请求失败: 500');
     await expect(http.legacyRequest('GET', '/old')).rejects.toThrow('旧版页面请求失败: 404');
   });
+
+  it('uses configured legacy base URL and retries legacy 401 once', async () => {
+    const axiosMock = mockAxios();
+    axiosMock.create.mockReturnValue({
+      post: vi.fn()
+        .mockResolvedValueOnce({ data: { token: 'old' } })
+        .mockResolvedValueOnce({ data: { token: 'new' } }),
+      request: vi.fn(),
+    });
+    axiosMock.request
+      .mockRejectedValueOnce(axiosError(401, 'expired'))
+      .mockResolvedValueOnce({ data: { ok: true } });
+    const { ZentaoHttpClient } = await import('../../src/core/http.js');
+    const http = new ZentaoHttpClient({ ...config, legacyBaseUrl: 'https://zentao.example.com/custom' });
+
+    await expect(http.legacyRequest('GET', '/old')).resolves.toEqual({ ok: true });
+
+    expect(axiosMock.request).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      baseURL: 'https://zentao.example.com/custom',
+      headers: { Token: 'new' },
+    }));
+  });
 });

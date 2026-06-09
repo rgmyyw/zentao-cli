@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.14 - 2026-06-10
+
+### Added
+
+- README 增加图标与封面图资源，并补充标准 REST API 之外的页面 JSON、动作记录和前端请求模拟扩展场景说明。
+- 新增 `ZENTAO_LEGACY_BASE_URL` 配置项，支持非标准部署路径下的旧版页面 JSON 请求。
+
+### Changed
+
+- CLI 参数解析支持 `--key=value` 写法，并对未知参数直接报错，避免拼写错误被静默忽略。
+- tag 发布工作流改为执行完整 `pnpm check`，并将 `contents` 权限收敛为只读；GitHub Release 仍只由 `/release` 流程手动创建。
+- 任务全量拉取在旧快捷方式返回不完整时会回退标准分页扫描；批量分页读取统一限制最大页数，避免异常 `total` 导致过量请求。
+- Skill 执行参考文档泛化迭代名称示例，避免出现具体内部迭代名。
+
+### Fixed
+
+- 修复服务端将分页元信息返回为字符串数字时统计不准确的问题。
+- 修复旧版页面请求 token 过期后不会自动重试的问题。
+
 ## 0.1.13 - 2026-06-08
 
 ### Added

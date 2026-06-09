@@ -1,6 +1,6 @@
 import type { ZentaoHttpClient } from '../core/http.js';
 import { toClientPaginatedListResult, toServerListResult, type ListResult } from '../core/list-result.js';
-import { normalizePagination, type PaginationInput } from '../core/pagination.js';
+import { normalizePagination, normalizeTotalPages, type PaginationInput } from '../core/pagination.js';
 import type { ZentaoBug, ZentaoListResponse } from '../types/zentao.js';
 
 export interface BugListParams extends PaginationInput {
@@ -123,8 +123,7 @@ export class BugApi {
     const limit = 100;
     const firstPage = await this.getProductBugs({ ...params, status: 'assigntome', page: 1, limit }) as ListResult<ZentaoBug>;
     const bugs = [...firstPage.items];
-    const total = firstPage.total ?? bugs.length;
-    const totalPages = Math.ceil(total / limit);
+    const totalPages = normalizeTotalPages(firstPage.total, limit, bugs.length);
 
     for (let page = 2; page <= totalPages; page += 1) {
       const response = await this.getProductBugs({ ...params, status: 'assigntome', page, limit }) as ListResult<ZentaoBug>;

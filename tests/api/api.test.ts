@@ -111,6 +111,18 @@ describe('TaskApi', () => {
     expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/tasks', { params: { assignedTo: 'me', page: 3 } });
   });
 
+  it('falls back to standard pagination when the task full-list shortcut is incomplete', async () => {
+    const http = createHttp([
+      { tasks: [{ id: 1, status: 'doing' }], page: 1, limit: 1, total: 3 },
+      { tasks: [{ id: 1, status: 'doing' }], total: 3 },
+      { tasks: [{ id: 1, status: 'doing' }, { id: 2, status: 'done' }, { id: 3, status: 'doing' }], total: 3 },
+    ]);
+    const result = await new TaskApi(http as never).getMyTasks({ status: 'all', page: 1, limit: 10 });
+
+    expect(result).toMatchObject({ total: 3, scanned: 3 });
+    expect(http.request).toHaveBeenNthCalledWith(3, 'GET', '/tasks', { params: { assignedTo: 'me', page: 1, limit: 100 } });
+  });
+
   it('calls detail and write endpoints', async () => {
     const http = createHttp([{ id: 1 }, {}, {}, {}]);
     const api = new TaskApi(http as never);

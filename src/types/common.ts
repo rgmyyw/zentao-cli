@@ -6,6 +6,7 @@ export interface ZentaoConfig {
   password: string;
   apiVersion: string;
   apiBaseUrl?: string;
+  legacyBaseUrl?: string;
 }
 
 export interface JsonContentResult {

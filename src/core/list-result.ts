@@ -41,9 +41,9 @@ export function toServerListResult<T = unknown>(response: unknown, keys: string[
   }
 
   const record = typeof response === 'object' && response !== null ? response as Record<string, unknown> : {};
-  const page = typeof record.page === 'number' ? record.page : normalized.page;
-  const limit = typeof record.limit === 'number' ? record.limit : normalized.limit;
-  const total = typeof record.total === 'number' ? record.total : items.length;
+  const page = toFiniteNumber(record.page) ?? normalized.page;
+  const limit = toFiniteNumber(record.limit) ?? normalized.limit;
+  const total = toFiniteNumber(record.total) ?? items.length;
 
   return {
     source: 'server-paginated',
@@ -54,6 +54,15 @@ export function toServerListResult<T = unknown>(response: unknown, keys: string[
     itemKey: keys[0] ?? 'items',
     items,
   };
+}
+
+function toFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
 }
 
 export function toClientPaginatedListResult<T = unknown>(response: unknown, keys: string[], pagination: PaginationInput = {}): ListResult<T> {

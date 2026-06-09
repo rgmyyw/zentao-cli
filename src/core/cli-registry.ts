@@ -40,6 +40,11 @@ export class InMemoryCliRegistry implements CliRegistry {
 
 export function parseCommandInput(schema: ZodRawShape, args: string[]): Record<string, unknown> {
   const raw = parseArgv(args);
+  const unknownKeys = Object.keys(raw).filter(key => !(key in schema));
+  if (unknownKeys.length > 0) {
+    throw new Error(`未知参数: ${unknownKeys.map(key => `--${key}`).join(', ')}`);
+  }
+
   const converted: Record<string, unknown> = {};
 
   for (const [key, fieldSchema] of Object.entries(schema)) {
@@ -60,12 +65,14 @@ function parseArgv(args: string[]): Record<string, unknown> {
       throw new Error(`无法识别的位置参数: ${token}`);
     }
 
-    const key = token.slice(2);
+    const equalsIndex = token.indexOf('=');
+    const key = equalsIndex >= 0 ? token.slice(2, equalsIndex) : token.slice(2);
     if (!key) throw new Error('检测到空参数名。');
 
     const next = args[index + 1];
-    const hasExplicitValue = typeof next === 'string' && !next.startsWith('--');
-    const value = hasExplicitValue ? next : true;
+    const hasInlineValue = equalsIndex >= 0;
+    const hasExplicitValue = !hasInlineValue && typeof next === 'string' && !next.startsWith('--');
+    const value = hasInlineValue ? token.slice(equalsIndex + 1) : hasExplicitValue ? next : true;
 
     if (hasExplicitValue) index += 1;
 

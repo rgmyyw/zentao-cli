@@ -139,7 +139,7 @@ pnpm build
 
 ## 发布链路
 
-已内置 GitHub Actions：push 形如 `v*` 的 tag 时会安装依赖、执行 `pnpm typecheck`、执行 `pnpm build`、发布 npm 包并创建 GitHub Release。
+已内置 GitHub Actions：push 形如 `v*` 的 tag 时会安装依赖、执行 `pnpm check`、发布 npm 包。GitHub Release 由项目级 `/release` 流程手动创建，Actions 不自动创建 Release。
 
 工作流文件：`.github/workflows/publish.yml`。
 

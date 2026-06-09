@@ -42,6 +42,14 @@ describe('toServerListResult', () => {
     });
   });
 
+  it('支持服务端把分页元信息返回为字符串数字', () => {
+    expect(toServerListResult({ page: '3', limit: '10', total: '99', bugs: [{ id: 1 }] }, ['bugs'])).toMatchObject({
+      page: 3,
+      limit: 10,
+      total: 99,
+    });
+  });
+
   it('缺少分页元信息时回退到标准化分页参数', () => {
     expect(toServerListResult({ rows: [{ id: 1 }, { id: 2 }] }, ['rows'], { page: 2.9, limit: 300 })).toEqual({
       source: 'server-paginated',

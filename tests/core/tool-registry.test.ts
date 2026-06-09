@@ -142,6 +142,30 @@ describe('registerTools', () => {
     expect(parseResult(result)).toEqual({ ok: true, input: { status: 'doing', page: 2, limit: 5 } });
   });
 
+  it('rejects unknown CLI args instead of silently ignoring them', () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ task: { getMyTasks: vi.fn() } } as never);
+
+    registerTools(registry, 'dev');
+    const command = registry.getCommand('getMyTasks');
+
+    expect(() => parseCommandInput(command!.schema, ['--statsu', 'doing'])).toThrow('未知参数: --statsu');
+  });
+
+  it('parses inline --key=value CLI args', () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ task: { getMyTasks: vi.fn() } } as never);
+
+    registerTools(registry, 'dev');
+    const command = registry.getCommand('getMyTasks');
+
+    expect(parseCommandInput(command!.schema, ['--status=doing', '--page=2', '--limit=5'])).toEqual({
+      status: 'doing',
+      page: 2,
+      limit: 5,
+    });
+  });
+
   it('returns confirm previews before calling write handlers', async () => {
     const registry = new InMemoryCliRegistry();
     const updateTask = vi.fn();

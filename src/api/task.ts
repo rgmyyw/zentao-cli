@@ -25,7 +25,7 @@ export class TaskApi {
 
     const firstPage = toServerListResult<ZentaoTask>(firstResponse, ['tasks'], { page: 1, limit: 1 });
     const total = Math.max(firstPage.total, firstPage.items.length);
-    const response = total > firstPage.items.length
+    const fullResponse = total > firstPage.items.length
       ? await this.http.request<{ tasks?: ZentaoTask[] } | ZentaoTask[]>('GET', '/tasks', {
         params: {
           assignedTo: this.http.username,
@@ -34,7 +34,8 @@ export class TaskApi {
       })
       : firstResponse;
 
-    const allTasks = extractItems<ZentaoTask>(response, ['tasks']);
+    const fullTasks = extractItems<ZentaoTask>(fullResponse, ['tasks']);
+    const allTasks = total > fullTasks.length ? await this.getAllMyTasksByPages(total) : fullTasks;
     const filteredTasks = input.status && input.status !== 'all'
       ? allTasks.filter(task => task.status === input.status)
       : allTasks;
@@ -47,6 +48,25 @@ export class TaskApi {
 
   async getTaskDetail(taskId: number): Promise<ZentaoTask> {
     return this.http.request<ZentaoTask>('GET', `/tasks/${taskId}`);
+  }
+
+  private async getAllMyTasksByPages(total: number): Promise<ZentaoTask[]> {
+    const limit = 100;
+    const totalPages = Math.min(Math.ceil(total / limit), 1000);
+    const tasks: ZentaoTask[] = [];
+
+    for (let page = 1; page <= totalPages; page += 1) {
+      const response = await this.http.request<{ tasks?: ZentaoTask[] } | ZentaoTask[]>('GET', '/tasks', {
+        params: {
+          assignedTo: this.http.username,
+          page,
+          limit,
+        },
+      });
+      tasks.push(...extractItems<ZentaoTask>(response, ['tasks']));
+    }
+
+    return tasks;
   }
 
   async updateTask(taskId: number, update: Record<string, unknown>): Promise<unknown> {

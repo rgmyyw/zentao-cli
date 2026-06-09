@@ -1,18 +1,24 @@
 # @cloudglab/zentao-cli
 
+<p align="center">
+  <img src="./assets/readme/zentao-cli-icon.png" alt="zentao-cli icon" width="128" height="128" />
+</p>
+
 ![zentao-cli hero](./assets/readme/zentao-cli-hero.png)
 
-把禅道任务、Bug、执行、构建、动态和统计能力接到命令行，方便在 CI、脚本和 AI Skill 里直接调用。
+把禅道任务、Bug、需求、执行、测试、构建、动态和统计能力接到命令行，方便在终端、脚本、CI 和 AI Skill 里直接调用。
+
+除了标准 REST API，本工具还补充了部分扩展场景：会在必要时读取页面 JSON、详情页动作记录，或模拟禅道前端请求，把标准接口不好覆盖的查询、统计和流转动作封装成可调用命令。
 
 ## 安装方式
 
-### 一键安装 CLI + Skill
+### 推荐：一键安装 CLI + Skill
 
 ```bash
 npx -y @cloudglab/zentao-cli@latest install
 ```
 
-该命令会依次安装全局 CLI、从 CLI 包内自带的 `skills/zentao-cli` 安装 skill，并在禅道配置缺失或登录校验失败时引导输入配置。配置完成后默认支持写操作；真实写入仍需要在命令参数中传 `confirm=true`，如需禁用写操作可设置 `ZENTAO_DISABLE_WRITE=true`。
+该命令会安装全局 CLI 和内置 Skill，并在禅道配置缺失或登录校验失败时引导输入配置。配置完成后可以执行写操作；真实写入仍需要显式传入 `confirm=true`，也可以通过 `ZENTAO_DISABLE_WRITE=true` 临时禁用写入。
 
 如果需要强制重新下载 npm 静态包，可改用 npm 模式：
 
@@ -114,72 +120,62 @@ export ZENTAO_API_VERSION="v1"
 
 # 可选：非标准部署时指定完整 API 基础地址
 # export ZENTAO_API_BASE_URL="https://your-zentao.example.com/custom/api.php/v1"
+# 可选：非标准部署时指定旧版页面 JSON 基础地址
+# export ZENTAO_LEGACY_BASE_URL="https://your-zentao.example.com/custom"
 ```
 
 `ZENTAO_URL` 传根域名即可，不要带 `/zentao`。
 
-## 可以这样描述场景
+CLI 参数支持 `--key value` 和 `--key=value` 两种写法；如果参数名拼错，会直接提示未知参数，避免写操作时静默忽略字段。
 
-下面这些话可以交给 AI Skill / Agent 转成对应的 zentao-cli 命令。
+## 可以这样问
+
+下面这些自然语言请求可以交给 AI Skill / Agent 转成对应的 zentao-cli 命令。
 
 ### 我的任务和 Bug
 
 - 我今天的 Bug 有多少？
-- 我今天的任务有多少？
 - 获取我的所有任务。
-- 我当前登录的是谁？
-- 查看当前禅道登录用户信息。
-- 看我等待中的任务。
-- 看我进行中的任务。
-- 看我已取消的任务。
+- 看我等待中、进行中或已取消的任务。
 - 分页看我的任务。
 - 看我当前指派的 Bug。
-- 统计我当前 Bug 的状态分布。
-- 统计我当前任务的状态分布。
+- 统计我当前任务和 Bug 的状态分布。
 
 ### 一段时间内我做了什么
 
 - 分析上周我都干了什么。
-- 查一下我本周解决了多少个 Bug。
-- 查一下 lixm1 上周解决了多少个 Bug。
-- 看 lixm1 最近 3 天做了什么。
-- 看我 2026-05-28 做了什么。
+- 查一下某个人上周解决了多少个 Bug。
+- 看某个人最近 3 天做了什么。
 - 拉一下 2026-05-25 到 2026-05-29 的工作清单。
 - 汇总我上周的评论、指派、流转和解决记录。
-- 按天列出我最近几天处理过的 Bug 和任务。
+- 按天列出我最近几天处理过的 Bug、任务和评论。
 
 ### 执行 / 迭代统计
 
 - 这个迭代有多少个 Bug？
 - 这个迭代今天解决了多少个问题？
-- 分析 execution 2067 的每日迭代执行统计。
-- 生成 1.2.3 迭代日报。
+- 分析某个执行的每日迭代执行统计。
+- 生成某个迭代的日报。
 - 统计某个迭代今天 Bug 和任务情况。
 - 看这个执行的 Bug、任务、参与人员和风险明细。
-- 统计这个迭代的延期 Bug、reopen Bug 和未解决 Bug。
-- 看这个迭代里测试未及时关闭的问题。
-- 看这个迭代里开发今日未及时解决的问题。
-- 看这个迭代的任务总数、完成数、逾期未完成数和工时消耗。
-- 看这个迭代每个人负责了多少 Bug 和任务。
+- 统计延期、reopen、未解决、未及时关闭的问题。
+- 看这个迭代的任务完成数、逾期数和工时消耗。
 
 ### 禅道页面 URL 查询
 
-- 列出 `execution-bug-2130.html` 里面的 Bug。
-- 看 `execution-build-2130.html` 这个执行有哪些版本。
-- 看 `execution-dynamic-2130.html` 这个执行最近的动态。
-- 从禅道 Bug 列表页里提取 execution ID 并列出 Bug。
-- 从禅道版本页里提取 execution ID 并列出构建。
+- 列出 `execution-bug-1234.html` 里面的 Bug。
+- 看 `execution-build-1234.html` 这个执行有哪些版本。
+- 看 `execution-dynamic-1234.html` 这个执行最近的动态。
+- 从禅道页面 URL 里提取对象类型和 ID，再查询结构化数据。
 
 ### Bug 和版本
 
 - 看某个执行下有哪些版本。
 - 提一个新的 Bug 并指派负责人。
 - 调整 Bug 的优先级、严重程度、模块、关联需求或计划。
-- 指派、确认、激活、关闭或删除某个 Bug。
+- 指派、确认、解决、激活、关闭或删除某个 Bug。
 - 解决 Bug 时关联到某个版本。
-- 查某个执行下已解决但还没关闭的 Bug。
-- 查某个执行下延期处理的 Bug。
-- 查某个执行下 reopen 过的 Bug。
+- 查某个执行下已解决未关闭、延期处理或 reopen 过的 Bug。
 
 ### 需求、产品、项目和测试
 
@@ -187,7 +183,6 @@ export ZENTAO_API_VERSION="v1"
 - 创建需求，或指派、关闭、激活、评审需求。
 - 查某个产品下的 Bug。
 - 查某个项目下的执行列表。
-- 查某个执行下的构建列表。
 - 查某个产品下的测试用例。
 - 查某个测试单详情。
 - 创建、更新、完成、激活或删除我的待办。
@@ -220,6 +215,13 @@ Skill / Agent 处理禅道请求时，优先按下面格式路由：
 - 创建/流转需求：创建需求、指派需求、关闭/激活需求、评审需求 → 补齐产品、标题、评审人、结果或关闭原因 → 写操作确认 → 调对应命令。
 - 查项目/执行：有哪些项目、当前迭代、`executionId` 是多少、项目下执行、进行中的执行 → 查询可选项 → 让用户确认范围。
 
+### 特殊扩展场景
+
+- 页面 URL 查询：从旧版禅道页面 URL 解析对象类型和 ID，再返回结构化结果。
+- 动态和评论：REST API 缺少完整入口时，读取对象详情或页面 JSON 中的动作记录补全。
+- 每日迭代统计：组合执行 Bug、任务、构建、人员和动作记录，生成标准接口之外的汇总视图。
+- 写入类补全：标准 REST API 不覆盖的少量动作，会在明确 `confirm=true` 后模拟禅道前端 JSON 请求完成。
+
 ### 排期和父子结构
 
 - 默认跳过周末和节假日；只有用户明确周末/节假日加班时才排。
@@ -237,21 +239,21 @@ zentao --role qa getMyTasks --status all --limit 100
 zentao --role qa getMyTasks --status wait --limit 50
 
 # 我的阶段性工作清单
-zentao --role qa getMyWeeklyActivity --account lixm1 --week last
-zentao --role qa getMyWeeklyActivity --account lixm1 --dateRange 最近3天
-zentao --role qa getMyWeeklyActivity --account lixm1 --dateRange 2026-05-25到2026-05-29
+zentao --role qa getMyWeeklyActivity --account some-account --week last
+zentao --role qa getMyWeeklyActivity --account some-account --dateRange 最近3天
+zentao --role qa getMyWeeklyActivity --account some-account --dateRange 2026-05-25到2026-05-29
 
 # 执行 Bug / 构建 / 动态
-zentao --role qa getExecutionBugs --executionId 2130 --limit 100
-zentao --role qa getExecutionBuilds --executionId 2130
-zentao --role qa getExecutionDynamic --executionId 2130
+zentao --role qa getExecutionBugs --executionId 1234 --limit 100
+zentao --role qa getExecutionBuilds --executionId 1234
+zentao --role qa getExecutionDynamic --executionId 1234
 
 # 每日迭代执行统计
-zentao --role qa getExecutionDailyBugStats --executionId 2067 --iterationName 1.2.3迭代
-zentao --role qa getExecutionDailyBugStats --executionId 2067 --iterationName 1.2.3迭代 --date 2026-06-06
+zentao --role qa getExecutionDailyBugStats --executionId 1234 --iterationName 某个迭代
+zentao --role qa getExecutionDailyBugStats --executionId 1234 --iterationName 某个迭代 --date 2026-06-06
 
 # 写操作示例（必须显式 confirm=true）
-zentao --role dev assignTask --taskId 123 --assignedTo lixm1 --confirm true
+zentao --role dev assignTask --taskId 123 --assignedTo some-account --confirm true
 zentao --role qa createBug --product 1 --title "页面按钮无响应" --openedBuild trunk --steps "复现步骤" --confirm true
 zentao --role pm createStory --product 1 --title "新增导出能力" --spec "需求说明" --verify "验收标准" --confirm true
 zentao createTodo --name "跟进缺陷回归" --begin 09:00 --end 10:00 --confirm true
@@ -274,9 +276,3 @@ zentao help
 zentao list
 zentao --role qa list
 ```
-
-## 发布说明
-
-项目内置 `/release` 命令作为唯一 GitHub Release 创建入口。发布时先更新 `CHANGELOG.md` 和 `README.md`，再提升版本、运行 `pnpm check`、提交、创建 annotated tag、推送 main 和 tag，最后手动创建 GitHub Release 并检查 npm 发布结果。
-
-GitHub Actions 只在 `v*` tag push 后校验版本、执行 typecheck/build 并发布 npm，不再自动创建 GitHub Release，避免和 `/release` 重复创建 Release。
