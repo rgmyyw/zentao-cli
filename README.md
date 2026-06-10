@@ -1,9 +1,5 @@
 # @cloudglab/zentao-cli
 
-<p align="center">
-  <img src="./assets/readme/zentao-cli-icon.png" alt="zentao-cli icon" width="128" height="128" />
-</p>
-
 ![zentao-cli hero](./assets/readme/zentao-cli-hero.png)
 
 把禅道任务、Bug、需求、执行、测试、构建、动态和统计能力接到命令行，方便在终端、脚本、CI 和 AI Skill 里直接调用。
@@ -126,7 +122,7 @@ export ZENTAO_API_VERSION="v1"
 
 `ZENTAO_URL` 传根域名即可，不要带 `/zentao`。
 
-CLI 参数支持 `--key value` 和 `--key=value` 两种写法；如果参数名拼错，会直接提示未知参数，避免写操作时静默忽略字段。
+CLI 参数支持 `--key value` 和 `--key=value` 两种写法；如果参数名拼错，会直接提示未知参数，避免写操作时静默忽略字段。需要确认某条命令参数时，可以运行 `zentao help <command>`，例如 `zentao help getExecutionDetail`。
 
 ## 可以这样问
 
@@ -235,6 +231,7 @@ Skill / Agent 处理禅道请求时，优先按下面格式路由：
 # 我的任务
 zentao whoami
 zentao who am i
+zentao help getMyTasks
 zentao --role qa getMyTasks --status all --limit 100
 zentao --role qa getMyTasks --status wait --limit 50
 
@@ -244,6 +241,7 @@ zentao --role qa getMyWeeklyActivity --account some-account --dateRange 最近3�
 zentao --role qa getMyWeeklyActivity --account some-account --dateRange 2026-05-25到2026-05-29
 
 # 执行 Bug / 构建 / 动态
+zentao help getExecutionDetail
 zentao --role qa getExecutionBugs --executionId 1234 --limit 100
 zentao --role qa getExecutionBuilds --executionId 1234
 zentao --role qa getExecutionDynamic --executionId 1234
@@ -273,6 +271,8 @@ export ZENTAO_DISABLE_WRITE=true
 
 ```bash
 zentao help
+zentao help getExecutionDetail
 zentao list
 zentao --role qa list
+pnpm release:smoke-query
 ```

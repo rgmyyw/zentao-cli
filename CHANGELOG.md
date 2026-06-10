@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.15 - 2026-06-10
+
+### Added
+
+- 新增命令级帮助：支持 `zentao help <command>` 与 `zentao <command> --help`，输出参数类型、必填/可选和字段说明。
+- 新增发布前查询回归脚本 `pnpm release:smoke-query`，先检查全部 CLI 命令的 `help` / schema 入口，再用执行 `2140` 及其关联固定数据覆盖主要真实查询命令。
+- Skill 新增 `reference/commands.md` 查询命令速查，覆盖全部查询入口、URL 映射和常用组合。
+
+### Changed
+
+- `/release` 项目命令和维护说明加入本地查询回归步骤，避免发布前只跑单元测试而遗漏真实 CLI 查询场景。
+- Skill 增加命令选择强制规则：参数不确定时优先运行 `zentao help <command>`，避免凭印象猜参数。
+
 ## 0.1.14 - 2026-06-10
 
 ### Added

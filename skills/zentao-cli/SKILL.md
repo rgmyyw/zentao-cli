@@ -19,6 +19,24 @@ argument-hint: "[command]"
 
 建议把它当成一个“命令行技能包”：先安装，再按 `reference/` 文档执行。
 
+## 命令选择强制规则
+
+- 不确定命令名或参数时，先查 `reference/*.md`，不要猜参数名。
+- 需要确认某条命令参数时，优先运行 `zentao help <command>`；本机没有安装时用 `npx -y @cloudglab/zentao-cli@latest help <command>`。
+- 如果用户给的是禅道旧版页面 URL，先按 URL 里的对象类型和 ID 映射到 reference 中的命令，再执行 CLI 查询。
+- 如果 CLI 返回 `未知参数`，立即运行 `zentao help <command>` 校对参数；不要换一个看起来相似但未确认的参数。
+
+## Reference 路由表
+
+- 任务 / 我的任务 / 任务详情 / 完成任务：`reference/task.md`
+- Bug / 我的 Bug / 产品 Bug / 线上问题：`reference/bug.md`
+- 需求 / 产品需求 / 搜索需求：`reference/story.md`
+- 执行 / 迭代 / 执行 Bug / 执行构建 / 执行日报：`reference/execution.md`
+- 统计 / 周报 / 最近几天做了什么：`reference/statistics.md`
+- 产品 / 项目 / 计划 / 构建 / 测试用例 / 测试单：分别看 `reference/product.md`、`reference/project.md`、`reference/plan.md`、`reference/build.md`、`reference/testcase.md`、`reference/testtask.md`
+
+注意：`getDevelopmentContext` 只用于 `story` / `bug` 上下文，不接收 `executionId`。查执行上下文应使用 `getExecutionDetail`、`getExecutionBugs`、`getExecutionBuilds`、`getExecutionDynamic` 或 `getExecutionDailyBugStats`。
+
 ## 入口优先级
 
 1. 本机已安装 `zentao`：直接执行
@@ -160,6 +178,7 @@ npx -y @cloudglab/zentao-cli@latest --role qa
 - `reference/overview.md`
 - `reference/install.md`
 - `reference/cli.md`
+- `reference/commands.md`
 - `reference/task.md`
 - `reference/bug.md`
 - `reference/story.md`

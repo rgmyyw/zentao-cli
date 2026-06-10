@@ -146,4 +146,5 @@ pnpm build
 发版前确保：
 
 - `package.json` 中的 `version` 与 tag 一致。
+- 本地先运行 `pnpm check`，再运行 `pnpm release:smoke-query` 做查询回归；默认使用执行 `2140` 及其关联固定数据：`ZENTAO_SMOKE_ACCOUNT=lixm1`、`ZENTAO_SMOKE_PRODUCT_ID=153`、`ZENTAO_SMOKE_PROJECT_ID=1772`、`ZENTAO_SMOKE_PROGRAM_ID=620`、`ZENTAO_SMOKE_STORY_ID=10154`、`ZENTAO_SMOKE_BUG_ID=84362`、`ZENTAO_SMOKE_TASK_ID=79922`、`ZENTAO_SMOKE_BUILD_ID=5648`、`ZENTAO_SMOKE_PLAN_ID=360`、`ZENTAO_SMOKE_TEST_CASE_ID=58191`、`ZENTAO_SMOKE_TEST_TASK_ID=2319`；`getProjectReleases` 因当前账号常见 403 默认跳过，如需覆盖可设置 `ZENTAO_SMOKE_RELEASE_PROJECT_ID`；如数据变化，可用同名环境变量覆盖。
 - npm 包已配置 GitHub Actions trusted publisher，绑定仓库 `cloudglab/zentao-cli`。

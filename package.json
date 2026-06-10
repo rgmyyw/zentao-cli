@@ -1,6 +1,6 @@
 {
   "name": "@cloudglab/zentao-cli",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "ZenTao CLI rebuilt for ZenTao 18.5 REST v1 API",
   "repository": {
     "type": "git",
@@ -18,13 +18,10 @@
   },
   "files": [
     "dist",
-    "assets/readme/zentao-cli-icon.png",
     "assets/readme/zentao-cli-hero.png",
-    "assets/readme/zentao-cli-social-preview.jpg",
     "skills",
     "README.md",
-    "CHANGELOG.md",
-    "MCP_ZENTAO_REBUILD_PLAN.md"
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.json",
@@ -33,6 +30,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "release:smoke-query": "node scripts/release-query-smoke.mjs",
     "prepare": "lefthook install"
   },
   "dependencies": {

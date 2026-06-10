@@ -3,6 +3,7 @@ import { registerTools } from './core/tool-registry.js';
 import { runInstallCommand, runUpdateCommand } from './install.js';
 import type { Role } from './types/common.js';
 import { CLI_VERSION } from './version.js';
+import { z, type ZodRawShape, type ZodTypeAny } from 'zod';
 
 const VALID_ROLES = new Set<Role>(['full', 'dev', 'pm', 'qa']);
 
@@ -13,8 +14,22 @@ export async function runCli(rawArgs: string[]): Promise<void> {
   const builtinCommandNames = ['help', 'list', 'version', 'install', 'update'];
   const commandNames = [...builtinCommandNames, ...registry.listCommands().map((item) => item.name)];
 
-  if (!commandName || commandName === 'help' || commandName === '--help' || commandName === '-h') {
+  if (!commandName || commandName === '--help' || commandName === '-h') {
     printHelp(role, commandNames);
+    return;
+  }
+
+  if (commandName === 'help') {
+    const targetCommandName = commandArgs[0];
+    if (!targetCommandName) {
+      printHelp(role, commandNames);
+      return;
+    }
+    const targetCommand = registry.getCommand(targetCommandName);
+    if (!targetCommand) {
+      throw new Error(`未找到命令: ${targetCommandName}`);
+    }
+    printCommandHelp(targetCommand.name, targetCommand.schema);
     return;
   }
 
@@ -43,6 +58,11 @@ export async function runCli(rawArgs: string[]): Promise<void> {
   const command = registry.getCommand(commandName);
   if (!command) {
     throw new Error(`未找到命令: ${commandName}`);
+  }
+
+  if (commandArgs.length === 1 && (commandArgs[0] === '--help' || commandArgs[0] === '-h')) {
+    printCommandHelp(command.name, command.schema);
+    return;
   }
 
   const input = parseCommandInput(command.schema, commandArgs);
@@ -112,4 +132,44 @@ function printHelp(role: Role, commands: string[]): void {
     ...commands.map((item) => `  - ${item}`),
     '',
   ].join('\n'));
+}
+
+function printCommandHelp(commandName: string, schema: ZodRawShape): void {
+  const entries = Object.entries(schema);
+  process.stdout.write([
+    `zentao ${commandName}`,
+    '',
+    '用法：',
+    `  zentao ${commandName}${entries.length > 0 ? ' [--key value ...]' : ''}`,
+    `  zentao help ${commandName}`,
+    '',
+    '参数：',
+    ...entries.map(formatParameterHelp),
+    '',
+  ].join('\n'));
+}
+
+function formatParameterHelp([key, fieldSchema]: [string, ZodTypeAny]): string {
+  const description = fieldSchema.description ? `：${fieldSchema.description}` : '';
+  return `  --${key} <${describeSchema(fieldSchema)}>${isOptionalSchema(fieldSchema) ? ' （可选）' : ' （必填）'}${description}`;
+}
+
+function describeSchema(schema: ZodTypeAny): string {
+  const unwrapped = unwrapSchema(schema);
+  if (unwrapped instanceof z.ZodNumber) return 'number';
+  if (unwrapped instanceof z.ZodBoolean) return 'boolean';
+  if (unwrapped instanceof z.ZodArray) return 'array';
+  if (unwrapped instanceof z.ZodEnum) return unwrapped.options.join('|');
+  return 'string';
+}
+
+function isOptionalSchema(schema: ZodTypeAny): boolean {
+  return schema instanceof z.ZodOptional || schema instanceof z.ZodDefault || schema instanceof z.ZodNullable;
+}
+
+function unwrapSchema(schema: ZodTypeAny): ZodTypeAny {
+  if (schema instanceof z.ZodOptional || schema instanceof z.ZodNullable) return unwrapSchema(schema.unwrap());
+  if (schema instanceof z.ZodDefault) return unwrapSchema((schema._def as { innerType: ZodTypeAny }).innerType);
+  if (schema instanceof z.ZodEffects) return unwrapSchema(schema.innerType());
+  return schema;
 }

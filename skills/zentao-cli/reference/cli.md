@@ -4,6 +4,7 @@
 
 ```bash
 zentao help
+zentao help getExecutionDetail
 zentao list
 zentao whoami
 zentao who am i
@@ -18,6 +19,7 @@ zentao --role qa getMyBugs --limit 50
 ## 常见形式
 
 - `zentao <command> --key value`
+- `zentao help <command>` 查看单条命令参数
 - `zentao --role qa <command> --key value`
 - `zentao whoami` / `zentao who-am-i` / `zentao who am i` 查看当前登录用户
 
