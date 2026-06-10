@@ -2,6 +2,7 @@ import { InMemoryCliRegistry, parseCommandInput } from './core/cli-registry.js';
 import { registerTools } from './core/tool-registry.js';
 import { runInstallCommand, runUpdateCommand } from './install.js';
 import type { Role } from './types/common.js';
+import { runDailyUpdateProbe } from './update-probe.js';
 import { CLI_VERSION } from './version.js';
 import { z, type ZodRawShape, type ZodTypeAny } from 'zod';
 
@@ -64,6 +65,8 @@ export async function runCli(rawArgs: string[]): Promise<void> {
     printCommandHelp(command.name, command.schema);
     return;
   }
+
+  await runDailyUpdateProbe(commandName);
 
   const input = parseCommandInput(command.schema, commandArgs);
   const result = await command.handler(input);

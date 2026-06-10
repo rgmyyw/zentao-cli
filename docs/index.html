@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>zentao-cli · 禅道命令速查</title>
+  <meta name="description" content="zentao-cli 极简命令速查、安装和更新入口。">
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #fbfaf7;
+      --ink: #161616;
+      --muted: #606060;
+      --hairline: #161616;
+      --soft-line: #d7d4cc;
+      --inverse: #f6f3eb;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(var(--soft-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--soft-line) 1px, transparent 1px),
+        var(--paper);
+      background-size: 28px 28px;
+      line-height: 1.6;
+    }
+
+    main {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 36px 0 48px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+      gap: 18px;
+      align-items: stretch;
+      margin-bottom: 18px;
+    }
+
+    .panel, .command, .section {
+      min-width: 0;
+      border: 1px solid var(--hairline);
+      background: var(--paper);
+    }
+
+    .panel {
+      display: grid;
+      align-content: space-between;
+      min-height: 356px;
+      padding: 34px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 34px;
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      display: inline-block;
+      width: 44px;
+      height: 1px;
+      background: var(--ink);
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 7em;
+      font-size: clamp(44px, 9vw, 104px);
+      line-height: 0.88;
+      letter-spacing: -0.08em;
+    }
+
+    .lead {
+      max-width: 620px;
+      margin: 30px 0 0;
+      color: var(--muted);
+      font-size: clamp(16px, 1.8vw, 20px);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0;
+      margin-top: 34px;
+    }
+
+    a, button { font: inherit; }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      margin-right: -1px;
+      padding: 0 18px;
+      border: 1px solid var(--hairline);
+      color: var(--ink);
+      background: var(--paper);
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .button.primary {
+      color: var(--inverse);
+      background: var(--ink);
+      font-weight: 700;
+    }
+
+    .stack {
+      display: grid;
+      gap: 0;
+    }
+
+    .command {
+      display: grid;
+      align-content: center;
+      min-height: 108px;
+      padding: 18px 20px;
+      border-bottom: 0;
+    }
+
+    .command:last-child {
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .command strong {
+      display: block;
+      margin-bottom: 12px;
+      font-size: 14px;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+
+    .copy-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 76px;
+      gap: 0;
+      align-items: center;
+    }
+
+    code {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      padding: 12px 13px;
+      overflow-x: auto;
+      border: 1px solid var(--hairline);
+      color: var(--ink);
+      background: var(--inverse);
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 13px;
+      line-height: 1.45;
+      white-space: nowrap;
+      scrollbar-width: thin;
+    }
+
+    .copy {
+      min-height: 48px;
+      margin-left: -1px;
+      padding: 0 12px;
+      border: 1px solid var(--hairline);
+      color: var(--ink);
+      background: var(--paper);
+      cursor: pointer;
+    }
+
+    .button:hover, .copy:hover {
+      color: var(--inverse);
+      background: var(--ink);
+    }
+
+    .wiki {
+      margin-top: 18px;
+      padding: 24px;
+    }
+
+    .wiki-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+      gap: 18px;
+      align-items: end;
+    }
+
+    .wiki p {
+      max-width: 680px;
+      margin: -6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .wiki-search {
+      display: grid;
+      gap: 8px;
+    }
+
+    .wiki-search label {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .wiki-search input {
+      width: 100%;
+      min-height: 46px;
+      padding: 0 14px;
+      border: 1px solid var(--hairline);
+      border-radius: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font: inherit;
+      outline: none;
+    }
+
+    .wiki-search input:focus {
+      box-shadow: inset 0 0 0 2px var(--ink);
+    }
+
+    .wiki-status {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .section {
+      padding: 22px;
+    }
+
+    h2 {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 0 0 18px;
+      font-size: 20px;
+      letter-spacing: -0.04em;
+    }
+
+    h2::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--hairline);
+    }
+
+    ul {
+      display: grid;
+      gap: 14px;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    li {
+      min-width: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    li code {
+      font-size: 12px;
+    }
+
+    li .copy-row {
+      position: relative;
+      display: block;
+      margin-top: 6px;
+    }
+
+    li code {
+      min-height: 46px;
+      padding-right: 88px;
+      overflow-x: visible;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    li .copy {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 76px;
+      height: 100%;
+      min-height: 46px;
+      margin-top: 0;
+      margin-left: 0;
+      font-size: 13px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(6px);
+      transition: opacity 120ms ease, transform 120ms ease;
+    }
+
+    li .copy-row:hover code,
+    li .copy-row:focus-within code {
+      background: var(--paper);
+    }
+
+    li .copy-row:hover .copy,
+    li .copy-row:focus-within .copy {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
+    }
+
+    footer {
+      margin-top: 28px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    footer code {
+      display: inline;
+      width: auto;
+      padding: 2px 6px;
+      border: 1px solid var(--hairline);
+      background: transparent;
+      white-space: normal;
+    }
+
+    @media (max-width: 860px) {
+      main { padding-top: 20px; }
+      .hero, .wiki-head, .grid { grid-template-columns: 1fr; }
+      .panel {
+        min-height: auto;
+        padding: 26px;
+      }
+      .stack { border-bottom: 1px solid var(--hairline); }
+      .command:last-child { border-bottom: 0; }
+    }
+
+    @media (max-width: 520px) {
+      main { width: min(100% - 18px, 1180px); }
+      h1 { font-size: clamp(42px, 18vw, 76px); }
+      .actions { display: grid; }
+      .button {
+        width: 100%;
+        margin-right: 0;
+        margin-bottom: -1px;
+      }
+      .command .copy-row { grid-template-columns: 1fr; }
+      .command .copy {
+        width: 100%;
+        margin-top: -1px;
+        margin-left: 0;
+      }
+    }
+
+    @media (hover: none), (pointer: coarse) {
+      li .copy {
+        opacity: 1;
+        pointer-events: auto;
+        transform: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <div class="panel">
+        <div class="eyebrow">ZenTao CLI</div>
+        <h1>命令速查</h1>
+        <p class="lead">把任务、Bug、需求、执行、测试、构建、动态和统计能力接到终端、脚本、CI 和 AI Skill。</p>
+        <div class="actions">
+          <button class="button primary" type="button" data-copy="npx -y @cloudglab/zentao-cli@latest install">复制安装命令</button>
+          <a class="button" href="https://github.com/cloudglab/zentao-cli">GitHub</a>
+          <a class="button" href="https://www.npmjs.com/package/@cloudglab/zentao-cli">npm</a>
+        </div>
+      </div>
+      <div class="stack">
+        <div class="command">
+          <strong>一键安装 CLI + Skill</strong>
+          <div class="copy-row"><code>npx -y @cloudglab/zentao-cli@latest install</code><button class="copy" type="button" data-copy="npx -y @cloudglab/zentao-cli@latest install">复制</button></div>
+        </div>
+        <div class="command">
+          <strong>已安装后更新</strong>
+          <div class="copy-row"><code>zentao update</code><button class="copy" type="button" data-copy="zentao update">复制</button></div>
+        </div>
+        <div class="command">
+          <strong>自举更新</strong>
+          <div class="copy-row"><code>npx -y @cloudglab/zentao-cli@latest update</code><button class="copy" type="button" data-copy="npx -y @cloudglab/zentao-cli@latest update">复制</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section wiki" aria-labelledby="wiki-title">
+      <div class="wiki-head">
+        <div>
+          <h2 id="wiki-title">Wiki / 检索</h2>
+          <p>先做成静态检索：安装、角色、任务、Bug、需求、执行、测试、构建和环境变量都能在本页快速过滤。后续可以扩展为构建期索引，覆盖 README、CHANGELOG 和源码导出的命令清单。</p>
+        </div>
+        <div class="wiki-search">
+          <label for="wiki-query">输入关键词</label>
+          <input id="wiki-query" type="search" placeholder="例如：Bug、需求、执行、环境变量、update" autocomplete="off">
+        </div>
+      </div>
+      <div class="wiki-status" id="wiki-status">输入关键词后过滤下方命令。</div>
+    </section>
+
+    <section class="grid" aria-label="命令速查">
+      <div class="section">
+        <h2>基础</h2>
+        <ul>
+          <li>一键安装<code>npx -y @cloudglab/zentao-cli@latest install</code></li>
+          <li>更新 CLI<code>zentao update</code></li>
+          <li>查看版本<code>zentao version</code></li>
+          <li>列出命令<code>zentao list</code></li>
+          <li>查看参数<code>zentao help getExecutionDetail</code></li>
+          <li>查看当前用户<code>zentao whoami</code></li>
+        </ul>
+      </div>
+      <div class="section">
+        <h2>我的工作</h2>
+        <ul>
+          <li>我的任务<code>zentao getMyTasks --status all --limit 20</code></li>
+          <li>我的 Bug<code>zentao getMyBugs --limit 50</code></li>
+          <li>任务统计<code>zentao getMyTaskStatistics</code></li>
+          <li>最近工作<code>zentao getMyWeeklyActivity --dateRange 最近3天</code></li>
+        </ul>
+      </div>
+      <div class="section">
+        <h2>角色入口</h2>
+        <ul>
+          <li>完整能力<code>zentao --role full list</code></li>
+          <li>研发常用<code>zentao-dev getMyTasks --limit 20</code></li>
+          <li>测试常用<code>zentao-qa getMyBugs --limit 50</code></li>
+          <li>产品项目<code>zentao-pm getProducts</code></li>
+        </ul>
+      </div>
+      <div class="section">
+        <h2>执行 / 迭代</h2>
+        <ul>
+          <li>执行详情<code>zentao getExecutionDetail --executionId 2130</code></li>
+          <li>执行 Bug<code>zentao getExecutionBugs --executionId 2130 --limit 100</code></li>
+          <li>执行构建<code>zentao getExecutionBuilds --executionId 2130</code></li>
+          <li>每日统计<code>zentao getExecutionDailyBugStats --executionId 2130</code></li>
+        </ul>
+      </div>
+      <div class="section">
+        <h2>产品 / 需求</h2>
+        <ul>
+          <li>产品列表<code>zentao getProducts</code></li>
+          <li>需求详情<code>zentao getStoryDetail --storyId 10154</code></li>
+          <li>搜索需求<code>zentao searchStories --keyword 登录</code></li>
+          <li>计划详情<code>zentao getPlanDetail --planId 360</code></li>
+        </ul>
+      </div>
+      <div class="section">
+        <h2>环境变量</h2>
+        <ul>
+          <li>服务地址<code>export ZENTAO_URL="https://your-zentao.example.com"</code></li>
+          <li>账号<code>export ZENTAO_USERNAME="your-account"</code></li>
+          <li>密码<code>export ZENTAO_PASSWORD="your-password"</code></li>
+          <li>API 版本<code>export ZENTAO_API_VERSION="v1"</code></li>
+        </ul>
+      </div>
+    </section>
+
+    <footer>写操作默认可用；真实写入仍需显式传入 <code style="display:inline;padding:2px 6px;border-radius:7px">confirm=true</code>。</footer>
+  </main>
+  <script>
+    document.querySelectorAll('li code').forEach((code) => {
+      if (code.parentElement?.classList.contains('copy-row')) return;
+      const row = document.createElement('div');
+      row.className = 'copy-row';
+      const copy = document.createElement('button');
+      copy.className = 'copy';
+      copy.type = 'button';
+      copy.textContent = '复制';
+      copy.dataset.copy = code.textContent.trim();
+      code.before(row);
+      row.append(code, copy);
+    });
+
+    async function copyText(text) {
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch (error) {
+          void error;
+        }
+      }
+
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const ok = document.execCommand('copy');
+      textarea.remove();
+      return ok;
+    }
+
+    document.querySelectorAll('[data-copy]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const text = button.textContent;
+        const ok = await copyText(button.dataset.copy);
+        button.textContent = ok ? '已复制' : '复制失败';
+        window.setTimeout(() => { button.textContent = text; }, 1200);
+      });
+    });
+
+    const wikiQuery = document.querySelector('#wiki-query');
+    const wikiStatus = document.querySelector('#wiki-status');
+    const commandSections = [...document.querySelectorAll('.grid .section')].map((section) => {
+      const items = [...section.querySelectorAll('li')].map((item) => ({
+        element: item,
+        text: item.textContent.toLowerCase(),
+      }));
+      return {
+        element: section,
+        text: section.textContent.toLowerCase(),
+        items,
+      };
+    });
+
+    function filterWiki() {
+      const query = wikiQuery.value.trim().toLowerCase();
+      let visibleItems = 0;
+      let visibleSections = 0;
+
+      commandSections.forEach((section) => {
+        let sectionHasMatch = false;
+        section.items.forEach((item) => {
+          const itemMatch = !query || item.text.includes(query);
+          item.element.hidden = !itemMatch;
+          if (itemMatch) {
+            sectionHasMatch = true;
+            visibleItems += 1;
+          }
+        });
+
+        const sectionMatch = !query || section.text.includes(query);
+        section.element.hidden = !(sectionHasMatch || sectionMatch);
+        if (!section.element.hidden) visibleSections += 1;
+      });
+
+      if (!query) {
+        wikiStatus.textContent = '输入关键词后过滤下方命令。';
+        return;
+      }
+
+      wikiStatus.textContent = visibleItems
+        ? `找到 ${visibleItems} 条命令，分布在 ${visibleSections} 个分类。`
+        : '没有匹配命令，可以换个关键词。';
+    }
+
+    wikiQuery.addEventListener('input', filterWiki);
+  </script>
+</body>
+</html>

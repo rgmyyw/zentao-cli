@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.16 - 2026-06-10
+
+### Added
+
+- 新增每日更新探针：每天首次执行普通 `zentao` 命令时检查 npm 最新版本，发现新版本后提示并自动执行 `zentao update --skip-config-check`。
+- 新增 GitHub Pages 极简命令速查页，提供安装、更新、角色入口、常用查询和环境变量命令的一键复制入口。
+- 新增 Pages 发布工作流，推送 `main` 后自动部署 `docs/` 静态页面。
+
+### Changed
+
+- 命令速查页改为黑白线条风格，并在桌面端使用 hover/focus 显示复制动作，移动端保持复制按钮可见。
+- 命令速查页新增本地 Wiki / 检索入口，可按关键词过滤本页维护的命令清单。
+
 ## 0.1.15 - 2026-06-10
 
 ### Added

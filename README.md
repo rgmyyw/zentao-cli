@@ -42,7 +42,7 @@ zentao install --skill-local-path ./package
 zentao update
 ```
 
-`zentao update` 会重新安装最新 CLI，然后从全局已安装的最新 CLI 包内安装 skill，最后校验禅道配置。只是更新工具、不想被配置校验阻塞时可以跳过校验：
+`zentao update` 会重新安装最新 CLI，然后从全局已安装的最新 CLI 包内安装 skill，最后校验禅道配置。普通命令每天首次运行时也会做一次轻量更新探针：如果 npm 上存在新版本，会提示并自动执行 `zentao update --skip-config-check`，避免长期停留在旧版。只是更新工具、不想被配置校验阻塞时可以跳过校验：
 
 ```bash
 zentao update --skip-config-check
@@ -60,6 +60,22 @@ npx -y @cloudglab/zentao-cli@latest update
 zentao update --cli-only
 zentao update --skill-only
 ```
+
+如果需要在脚本或 CI 中关闭每日更新探针，可以设置：
+
+```bash
+export ZENTAO_SKIP_UPDATE_CHECK=true
+```
+
+### 命令速查页
+
+项目提供极简命令速查页，适合复制安装、更新、角色入口、常用查询和环境变量命令：
+
+```text
+https://cloudglab.github.io/zentao-cli/
+```
+
+页面源码位于 `docs/index.html`，由 GitHub Pages 工作流自动部署。该页面不随 npm 包发布，npm 包只保留 CLI、Skill、README 和 CHANGELOG。
 
 ### CI / 脚本里临时使用
 
