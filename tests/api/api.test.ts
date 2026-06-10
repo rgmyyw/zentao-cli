@@ -140,11 +140,18 @@ describe('TaskApi', () => {
 
 describe('BugApi', () => {
   it('gets product bugs with normalized params and default branch/order', async () => {
-    const http = createHttp([{ bugs: [{ id: 1 }], total: 1 }]);
-    const result = await new BugApi(http as never).getProductBugs({ productId: 2, status: 'all', page: 1, limit: 5 });
+    const http = createHttp([{ bugs: [{ id: 1, title: '【YJ】wifi设备位置不准' }, { id: 2, title: '【AB】其他问题' }], total: 2 }]);
+    const result = await new BugApi(http as never).getProductBugs({ productId: 2, status: 'all', page: 1, limit: 5, module: 'yj' });
 
-    expect(result).toMatchObject({ items: [{ id: 1 }], total: 1 });
-    expect(http.request).toHaveBeenCalledWith('GET', '/products/2/bugs', { params: { page: 1, limit: 5, branch: 'all', order: 'id_desc', status: undefined } });
+    expect(result).toMatchObject({ source: 'client-paginated', items: [{ id: 1 }], total: 1, scanned: 2 });
+    expect(http.request).toHaveBeenCalledWith('GET', '/products/2/bugs', { params: { page: 1, limit: 100, branch: 'all', order: 'id_desc', status: undefined } });
+  });
+
+  it('matches chinese module aliases by initials', async () => {
+    const http = createHttp([{ bugs: [{ id: 1, module: '云镜' }, { id: 2, module: '警务数盘' }], total: 2 }]);
+    const result = await new BugApi(http as never).getProductBugs({ productId: 2, status: 'all', page: 1, limit: 5, module: 'yj' });
+
+    expect(result).toMatchObject({ source: 'client-paginated', items: [{ id: 1, module: '云镜' }], total: 1, scanned: 2, matched: 1 });
   });
 
   it('aggregates assigned bugs across all products and sorts them', async () => {

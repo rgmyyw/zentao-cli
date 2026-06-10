@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.17 - 2026-06-11
+
+### Added
+
+- `getProductBugs` 新增 `--search`、`--module` 和 `--moduleId` 参数，支持按关键词、模块别名或模块 ID 查询产品 Bug。
+- 线上 / 生产 / 客户反馈 Bug 场景默认先定位固定产品 `市场和售后问题跟踪`，再通过模块匹配真实业务产品；模块别名大小写不敏感，常见中文模块支持首字母缩写，例如 `云镜` 可用 `yj`。
+
+### Fixed
+
+- 修复禅道 REST v1 忽略产品 Bug 列表 `query/moduleId` 参数时，CLI 无法按关键词或模块准确过滤的问题；现在会在需要过滤时全量分页拉取后做客户端过滤、排序和分页。
+
 ## 0.1.16 - 2026-06-10
 
 ### Added

@@ -8,6 +8,9 @@ export interface BugListParams extends PaginationInput {
   status?: string;
   branch?: string;
   order?: string;
+  search?: string;
+  module?: string;
+  moduleId?: number;
 }
 
 export interface ResolveBugInput {
@@ -69,6 +72,12 @@ export class BugApi {
   }
 
   async getProductBugs(params: BugListParams): Promise<unknown> {
+    const needsClientFilter = !!(params.moduleId || params.module || params.search);
+
+    if (needsClientFilter) {
+      return this.getProductBugsWithClientFilter(params);
+    }
+
     const pagination = normalizePagination(params);
     const response = await this.http.request<ZentaoListResponse<ZentaoBug> & { bugs?: ZentaoBug[] }>('GET', `/products/${params.productId}/bugs`, {
       params: {
@@ -79,6 +88,61 @@ export class BugApi {
       },
     });
     return toServerListResult(response, ['bugs'], params);
+  }
+
+  private async getProductBugsWithClientFilter(params: BugListParams): Promise<ListResult<ZentaoBug>> {
+    const pageSize = 100;
+    const firstPage = await this.fetchProductBugsPage(params, 1, pageSize);
+    const firstResult = toServerListResult<ZentaoBug>(firstPage, ['bugs']);
+    const total = firstResult.total;
+    const allBugs = [...firstResult.items];
+    const totalPages = normalizeTotalPages(total, pageSize, allBugs.length);
+
+    for (let page = 2; page <= totalPages; page += 1) {
+      const response = await this.fetchProductBugsPage(params, page, pageSize);
+      const result = toServerListResult<ZentaoBug>(response, ['bugs']);
+      allBugs.push(...result.items);
+    }
+
+    let filtered = allBugs;
+
+    if (params.moduleId) {
+      filtered = filtered.filter((bug) => {
+        const bugModuleId = (bug as Record<string, unknown>).module ?? (bug as Record<string, unknown>).moduleId;
+        return Number(bugModuleId) === params.moduleId;
+      });
+    }
+
+    if (params.module) {
+      const keyword = normalizeBugFilterText(params.module);
+      filtered = filtered.filter((bug) => bugMatchesModuleAlias(bug, keyword));
+    }
+
+    if (params.search) {
+      const keyword = normalizeBugFilterText(params.search);
+      filtered = filtered.filter((bug) => bugMatchesKeyword(bug, keyword, ['id', 'title', 'name', 'keywords', 'steps', 'moduleTitle', 'moduleName', 'modulePath', 'path']));
+    }
+
+    const sorted = this.sortBugs(filtered, params.order);
+
+    const result = toClientPaginatedListResult<ZentaoBug>({ bugs: sorted }, ['bugs'], params);
+    return {
+      ...result,
+      scanned: allBugs.length,
+      ...(filtered.length !== allBugs.length ? { matched: filtered.length } : {}),
+    } as ListResult<ZentaoBug> & { matched?: number };
+  }
+
+  private async fetchProductBugsPage(params: BugListParams, page: number, limit: number): Promise<unknown> {
+    return this.http.request('GET', `/products/${params.productId}/bugs`, {
+      params: {
+        page,
+        limit,
+        branch: params.branch ?? 'all',
+        order: params.order ?? 'id_desc',
+        status: params.status === 'all' ? undefined : params.status,
+      },
+    });
   }
 
   async getBugDetail(bugId: number): Promise<ZentaoBug> {
@@ -146,3 +210,87 @@ export class BugApi {
     return sorted;
   }
 }
+
+function normalizeBugFilterText(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function bugMatchesKeyword(bug: ZentaoBug, keyword: string, fields: string[]): boolean {
+  if (!keyword) return true;
+
+  const record = bug as Record<string, unknown>;
+  for (const field of fields) {
+    const value = record[field];
+    if (value === undefined || value === null) continue;
+    if (String(value).toLowerCase().includes(keyword)) return true;
+  }
+
+  return false;
+}
+
+function bugMatchesModuleAlias(bug: ZentaoBug, keyword: string): boolean {
+  if (!keyword) return true;
+
+  const fields = ['module', 'moduleId', 'moduleName', 'moduleTitle', 'modulePath', 'path', 'title', 'keywords', 'v1', 'v2'];
+  if (bugMatchesKeyword(bug, keyword, fields)) return true;
+
+  const record = bug as Record<string, unknown>;
+  const aliasSources = fields
+    .map((field) => record[field])
+    .filter((value): value is string | number => value !== undefined && value !== null)
+    .map((value) => String(value));
+
+  return aliasSources.some((value) => normalizeAliasText(value).includes(keyword));
+}
+
+function normalizeAliasText(value: string): string {
+  let result = '';
+
+  for (const char of value.toLowerCase()) {
+    if (/[a-z0-9]/.test(char)) {
+      result += char;
+      continue;
+    }
+
+    const initial = chineseInitialMap[char];
+    if (initial) {
+      result += initial;
+    }
+  }
+
+  return result;
+}
+
+const chineseInitialMap: Record<string, string> = {
+  '超': 'c',
+  '管': 'g',
+  '云': 'y',
+  '镜': 'j',
+  '助': 'z',
+  '手': 's',
+  '脉': 'm',
+  '眺': 't',
+  '警': 'j',
+  '务': 'w',
+  '数': 's',
+  '盘': 'p',
+  '析': 'x',
+  '案': 'a',
+  '系': 'x',
+  '统': 't',
+  '寻': 'x',
+  '迹': 'j',
+  '客': 'k',
+  '户': 'h',
+  '成': 'c',
+  '功': 'g',
+  '部': 'b',
+  '服': 'f',
+  '止': 'z',
+  '付': 'f',
+  '通': 't',
+  '两': 'l',
+  '卡': 'k',
+  '其': 'q',
+  '他': 't',
+};

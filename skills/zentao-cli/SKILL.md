@@ -80,7 +80,7 @@ argument-hint: "[command]"
 2. 找到名称为 `市场和售后问题跟踪` 的产品
 3. 用该产品 ID 调 `getProductBugs`
 4. 必要时继续分页
-5. 用 `module` / `moduleName` / `modulePath` / `path`，以及标题、关键词等字段匹配真实业务产品
+5. 用 `module` / `moduleName` / `modulePath` / `path`，以及标题、关键词等字段匹配真实业务产品；模块别名按不区分大小写处理，`YJ` / `Yj` / `yj` 视为同一模块，常见中文模块名支持首字母缩写，例如 `云镜` 可用 `yj`
 
 输出必须说明：
 

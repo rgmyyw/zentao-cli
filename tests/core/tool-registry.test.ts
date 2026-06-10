@@ -152,6 +152,35 @@ describe('registerTools', () => {
     expect(() => parseCommandInput(command!.schema, ['--statsu', 'doing'])).toThrow('未知参数: --statsu');
   });
 
+  it('parses getProductBugs search keyword', () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ bug: { getProductBugs: vi.fn() } } as never);
+
+    registerTools(registry, 'dev');
+    const command = registry.getCommand('getProductBugs');
+
+    expect(parseCommandInput(command!.schema, ['--productId', '87', '--status', 'all', '--limit', '100', '--order', 'id_desc', '--search', '浙江'])).toMatchObject({
+      productId: 87,
+      status: 'all',
+      limit: 100,
+      order: 'id_desc',
+      search: '浙江',
+    });
+  });
+
+  it('parses getProductBugs module alias keyword', () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ bug: { getProductBugs: vi.fn() } } as never);
+
+    registerTools(registry, 'dev');
+    const command = registry.getCommand('getProductBugs');
+
+    expect(parseCommandInput(command!.schema, ['--productId', '87', '--module', 'Yj'])).toMatchObject({
+      productId: 87,
+      module: 'Yj',
+    });
+  });
+
   it('parses inline --key=value CLI args', () => {
     const registry = new InMemoryCliRegistry();
     setApi({ task: { getMyTasks: vi.fn() } } as never);

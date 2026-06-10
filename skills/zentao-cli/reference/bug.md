@@ -36,7 +36,7 @@ zentao getProductBugs --productId <市场和售后问题跟踪产品ID> --status
 zentao getProductBugs --productId <市场和售后问题跟踪产品ID> --status all --page 2 --limit 100 --order id_desc
 ```
 
-4. 在返回结果中，用用户提到的真实产品名匹配 Bug 的模块字段，例如 `module`、`moduleName`、`modulePath`、`path`，以及标题、关键词等补充字段。
+4. 在返回结果中，用用户提到的真实产品名匹配 Bug 的模块字段，例如 `module`、`moduleName`、`modulePath`、`path`，以及标题、关键词等补充字段；模块别名按不区分大小写匹配，`YJ` / `Yj` / `yj` 视为同一个模块查询，常见中文模块名支持首字母缩写，例如 `云镜` 可用 `yj`。
 5. 如果用户没有指定状态，默认同时看未关闭和近期已解决的 Bug；输出时优先展示未关闭 / 激活 / 待处理问题。
 6. 如果用户问“最近”，优先用 `openedDate`、`editedDate`、`assignedDate`、`resolvedDate`、`closedDate` 等时间字段判断；缺少时间字段时，说明只能按 `id_desc` 近似代表最近。
 

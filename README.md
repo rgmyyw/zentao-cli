@@ -183,6 +183,8 @@ CLI 参数支持 `--key value` 和 `--key=value` 两种写法；如果参数名�
 ### Bug 和版本
 
 - 看某个执行下有哪些版本。
+- 查某个产品下包含关键词的 Bug：`zentao getProductBugs --productId 87 --status all --search 浙江 --limit 100`。
+- 查线上 / 生产 / 客户反馈问题时，先查 `市场和售后问题跟踪` 产品，再按模块过滤真实业务产品：`zentao getProductBugs --productId <市场和售后问题跟踪产品ID> --status all --module yj --order id_desc --limit 100`。
 - 提一个新的 Bug 并指派负责人。
 - 调整 Bug 的优先级、严重程度、模块、关联需求或计划。
 - 指派、确认、解决、激活、关闭或删除某个 Bug。
@@ -209,6 +211,7 @@ Skill / Agent 处理禅道请求时，优先按下面格式路由：
 ### Bug 类
 
 - 查我的 Bug：我的 bug、我负责的 bug、分配给我的 bug、待我处理的 bug → 确认范围 → 调 `getMyBugs` → 过滤/分页 → 汇总。
+- 查线上 Bug：线上问题、生产问题、客户反馈问题、售后反馈 Bug → 先调 `getProducts` 找 `市场和售后问题跟踪` → 调 `getProductBugs --module <模块别名>` → 汇总未关闭和近期已解决问题。
 - 查 Bug 列表：查 bug、缺陷列表、某产品/执行 bug、未关闭/激活/已解决 bug → 确认产品或执行 → 查询列表 → 汇总。
 - 查 Bug 详情：这个 bug 什么情况、复现步骤、当前状态、谁负责 → 确认 `bugId` → 查详情 → 汇总。
 - 创建/更新 Bug：提 bug、报缺陷、指派、确认、关闭、激活、解决、改优先级/严重级别 → 补齐必要字段 → 写操作确认 → 调对应命令 → 汇总。

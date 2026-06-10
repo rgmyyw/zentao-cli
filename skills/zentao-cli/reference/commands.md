@@ -70,7 +70,8 @@
 | 场景 | 命令 | 用法 | 说明 |
 | --- | --- | --- | --- |
 | Bug 详情 | `getBugDetail` | `zentao getBugDetail --bugId <bugId>` | 查复现步骤、状态、负责人、动作记录、转任务。 |
-| 产品 Bug | `getProductBugs` | `zentao getProductBugs --productId <productId> --status all --limit 100` | 查某个禅道产品下 Bug。 |
+| 线上 Bug（默认优先） | `getProductBugs` | `zentao getProductBugs --productId <市场和售后问题跟踪产品ID> --status all --limit 100 --order id_desc --module <模块别名>` | 线上 / 生产 / 客户反馈问题默认走这里；先 `getProducts` 找到 `市场和售后问题跟踪`，模块名支持中文名、路径和 `YJ` / `yj` / `Yj` 这类别名。 |
+| 产品 Bug | `getProductBugs` | `zentao getProductBugs --productId <productId> --status all --limit 100` | 仅在用户明确说“查某个禅道产品下的 Bug”时使用。 |
 | 我的 Bug | `getMyBugs` | `zentao getMyBugs --productId <productId> --limit 50` | 产品内指派给我的 Bug。 |
 | Bug 关联需求 | `getBugRelatedStory` | `zentao getBugRelatedStory --bugId <bugId>` | 从 Bug 查关联需求。 |
 
