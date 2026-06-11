@@ -16,6 +16,7 @@ import { registerPlanRelationTools, registerStoryWriteTools, registerTaskDerived
 import { registerBuildWriteTools, registerExecutionWriteTools, registerTestCaseWriteTools, registerTestTaskWriteTools } from '../tools/phase3b.js';
 import { registerRelationTools } from '../tools/relation.js';
 import { registerReleaseTools } from '../tools/release.js';
+import { registerResourceAnalysisTools } from '../tools/resource-analysis.js';
 import { registerStatisticsTools } from '../tools/statistics.js';
 import { registerStoryTools } from '../tools/story.js';
 import { registerTaskTools } from '../tools/task.js';
@@ -44,6 +45,7 @@ export function registerTools(server: CliRegistry, role: Role): void {
   if (hasToolGroup(role, 'plan')) registerPlanTools(server);
   if (hasToolGroup(role, 'build')) registerBuildTools(server);
   if (hasToolGroup(role, 'release')) registerReleaseTools(server);
+  if (hasToolGroup(role, 'resource-analysis')) registerResourceAnalysisTools(server);
   if (hasToolGroup(role, 'search')) registerSearchTools(server);
   if (hasToolGroup(role, 'story-write')) registerStoryWriteTools(server);
   if (hasToolGroup(role, 'task-derived')) registerTaskDerivedTools(server);

@@ -51,16 +51,18 @@ describe('simple API wrappers', () => {
   });
 
   it('ProgramApi, ReleaseApi and UserApi call expected endpoints', async () => {
-    const http = createHttp([{ programs: [] }, { id: 1 }, { releases: [] }, { account: 'me' }]);
+    const http = createHttp([{ programs: [] }, { id: 1 }, { releases: [] }, { id: 2 }, { account: 'me' }]);
     await new ProgramApi(http as never).getPrograms('id_desc');
     await new ProgramApi(http as never).getProgramDetail(1);
     await new ReleaseApi(http as never).getProjectReleases(9);
+    await new ReleaseApi(http as never).getReleaseDetail(2);
     await new UserApi(http as never).getMyProfile();
 
     expect(http.request).toHaveBeenNthCalledWith(1, 'GET', '/programs', { params: { order: 'id_desc' } });
     expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/programs/1');
     expect(http.request).toHaveBeenNthCalledWith(3, 'GET', '/projects/9/releases');
-    expect(http.request).toHaveBeenNthCalledWith(4, 'GET', '/user');
+    expect(http.request).toHaveBeenNthCalledWith(4, 'GET', '/releases/2');
+    expect(http.request).toHaveBeenNthCalledWith(5, 'GET', '/user');
   });
 
   it('BuildApi strips project when creating build', async () => {

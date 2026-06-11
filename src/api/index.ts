@@ -8,6 +8,7 @@ import { ProgramApi } from './program.js';
 import { ProjectApi } from './project.js';
 import { PlanApi } from './plan.js';
 import { ReleaseApi } from './release.js';
+import { ResourceAnalysisApi } from './resource-analysis.js';
 import { SearchApi } from './search.js';
 import { RelationApi } from './relation.js';
 import { StatisticsApi } from './statistics.js';
@@ -40,6 +41,7 @@ export class ZentaoApi {
   readonly plan: PlanApi;
   readonly build: BuildApi;
   readonly release: ReleaseApi;
+  readonly resourceAnalysis: ResourceAnalysisApi;
   readonly search: SearchApi;
 
   constructor(config: ZentaoConfig) {
@@ -62,6 +64,7 @@ export class ZentaoApi {
     this.plan = new PlanApi(this.http);
     this.build = new BuildApi(this.http);
     this.release = new ReleaseApi(this.http);
+    this.resourceAnalysis = new ResourceAnalysisApi(this.http, this.bug, this.task);
     this.search = new SearchApi(this.product, this.story);
   }
 

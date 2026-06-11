@@ -22,6 +22,7 @@ describe('roles', () => {
       'program',
       'plan',
       'release',
+      'resource-analysis',
       'search',
       'story-write',
       'plan-relation',

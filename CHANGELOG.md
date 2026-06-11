@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.18 - 2026-06-11
+
+### Added
+
+- 新增 `getReleaseDetail`，支持按发布 ID 查询发布详情，补齐项目发布列表后的详情查询链路。
+- 新增 `analyzeBugResources` 和 `analyzeTaskResources`，可从 Bug / 任务详情中解析附件和资源线索，下载到本地临时目录，并对小文本、图片、压缩包和二进制资源给出分析路由。
+- 新增 `okBug`，通过旧版 `bug-ok-{id}.json` 控制器支持 Bug 验证通过动作。
+
+### Changed
+
+- `startTask` 针对禅道 18.5 REST start 行为异常增加状态和负责人恢复逻辑，避免开始任务后被错误置为完成。
+- `resolveBug` 支持 `tostory` 解决方案，覆盖转需求场景。
+- 发布前查询回归脚本补充 `okBug` 命令面检查。
+
 ## 0.1.17 - 2026-06-11
 
 ### Added

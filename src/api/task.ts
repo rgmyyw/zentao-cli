@@ -76,7 +76,14 @@ export class TaskApi {
   }
 
   async startTask(taskId: number, data: Record<string, unknown> = {}): Promise<unknown> {
-    return this.http.request('POST', `/tasks/${taskId}/start`, { data });
+    // Workaround for Zentao 18.5 bug: POST /tasks/{id}/start incorrectly sets
+    // status to 'done' and changes assignedTo. Capture original assignee, call
+    // start, then force status back to 'doing' and restore assignee.
+    const before = await this.getTaskDetail(taskId);
+    const result = await this.http.request('POST', `/tasks/${taskId}/start`, { data });
+    const assignedTo = (data.assignedTo as string | undefined) ?? before.assignedTo ?? before.openedBy;
+    await this.updateTask(taskId, { status: 'doing', assignedTo });
+    return result;
   }
 
   async pauseTask(taskId: number, data: Record<string, unknown> = {}): Promise<unknown> {

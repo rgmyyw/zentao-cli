@@ -14,7 +14,7 @@ export interface BugListParams extends PaginationInput {
 }
 
 export interface ResolveBugInput {
-  resolution: 'fixed' | 'bydesign' | 'duplicate' | 'external' | 'notrepro' | 'postponed' | 'willnotfix';
+  resolution: 'fixed' | 'bydesign' | 'duplicate' | 'external' | 'notrepro' | 'postponed' | 'willnotfix' | 'tostory';
   resolvedBuild?: string;
   resolvedDate?: string;
   assignedTo?: string;
@@ -171,6 +171,11 @@ export class BugApi {
 
   async deleteBug(bugId: number): Promise<unknown> {
     return this.http.request('DELETE', `/bugs/${bugId}`);
+  }
+
+  async okBug(bugId: number, data: Record<string, unknown> = {}): Promise<unknown> {
+    // 禅道 18.5 REST 没暴露 /bugs/{id}/ok，UI 的 OK 按钮调旧版控制器
+    return this.http.legacyRequest('POST', `/bug-ok-${bugId}.json`, { data });
   }
 
   async resolveBug(bugId: number, input: ResolveBugInput): Promise<unknown> {

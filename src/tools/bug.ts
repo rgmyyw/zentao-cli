@@ -51,7 +51,7 @@ export function registerBugTools(server: CliRegistry): void {
     'resolveBug',
     {
       bugId: z.number().int().positive(),
-      resolution: z.enum(['fixed', 'bydesign', 'duplicate', 'external', 'notrepro', 'postponed', 'willnotfix']),
+      resolution: z.enum(['fixed', 'bydesign', 'duplicate', 'external', 'notrepro', 'postponed', 'willnotfix', 'tostory']),
       resolvedBuild: z.string().optional(),
       resolvedDate: z.string().optional().describe('解决日期/时间，禅道 18.5 bugresolve 支持该字段'),
       assignedTo: z.string().optional(),
@@ -120,6 +120,16 @@ export function registerBugTools(server: CliRegistry): void {
       confirm: z.boolean().optional().default(false),
     },
     async ({ bugId, confirm, ...data }) => runActioned('assignBug', confirm, { bugId, data }, () => getApi().bug.assignBug(bugId, data)),
+  );
+
+  server.tool(
+    'okBug',
+    {
+      bugId: z.number().int().positive(),
+      comment: z.string().optional(),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ bugId, confirm, ...data }) => runActioned('okBug', confirm, { bugId, data }, () => getApi().bug.okBug(bugId, data)),
   );
 
   server.tool(

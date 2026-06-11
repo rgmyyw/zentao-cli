@@ -183,13 +183,17 @@ CLI 参数支持 `--key value` 和 `--key=value` 两种写法；如果参数名�
 ### Bug 和版本
 
 - 看某个执行下有哪些版本。
+- 看某个项目下有哪些发布：`zentao getProjectReleases --projectId 1772`。
+- 看某个发布详情：`zentao getReleaseDetail --releaseId 1`。
 - 查某个产品下包含关键词的 Bug：`zentao getProductBugs --productId 87 --status all --search 浙江 --limit 100`。
 - 查线上 / 生产 / 客户反馈问题时，先查 `市场和售后问题跟踪` 产品，再按模块过滤真实业务产品：`zentao getProductBugs --productId <市场和售后问题跟踪产品ID> --status all --module yj --order id_desc --limit 100`。
 - 提一个新的 Bug 并指派负责人。
 - 调整 Bug 的优先级、严重程度、模块、关联需求或计划。
-- 指派、确认、解决、激活、关闭或删除某个 Bug。
+- 指派、确认、解决、验证通过、激活、关闭或删除某个 Bug。
 - 解决 Bug 时关联到某个版本。
+- 解决 Bug 时转需求：`zentao resolveBug --bugId 123 --resolution tostory --confirm true`。
 - 查某个执行下已解决未关闭、延期处理或 reopen 过的 Bug。
+- 分析 Bug 附件和图片资源：`zentao analyzeBugResources --bugId 123`。
 
 ### 需求、产品、项目和测试
 
@@ -229,12 +233,14 @@ Skill / Agent 处理禅道请求时，优先按下面格式路由：
 - 需求转任务：按需求拆任务、需求转任务、基于需求排期 → 先查需求详情 → 按技术方案/任务实施拆分 → 走拆任务链路。
 - 创建/流转需求：创建需求、指派需求、关闭/激活需求、评审需求 → 补齐产品、标题、评审人、结果或关闭原因 → 写操作确认 → 调对应命令。
 - 查项目/执行：有哪些项目、当前迭代、`executionId` 是多少、项目下执行、进行中的执行 → 查询可选项 → 让用户确认范围。
+- 查发布：项目发布、发布详情、版本发布记录 → 确认 `projectId` 或 `releaseId` → 调 `getProjectReleases` / `getReleaseDetail` → 汇总。
 
 ### 特殊扩展场景
 
 - 页面 URL 查询：从旧版禅道页面 URL 解析对象类型和 ID，再返回结构化结果。
 - 动态和评论：REST API 缺少完整入口时，读取对象详情或页面 JSON 中的动作记录补全。
 - 每日迭代统计：组合执行 Bug、任务、构建、人员和动作记录，生成标准接口之外的汇总视图。
+- 附件资源分析：从 Bug / 任务详情解析附件、图片、日志和压缩包线索，下载到本地临时目录；小文本直接内联摘要，图片交给视觉模型或 OCR。
 - 写入类补全：标准 REST API 不覆盖的少量动作，会在明确 `confirm=true` 后模拟禅道前端 JSON 请求完成。
 
 ### 排期和父子结构
@@ -264,6 +270,12 @@ zentao help getExecutionDetail
 zentao --role qa getExecutionBugs --executionId 1234 --limit 100
 zentao --role qa getExecutionBuilds --executionId 1234
 zentao --role qa getExecutionDynamic --executionId 1234
+zentao getProjectReleases --projectId 1772
+zentao getReleaseDetail --releaseId 1
+
+# 附件资源分析
+zentao analyzeBugResources --bugId 123
+zentao analyzeTaskResources --taskId 123 --download false
 
 # 每日迭代执行统计
 zentao --role qa getExecutionDailyBugStats --executionId 1234 --iterationName 某个迭代
@@ -272,6 +284,7 @@ zentao --role qa getExecutionDailyBugStats --executionId 1234 --iterationName �
 # 写操作示例（必须显式 confirm=true）
 zentao --role dev assignTask --taskId 123 --assignedTo some-account --confirm true
 zentao --role qa createBug --product 1 --title "页面按钮无响应" --openedBuild trunk --steps "复现步骤" --confirm true
+zentao --role qa okBug --bugId 123 --comment "回归通过" --confirm true
 zentao --role pm createStory --product 1 --title "新增导出能力" --spec "需求说明" --verify "验收标准" --confirm true
 zentao createTodo --name "跟进缺陷回归" --begin 09:00 --end 10:00 --confirm true
 ```

@@ -8,4 +8,8 @@ export class ReleaseApi {
     const response = await this.http.request('GET', `/projects/${projectId}/releases`);
     return toServerListResult(response, ['releases']);
   }
+
+  async getReleaseDetail(releaseId: number): Promise<unknown> {
+    return this.http.request('GET', `/releases/${releaseId}`);
+  }
 }

@@ -74,6 +74,7 @@ const commandSurface = [
   'getMyBugs',
   'getMyBugStatistics',
   'getMyProfile',
+  'okBug',
   'getMyTasks',
   'getMyTaskStatistics',
   'getMyTodos',

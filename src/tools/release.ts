@@ -5,4 +5,5 @@ import { jsonResult } from './shared.js';
 
 export function registerReleaseTools(server: CliRegistry): void {
   server.tool('getProjectReleases', { projectId: z.number().int().positive() }, async ({ projectId }) => jsonResult(await getApi().release.getProjectReleases(projectId)));
+  server.tool('getReleaseDetail', { releaseId: z.number().int().positive() }, async ({ releaseId }) => jsonResult(await getApi().release.getReleaseDetail(releaseId)));
 }
