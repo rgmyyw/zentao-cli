@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.23 - 2026-06-13
+
+### Fixed
+
+- `zentao install` / `zentao update` 及 `npx update` 在 `npm install -g` 之前主动清理全局安装残留目录（上一次安装/更新中断留下的半更新状态目录），从根源避免 ENOTEMPTY 错误。此前只在失败后重试清理，现在改为每次安装前无条件做预防性清理。
+
 ## 0.1.22 - 2026-06-13
 
 ### Added

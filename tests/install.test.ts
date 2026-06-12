@@ -68,6 +68,7 @@ describe('install command', () => {
     await runInstallCommand([]);
 
     expect(commandCalls).toEqual([
+      { command: 'npm', args: ['root', '-g'] },
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
       { command: 'npm', args: ['root', '-g'] },
       { command: 'npx', args: ['-y', 'skills', 'add', expectedSkillPath, '--yes'] },
@@ -82,6 +83,7 @@ describe('install command', () => {
     await runUpdateCommand(['--skip-config-check']);
 
     expect(commandCalls).toEqual([
+      { command: 'npm', args: ['root', '-g'] },
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
       { command: 'npm', args: ['root', '-g'] },
       { command: 'npx', args: ['-y', 'skills', 'add', path.join('/usr/local/lib/node_modules', '@cloudglab/zentao-cli', 'skills', 'zentao-cli'), '--yes'] },
@@ -96,6 +98,7 @@ describe('install command', () => {
     await runUpdateCommand(['--cli-only', '--skip-config-check']);
 
     expect(commandCalls).toEqual([
+      { command: 'npm', args: ['root', '-g'] },
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
     ]);
   });
@@ -124,6 +127,7 @@ describe('install command', () => {
     await runUpdateCommand(['--skill-local-path=./local-skill', '--skill-only=true', '--skip-config-check=false']);
 
     expect(commandCalls).toEqual([
+      { command: 'npm', args: ['root', '-g'] },
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
       { command: 'npm', args: ['pack', '@cloudglab/zentao-cli@latest', '--pack-destination', '/tmp/zentao-cli-skill-abc', '--silent'] },
       { command: 'tar', args: ['-xzf', '/tmp/zentao-cli-skill-abc/cloudglab-zentao-cli-0.1.5.tgz', '-C', '/tmp/zentao-cli-skill-abc'] },
@@ -141,8 +145,10 @@ describe('install command', () => {
     await runUpdateCommand(['--skill-source', 'git', '--skill-only', 'false', '--skip-config-check', 'true']);
 
     expect(commandCalls).toEqual([
+      { command: 'npm', args: ['root', '-g'] },
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
       { command: 'npx', args: ['-y', 'skills', 'add', 'cloudglab/zentao-cli', '--yes'] },
+      { command: 'npm', args: ['root', '-g'] },
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
       { command: 'npx', args: ['-y', 'skills', 'add', 'cloudglab/zentao-cli', '--yes'] },
     ]);
@@ -182,6 +188,7 @@ describe('install command', () => {
     await runInstallCommand(['--skill-source', 'git']);
 
     expect(commandCalls).toEqual([
+      { command: 'npm', args: ['root', '-g'] },
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
       { command: 'npx', args: ['-y', 'skills', 'add', 'cloudglab/zentao-cli', '--yes'] },
     ]);
@@ -195,6 +202,7 @@ describe('install command', () => {
     await runInstallCommand(['--skill-source', 'npm']);
 
     expect(commandCalls).toEqual([
+      { command: 'npm', args: ['root', '-g'] },
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
       { command: 'npm', args: ['pack', '@cloudglab/zentao-cli@latest', '--pack-destination', '/tmp/zentao-cli-skill-abc', '--silent'] },
       { command: 'tar', args: ['-xzf', '/tmp/zentao-cli-skill-abc/cloudglab-zentao-cli-0.1.5.tgz', '-C', '/tmp/zentao-cli-skill-abc'] },

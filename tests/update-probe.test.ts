@@ -30,7 +30,7 @@ describe('runDailyUpdateProbe', () => {
   it('prompts for manual update instead of auto-installing', async () => {
     process.env.NODE_ENV = 'development';
 
-    mockSpawn('0.1.23\n');
+    mockSpawn('0.1.24\n');
     vi.doMock('node:os', () => ({ homedir: () => '/tmp/home' }));
     vi.doMock('node:fs/promises', () => ({
       mkdir: vi.fn(async () => undefined),
@@ -45,7 +45,7 @@ describe('runDailyUpdateProbe', () => {
 
     await runDailyUpdateProbe('getMyTasks');
 
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('检测到 zentao CLI 新版本 0.1.23（当前 0.1.22）。'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('检测到 zentao CLI 新版本 0.1.24（当前 0.1.23）。'));
     expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao update --skip-config-check'));
     expect(write).not.toHaveBeenCalledWith(expect.stringContaining('开始自动更新'));
   });
@@ -53,7 +53,7 @@ describe('runDailyUpdateProbe', () => {
   it('ignores non-object update check state files', async () => {
     process.env.NODE_ENV = 'development';
 
-    mockSpawn('0.1.23\n');
+    mockSpawn('0.1.24\n');
     vi.doMock('node:os', () => ({ homedir: () => '/tmp/home' }));
     vi.doMock('node:fs/promises', () => ({
       mkdir: vi.fn(async () => undefined),
@@ -66,7 +66,7 @@ describe('runDailyUpdateProbe', () => {
 
     await runDailyUpdateProbe('getMyTasks');
 
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('检测到 zentao CLI 新版本 0.1.23（当前 0.1.22）。'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('检测到 zentao CLI 新版本 0.1.24（当前 0.1.23）。'));
     expect(write).not.toHaveBeenCalledWith(expect.stringContaining('自动更新检查失败'));
   });
 });

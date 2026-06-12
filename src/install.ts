@@ -279,6 +279,7 @@ function parseBooleanValue(value: string, optionName: string): boolean {
 
 async function installPackageAndSkill(action: '安装' | '更新', options: InstallOptions): Promise<void> {
   if (!options.skillOnly) {
+    await cleanupGlobalPackageResidues();
     await runStep(`${action} zentao CLI`, 'npm', ['install', '-g', `${PACKAGE_NAME}@latest`]);
   }
   if (!options.cliOnly) {
@@ -404,11 +405,8 @@ function runCommand(command: string, args: string[]): Promise<void> {
 
 function createCommandFailedError(command: string, args: string[], code: number | null, stderr: string): Error {
   const baseMessage = `${command} ${args.join(' ')} 执行失败，退出码 ${String(code)}`;
-  if (command === 'npm' && args[0] === 'install' && args.includes('-g') && stderr.includes('ENOTEMPTY')) {
-    return new Error(`${baseMessage}\n检测到 npm 全局安装目录残留，建议执行：\nnpm uninstall -g ${PACKAGE_NAME}\nrm -rf "$(npm root -g)/@cloudglab/zentao-cli" "$(npm root -g)/@cloudglab/.zentao-cli-*"\nnpm install -g ${PACKAGE_NAME}@latest`);
-  }
-
-  return new Error(baseMessage);
+  const tail = stderr ? `：${stderr.trim()}` : '';
+  return new Error(baseMessage + tail);
 }
 
 function runCommandOutput(command: string, args: string[]): Promise<string> {
