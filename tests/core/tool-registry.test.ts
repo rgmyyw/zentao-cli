@@ -94,6 +94,7 @@ describe('registerTools', () => {
       'okBug',
       'pauseTask',
       'putoffExecution',
+      'recordTaskEstimate',
       'resolveBug',
       'restartTask',
       'reviewStory',
@@ -185,6 +186,40 @@ describe('registerTools', () => {
     });
   });
 
+  it('parses updateBug project, execution, plan and openedBuild args', () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ bug: { updateBug: vi.fn() } } as never);
+
+    registerTools(registry, 'dev');
+    const command = registry.getCommand('updateBug');
+
+    expect(parseCommandInput(command!.schema, ['--bugId', '84733', '--project', '1772', '--execution', '2140', '--plan', '2140', '--openedBuild', 'trunk'])).toMatchObject({
+      bugId: 84733,
+      project: 1772,
+      execution: 2140,
+      plan: 2140,
+      openedBuild: 'trunk',
+      confirm: false,
+    });
+  });
+
+  it('parses recordTaskEstimate args', () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ task: { recordEstimate: vi.fn() } } as never);
+
+    registerTools(registry, 'dev');
+    const command = registry.getCommand('recordTaskEstimate');
+
+    expect(parseCommandInput(command!.schema, ['--taskId', '79945', '--date', ' 2026-06-12 ', '--consumed', '2', '--left', '18', '--work', ' 今天处理联调 '])).toMatchObject({
+      taskId: 79945,
+      date: '2026-06-12',
+      consumed: 2,
+      left: 18,
+      work: '今天处理联调',
+      confirm: false,
+    });
+  });
+
   it('parses inline --key=value CLI args', () => {
     const registry = new InMemoryCliRegistry();
     setApi({ task: { getMyTasks: vi.fn() } } as never);
@@ -196,6 +231,338 @@ describe('registerTools', () => {
       status: 'doing',
       page: 2,
       limit: 5,
+    });
+  });
+
+  it('accepts legacyBaseUrl in initZentao args', () => {
+    const registry = new InMemoryCliRegistry();
+
+    registerTools(registry, 'full');
+    const command = registry.getCommand('initZentao');
+
+    expect(parseCommandInput(command!.schema, ['--url', 'https://host', '--username', 'u', '--password', 'p', '--legacyBaseUrl', 'https://host/custom'])).toMatchObject({
+      url: 'https://host',
+      username: 'u',
+      password: 'p',
+      legacyBaseUrl: 'https://host/custom',
+      save: false,
+    });
+
+    expect(parseCommandInput(command!.schema, ['--url', ' https://host ', '--username', ' u ', '--password', ' p ', '--legacyBaseUrl', ' https://host/custom '])).toMatchObject({
+      url: 'https://host',
+      username: 'u',
+      password: ' p ',
+      legacyBaseUrl: 'https://host/custom',
+    });
+
+    expect(parseCommandInput(command!.schema, ['--apiVersion', ' v2 '])).toMatchObject({
+      apiVersion: 'v2',
+      save: false,
+    });
+
+    expect(parseCommandInput(command!.schema, ['--url', '   ', '--username', '   ', '--apiVersion', '   '])).toMatchObject({
+      url: undefined,
+      username: undefined,
+      apiVersion: undefined,
+      save: false,
+    });
+
+    expect(() => parseCommandInput(command!.schema, ['--url', '   ', '--username', 'u', '--password', 'p']))
+      .not.toThrow();
+  });
+
+  it('trims todo and comment write strings in schemas', () => {
+    const registry = new InMemoryCliRegistry();
+
+    registerTools(registry, 'full');
+    const createTodoCommand = registry.getCommand('createTodo');
+    const updateTodoCommand = registry.getCommand('updateTodo');
+    const addCommentCommand = registry.getCommand('addComment');
+
+    expect(parseCommandInput(createTodoCommand!.schema, ['--name', ' todo ', '--desc', ' note '])).toMatchObject({
+      name: 'todo',
+      desc: 'note',
+      confirm: false,
+    });
+    expect(parseCommandInput(updateTodoCommand!.schema, ['--todoId', '1', '--name', ' next '])).toMatchObject({
+      todoId: 1,
+      name: 'next',
+      confirm: false,
+    });
+    expect(parseCommandInput(addCommentCommand!.schema, ['--objectType', 'bug', '--objectID', '1', '--comment', ' hi '])).toMatchObject({
+      objectType: 'bug',
+      objectID: 1,
+      comment: 'hi',
+      confirm: false,
+    });
+
+    expect(() => parseCommandInput(createTodoCommand!.schema, ['--name', '   '])).toThrow();
+    expect(() => parseCommandInput(addCommentCommand!.schema, ['--objectType', 'bug', '--objectID', '1', '--comment', '   '])).toThrow();
+  });
+
+  it('trims bug and story write strings in schemas', () => {
+    const registry = new InMemoryCliRegistry();
+
+    registerTools(registry, 'full');
+    const createBugCommand = registry.getCommand('createBug');
+    const assignBugCommand = registry.getCommand('assignBug');
+    const confirmBugCommand = registry.getCommand('confirmBug');
+    const createStoryCommand = registry.getCommand('createStory');
+    const assignStoryCommand = registry.getCommand('assignStory');
+    const activateStoryCommand = registry.getCommand('activateStory');
+    const updateStoryCommand = registry.getCommand('updateStory');
+
+    expect(parseCommandInput(createBugCommand!.schema, ['--product', '2', '--title', ' 登录失败 ', '--assignedTo', ' dev '])).toMatchObject({
+      product: 2,
+      title: '登录失败',
+      assignedTo: 'dev',
+      confirm: false,
+    });
+    expect(parseCommandInput(assignBugCommand!.schema, ['--bugId', '1', '--assignedTo', ' qa ', '--comment', ' note '])).toMatchObject({
+      bugId: 1,
+      assignedTo: 'qa',
+      comment: 'note',
+      confirm: false,
+    });
+    expect(parseCommandInput(confirmBugCommand!.schema, ['--bugId', '1', '--type', ' designchange ', '--comment', ' ok '])).toMatchObject({
+      bugId: 1,
+      type: 'designchange',
+      comment: 'ok',
+      confirm: false,
+    });
+    expect(parseCommandInput(createStoryCommand!.schema, ['--product', '2', '--title', ' 新需求 '])).toMatchObject({
+      product: 2,
+      title: '新需求',
+      confirm: false,
+    });
+    expect(parseCommandInput(assignStoryCommand!.schema, ['--storyId', '1', '--assignedTo', ' dev '])).toMatchObject({
+      storyId: 1,
+      assignedTo: 'dev',
+      confirm: false,
+    });
+    expect(parseCommandInput(activateStoryCommand!.schema, ['--storyId', '1', '--comment', '   '])).toMatchObject({
+      storyId: 1,
+      comment: undefined,
+      confirm: false,
+    });
+    expect(parseCommandInput(updateStoryCommand!.schema, ['--storyId', '1', '--mailto', '[" dev "," qa "]', '--notifyEmail', '[" a@example.com "," b@example.com "]'])).toMatchObject({
+      storyId: 1,
+      mailto: ['dev', 'qa'],
+      notifyEmail: ['a@example.com', 'b@example.com'],
+      confirm: false,
+    });
+
+    expect(() => parseCommandInput(createBugCommand!.schema, ['--product', '2', '--title', '   '])).toThrow();
+    expect(() => parseCommandInput(assignStoryCommand!.schema, ['--storyId', '1', '--assignedTo', '   '])).toThrow();
+  });
+
+  it('trims build, test case and test task write strings in schemas', () => {
+    const registry = new InMemoryCliRegistry();
+
+    registerTools(registry, 'full');
+    const createBuildCommand = registry.getCommand('createBuild');
+    const createTestCaseCommand = registry.getCommand('createTestCase');
+    const updateTestCaseCommand = registry.getCommand('updateTestCase');
+    const createTestTaskCommand = registry.getCommand('createTestTask');
+
+    expect(parseCommandInput(createBuildCommand!.schema, ['--project', '1', '--execution', '2', '--product', '3', '--name', ' 构建 ', '--builder', ' me '])).toMatchObject({
+      project: 1,
+      execution: 2,
+      product: 3,
+      name: '构建',
+      builder: 'me',
+      confirm: false,
+    });
+    expect(parseCommandInput(createTestCaseCommand!.schema, ['--productId', '1', '--title', ' 用例 ', '--type', ' feature ', '--steps', '[{"desc":" d ","expect":" e "}]'])).toMatchObject({
+      productId: 1,
+      title: '用例',
+      type: 'feature',
+      steps: [{ desc: 'd', expect: 'e' }],
+      confirm: false,
+    });
+    expect(parseCommandInput(updateTestCaseCommand!.schema, ['--testCaseId', '1', '--title', ' 新标题 '])).toMatchObject({
+      testCaseId: 1,
+      title: '新标题',
+      confirm: false,
+    });
+    expect(parseCommandInput(createTestTaskCommand!.schema, ['--project', '1', '--productID', '2', '--name', ' 测试单 ', '--build', ' build ', '--begin', ' 2026-01-01 ', '--end', ' 2026-01-02 ', '--type', '[" 功能 "," 冒烟 "]'])).toMatchObject({
+      project: 1,
+      productID: 2,
+      name: '测试单',
+      build: 'build',
+      begin: '2026-01-01',
+      end: '2026-01-02',
+      type: ['功能', '冒烟'],
+      confirm: false,
+    });
+
+    expect(() => parseCommandInput(createBuildCommand!.schema, ['--project', '1', '--execution', '2', '--product', '3', '--name', '   ', '--builder', 'me'])).toThrow();
+    expect(() => parseCommandInput(createTestCaseCommand!.schema, ['--productId', '1', '--title', 'ok', '--type', 'feature', '--steps', '[{"desc":"   ","expect":"e"}]'])).toThrow();
+    expect(() => parseCommandInput(createTestTaskCommand!.schema, ['--project', '1', '--productID', '2', '--name', 'ok', '--build', '   ', '--begin', '2026-01-01', '--end', '2026-01-02'])).toThrow();
+  });
+
+  it('converts blank optional write strings to undefined in schemas', () => {
+    const registry = new InMemoryCliRegistry();
+    registerTools(registry, 'full');
+
+    const updateStory = registry.getCommand('updateStory');
+    const updateExecution = registry.getCommand('updateExecution');
+    const createTodo = registry.getCommand('createTodo');
+    const confirmBug = registry.getCommand('confirmBug');
+
+    expect(parseCommandInput(updateStory!.schema, ['--storyId', '1', '--reviewer', '   ', '--source', '   '])).toMatchObject({
+      storyId: 1,
+      reviewer: undefined,
+      source: undefined,
+    });
+    expect(parseCommandInput(updateExecution!.schema, ['--executionId', '1', '--desc', '   ', '--PO', '   '])).toMatchObject({
+      executionId: 1,
+      desc: undefined,
+      PO: undefined,
+    });
+    expect(parseCommandInput(createTodo!.schema, ['--name', 'todo', '--desc', '   ', '--status', '   '])).toMatchObject({
+      name: 'todo',
+      desc: undefined,
+      status: undefined,
+    });
+    expect(parseCommandInput(confirmBug!.schema, ['--bugId', '1', '--assignedTo', '   ', '--comment', '   '])).toMatchObject({
+      bugId: 1,
+      assignedTo: undefined,
+      comment: undefined,
+    });
+  });
+
+  it('trims execution write strings in schemas', () => {
+    const registry = new InMemoryCliRegistry();
+
+    registerTools(registry, 'full');
+    const updateExecutionCommand = registry.getCommand('updateExecution');
+    const startExecutionCommand = registry.getCommand('startExecution');
+
+    expect(parseCommandInput(updateExecutionCommand!.schema, ['--executionId', '1', '--name', ' 迭代 ', '--PO', ' po ', '--teamMembers', '[" dev "," qa "]'])).toMatchObject({
+      executionId: 1,
+      name: '迭代',
+      PO: 'po',
+      teamMembers: ['dev', 'qa'],
+      confirm: false,
+    });
+    expect(parseCommandInput(startExecutionCommand!.schema, ['--executionId', '1', '--comment', ' start ', '--realBegan', ' 2026-06-05 '])).toMatchObject({
+      executionId: 1,
+      comment: 'start',
+      realBegan: '2026-06-05',
+      confirm: false,
+    });
+
+    expect(() => parseCommandInput(updateExecutionCommand!.schema, ['--executionId', '1', '--name', '   '])).toThrow();
+  });
+
+  it('trims execution and statistics read strings in schemas', () => {
+    const registry = new InMemoryCliRegistry();
+
+    registerTools(registry, 'full');
+    const getExecutionBugsCommand = registry.getCommand('getExecutionBugs');
+    const getExecutionDailyBugStatsCommand = registry.getCommand('getExecutionDailyBugStats');
+    const getMyWeeklyActivityCommand = registry.getCommand('getMyWeeklyActivity');
+
+    expect(parseCommandInput(getExecutionBugsCommand!.schema, ['--executionId', '1', '--status', ' active ', '--search', ' 登录 ', '--module', ' yj ', '--moduleId', '3383'])).toMatchObject({
+      executionId: 1,
+      status: 'active',
+      search: '登录',
+      module: 'yj',
+      moduleId: 3383,
+    });
+    expect(parseCommandInput(getExecutionBugsCommand!.schema, ['--executionId', '1', '--status', '   '])).toMatchObject({
+      executionId: 1,
+      status: undefined,
+    });
+    expect(parseCommandInput(getExecutionDailyBugStatsCommand!.schema, ['--executionId', '1', '--iterationName', ' 1.2.3迭代 ', '--date', ' 2026-06-05 '])).toMatchObject({
+      executionId: 1,
+      iterationName: '1.2.3迭代',
+      date: '2026-06-05',
+    });
+    expect(parseCommandInput(getExecutionDailyBugStatsCommand!.schema, ['--executionId', '1', '--iterationName', '   ', '--date', '   '])).toMatchObject({
+      executionId: 1,
+      iterationName: undefined,
+      date: undefined,
+    });
+    expect(parseCommandInput(getMyWeeklyActivityCommand!.schema, ['--account', ' me ', '--dateRange', ' 最近3天 ', '--startDate', ' 2026-05-25 ', '--endDate', ' 2026-05-29 '])).toMatchObject({
+      account: 'me',
+      dateRange: '最近3天',
+      startDate: '2026-05-25',
+      endDate: '2026-05-29',
+      week: 'last',
+    });
+
+    expect(() => parseCommandInput(getMyWeeklyActivityCommand!.schema, ['--account', '   '])).toThrow();
+  });
+
+  it('trims low-frequency read query strings in schemas', () => {
+    const registry = new InMemoryCliRegistry();
+
+    registerTools(registry, 'full');
+    const getMyBugsCommand = registry.getCommand('getMyBugs');
+    const getProductBugsCommand = registry.getCommand('getProductBugs');
+    const getProductPlansCommand = registry.getCommand('getProductPlans');
+    const getProgramsCommand = registry.getCommand('getPrograms');
+    const getProductTestCasesCommand = registry.getCommand('getProductTestCases');
+
+    expect(parseCommandInput(getMyBugsCommand!.schema, ['--branch', ' main ', '--order', ' id_desc '])).toMatchObject({
+      branch: 'main',
+      order: 'id_desc',
+    });
+    expect(parseCommandInput(getProductBugsCommand!.schema, ['--productId', '2', '--status', '   '])).toMatchObject({
+      productId: 2,
+      status: undefined,
+    });
+    expect(parseCommandInput(getProductBugsCommand!.schema, ['--productId', '2', '--status', ' all ', '--branch', ' dev ', '--order', ' id_asc ', '--search', ' 登录 ', '--module', ' yj '])).toMatchObject({
+      productId: 2,
+      status: 'all',
+      branch: 'dev',
+      order: 'id_asc',
+      search: '登录',
+      module: 'yj',
+    });
+    expect(parseCommandInput(getProductPlansCommand!.schema, ['--productId', '1', '--branch', ' all ', '--status', ' doing ', '--query', ' q ', '--order', ' id_desc '])).toMatchObject({
+      productId: 1,
+      branch: 'all',
+      status: 'doing',
+      query: 'q',
+      order: 'id_desc',
+    });
+    expect(parseCommandInput(getProductPlansCommand!.schema, ['--productId', '1', '--branch', '   ', '--status', '   ', '--query', '   ', '--order', '   '])).toMatchObject({
+      productId: 1,
+      branch: undefined,
+      status: undefined,
+      query: undefined,
+      order: undefined,
+    });
+    expect(parseCommandInput(getProgramsCommand!.schema, ['--order', ' id_desc '])).toMatchObject({ order: 'id_desc' });
+    expect(parseCommandInput(getProgramsCommand!.schema, ['--order', '   '])).toMatchObject({ order: undefined });
+    expect(parseCommandInput(getProductTestCasesCommand!.schema, ['--productId', '2', '--status', ' normal '])).toMatchObject({
+      productId: 2,
+      status: 'normal',
+    });
+    expect(parseCommandInput(getProductTestCasesCommand!.schema, ['--productId', '2', '--status', '   '])).toMatchObject({
+      productId: 2,
+      status: undefined,
+    });
+  });
+
+  it('trims low-frequency path strings in resource analysis schemas', () => {
+    const registry = new InMemoryCliRegistry();
+
+    registerTools(registry, 'full');
+    const analyzeBugResourcesCommand = registry.getCommand('analyzeBugResources');
+
+    expect(parseCommandInput(analyzeBugResourcesCommand!.schema, ['--bugId', '1', '--outDir', ' /tmp/zentao-resources '])).toMatchObject({
+      bugId: 1,
+      outDir: '/tmp/zentao-resources',
+      download: true,
+    });
+    expect(parseCommandInput(analyzeBugResourcesCommand!.schema, ['--bugId', '1', '--outDir', '   '])).toMatchObject({
+      bugId: 1,
+      outDir: undefined,
+      download: true,
     });
   });
 
@@ -216,6 +583,29 @@ describe('registerTools', () => {
       action: 'updateTask',
       reason: expect.stringContaining('confirm: true'),
     });
+  });
+
+  it('omits blank optional write strings from preview payloads', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ story: { updateStory: vi.fn() } } as never);
+
+    registerTools(registry, 'full');
+    const command = registry.getCommand('updateStory');
+    const input = parseCommandInput(command!.schema, ['--storyId', '9', '--reviewer', '   ', '--sourceNote', ' note ']);
+    const result = await command!.handler(input);
+
+    expect(parseResult(result)).toMatchObject({
+      ok: false,
+      preview: true,
+      action: 'updateStory',
+      payload: {
+        storyId: 9,
+        update: {
+          sourceNote: 'note',
+        },
+      },
+    });
+    expect(JSON.stringify(parseResult(result))).not.toContain('reviewer');
   });
 
   it('returns disabled previews when write is explicitly disabled', async () => {
@@ -250,6 +640,97 @@ describe('registerTools', () => {
 
     expect(updateTestTask).toHaveBeenCalled();
     expect(parseResult(result)).toEqual({ status: 'success' });
+  });
+
+  it('trims task write strings and rejects whitespace-only required values in schemas', () => {
+    const registry = new InMemoryCliRegistry();
+    registerTools(registry, 'dev');
+
+    const finishTask = registry.getCommand('finishTask');
+    const assignTask = registry.getCommand('assignTask');
+    const pauseTask = registry.getCommand('pauseTask');
+    const activateTask = registry.getCommand('activateTask');
+    const createTaskFromStory = registry.getCommand('createTaskFromStory');
+
+    expect(parseCommandInput(finishTask!.schema, ['--taskId', '1', '--currentConsumed', '1', '--realStarted', ' 2026-01-01 ', '--finishedDate', ' 2026-01-02 ']))
+      .toMatchObject({ realStarted: '2026-01-01', finishedDate: '2026-01-02' });
+    expect(() => parseCommandInput(finishTask!.schema, ['--taskId', '1', '--currentConsumed', '1', '--realStarted', '   ', '--finishedDate', '2026-01-02']))
+      .toThrow();
+    expect(parseCommandInput(assignTask!.schema, ['--taskId', '1', '--assignedTo', ' dev ']))
+      .toMatchObject({ assignedTo: 'dev' });
+    expect(parseCommandInput(pauseTask!.schema, ['--taskId', '1', '--comment', ' note ']))
+      .toMatchObject({ comment: 'note' });
+    expect(parseCommandInput(activateTask!.schema, ['--taskId', '1', '--assignedTo', ' qa ', '--comment', ' back ']))
+      .toMatchObject({ assignedTo: 'qa', comment: 'back' });
+    expect(parseCommandInput(createTaskFromStory!.schema, ['--storyId', '1', '--execution', '2', '--taskName', ' 新任务 ', '--assignedTo', ' me ', '--estStarted', ' 2026-01-01 ', '--deadline', ' 2026-01-02 ']))
+      .toMatchObject({ taskName: '新任务', assignedTo: 'me', estStarted: '2026-01-01', deadline: '2026-01-02' });
+    expect(() => parseCommandInput(createTaskFromStory!.schema, ['--storyId', '1', '--execution', '2', '--taskName', '   ', '--assignedTo', 'me', '--estStarted', '2026-01-01', '--deadline', '2026-01-02']))
+      .toThrow();
+    expect(parseCommandInput(activateTask!.schema, ['--taskId', '1', '--assignedTo', '   ', '--comment', '   ']))
+      .toMatchObject({ assignedTo: undefined, comment: undefined });
+  });
+
+  it('omits blank optional task strings from preview payloads', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ task: { updateTask: vi.fn() } } as never);
+
+    registerTools(registry, 'dev');
+    const command = registry.getCommand('updateTask');
+    const input = parseCommandInput(command!.schema, ['--taskId', '9', '--assignedTo', '   ', '--desc', ' note ']);
+    const result = await command!.handler(input);
+
+    expect(parseResult(result)).toMatchObject({
+      ok: false,
+      preview: true,
+      action: 'updateTask',
+      payload: {
+        taskId: 9,
+        update: {
+          desc: 'note',
+        },
+      },
+    });
+    expect(JSON.stringify(parseResult(result))).not.toContain('assignedTo');
+  });
+
+  it('falls back to default derived task text when optional values are empty after trim', async () => {
+    const registry = new InMemoryCliRegistry();
+    const createTask = vi.fn(async () => ({ status: 'ok' }));
+    setApi({
+      bug: { getBugDetail: vi.fn(async () => ({ title: '登录失败', steps: '第一步' })) },
+      task: { createTask },
+    } as never);
+
+    registerTools(registry, 'full');
+    const command = registry.getCommand('createTaskFromBug');
+    const result = await command!.handler({
+      bugId: 1,
+      execution: 2,
+      taskName: '',
+      type: '',
+      assignedTo: 'me',
+      estStarted: '2026-01-01',
+      deadline: '2026-01-02',
+      desc: '',
+      confirm: false,
+    });
+
+    expect(createTask).not.toHaveBeenCalled();
+    expect(parseResult(result)).toMatchObject({
+      ok: false,
+      preview: true,
+      action: 'createTaskFromBug',
+      payload: {
+        execution: 2,
+        name: '修复Bug #1: 登录失败',
+        type: 'devel',
+        assignedTo: 'me',
+        estStarted: '2026-01-01',
+        deadline: '2026-01-02',
+        fromBug: 1,
+        desc: '修复Bug #1: 登录失败\n\n复现步骤:\n第一步',
+      },
+    });
   });
 
   it('dispatches registered read tools to their API methods', async () => {

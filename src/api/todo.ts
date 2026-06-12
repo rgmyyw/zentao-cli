@@ -14,11 +14,11 @@ export class TodoApi {
   }
 
   async createTodo(data: Record<string, unknown>): Promise<unknown> {
-    return this.http.request('POST', '/todos', { data });
+    return this.http.request('POST', '/todos', { data: this.normalizeTodoInput(data, true) });
   }
 
   async updateTodo(todoId: number, update: Record<string, unknown>): Promise<unknown> {
-    return this.http.request('PUT', `/todos/${todoId}`, { data: update });
+    return this.http.request('PUT', `/todos/${todoId}`, { data: this.normalizeTodoInput(update, false) });
   }
 
   async deleteTodo(todoId: number): Promise<unknown> {
@@ -31,5 +31,36 @@ export class TodoApi {
 
   async activateTodo(todoId: number): Promise<unknown> {
     return this.http.request('GET', `/todos/${todoId}/activate`);
+  }
+
+  private normalizeTodoInput(input: Record<string, unknown>, requireName: boolean): Record<string, unknown> {
+    const normalized: Record<string, unknown> = { ...input };
+
+    if (Object.prototype.hasOwnProperty.call(normalized, 'name')) {
+      normalized.name = this.requireNonBlank(normalized.name, 'name 不能为空');
+    } else if (requireName) {
+      throw new Error('name 不能为空');
+    }
+
+    for (const key of ['desc', 'begin', 'end', 'type', 'status'] as const) {
+      if (typeof normalized[key] === 'string') {
+        normalized[key] = normalized[key].trim();
+      }
+    }
+
+    return normalized;
+  }
+
+  private requireNonBlank(value: unknown, message: string): string {
+    if (typeof value !== 'string') {
+      throw new Error(message);
+    }
+
+    const normalized = value.trim();
+    if (!normalized) {
+      throw new Error(message);
+    }
+
+    return normalized;
   }
 }

@@ -50,6 +50,20 @@ describe('toServerListResult', () => {
     });
   });
 
+  it('服务端分页元信息非法时回退到安全默认值', () => {
+    expect(
+      toServerListResult({ page: '0', limit: '-5', total: '-1', bugs: [{ id: 1 }, { id: 2 }] }, ['bugs'], { page: 2, limit: 50 }),
+    ).toEqual({
+      source: 'server-paginated',
+      partial: false,
+      page: 2,
+      limit: 50,
+      total: 2,
+      itemKey: 'bugs',
+      items: [{ id: 1 }, { id: 2 }],
+    });
+  });
+
   it('缺少分页元信息时回退到标准化分页参数', () => {
     expect(toServerListResult({ rows: [{ id: 1 }, { id: 2 }] }, ['rows'], { page: 2.9, limit: 300 })).toEqual({
       source: 'server-paginated',

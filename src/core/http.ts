@@ -3,6 +3,11 @@ import { ZentaoAuth } from './auth.js';
 import type { ZentaoConfig } from '../types/common.js';
 import { sanitizeJsonLikeResponse } from '../utils/json.js';
 
+export interface HttpError extends Error {
+  statusCode?: number;
+  responseBody?: unknown;
+}
+
 export class ZentaoHttpClient {
   private readonly client: AxiosInstance;
   private readonly auth: ZentaoAuth;
@@ -75,7 +80,7 @@ export class ZentaoHttpClient {
 
         const data = error.response?.data;
         const message = Buffer.isBuffer(data) ? data.toString('utf8').slice(0, 500) : JSON.stringify(data ?? error.message);
-        throw new Error(`旧版资源下载失败: ${error.response?.status ?? 'NO_STATUS'} - ${message}`);
+        throw createHttpError(`旧版资源下载失败: ${error.response?.status ?? 'NO_STATUS'} - ${message}`, error.response?.status, data);
       }
       throw error;
     }
@@ -98,7 +103,7 @@ export class ZentaoHttpClient {
         },
       });
 
-      return sanitizeJsonLikeResponse(response.data) as T;
+      return normalizeResponseData(response.data) as T;
     } catch (error) {
       if (axios.isAxiosError(error)) {
         if (!retried && error.response?.status === 401) {
@@ -108,7 +113,7 @@ export class ZentaoHttpClient {
 
         const data = error.response?.data;
         const message = typeof data === 'string' ? data.slice(0, 500) : JSON.stringify(data ?? error.message);
-        throw new Error(`旧版页面请求失败: ${error.response?.status ?? 'NO_STATUS'} - ${message}`);
+        throw createHttpError(`旧版页面请求失败: ${error.response?.status ?? 'NO_STATUS'} - ${message}`, error.response?.status, data);
       }
       throw error;
     }
@@ -128,7 +133,7 @@ export class ZentaoHttpClient {
         },
       });
 
-      return sanitizeJsonLikeResponse(response.data) as T;
+      return normalizeResponseData(response.data) as T;
     } catch (error) {
       if (axios.isAxiosError(error)) {
         if (!retried && error.response?.status === 401) {
@@ -138,11 +143,24 @@ export class ZentaoHttpClient {
 
         const data = error.response?.data;
         const message = typeof data === 'string' ? data : JSON.stringify(data ?? error.message);
-        throw new Error(`请求失败: ${error.response?.status ?? 'NO_STATUS'} - ${message}`);
+        throw createHttpError(`请求失败: ${error.response?.status ?? 'NO_STATUS'} - ${message}`, error.response?.status, data);
       }
       throw error;
     }
   }
+}
+
+function normalizeResponseData(data: unknown): unknown {
+  if (data === null || data === undefined) return {};
+  if (typeof data === 'string' && data.trim() === '') return {};
+  return sanitizeJsonLikeResponse(data);
+}
+
+function createHttpError(message: string, statusCode?: number, responseBody?: unknown): HttpError {
+  const error = new Error(message) as HttpError;
+  error.statusCode = statusCode;
+  error.responseBody = responseBody;
+  return error;
 }
 
 function getHeaderString(value: unknown): string | undefined {

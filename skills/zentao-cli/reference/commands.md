@@ -70,12 +70,13 @@
 | 场景 | 命令 | 用法 | 说明 |
 | --- | --- | --- | --- |
 | Bug 详情 | `getBugDetail` | `zentao getBugDetail --bugId <bugId>` | 查复现步骤、状态、负责人、动作记录、转任务。 |
-| 线上 Bug（默认优先） | `getProductBugs` | `zentao getProductBugs --productId <市场和售后问题跟踪产品ID> --status all --limit 100 --order id_desc --module <模块别名>` | 线上 / 生产 / 客户反馈问题默认走这里；先 `getProducts` 找到 `市场和售后问题跟踪`，模块名支持中文名、路径和 `YJ` / `yj` / `Yj` 这类别名。 |
+| 线上 Bug（市场/售后/客户反馈） | `getProductBugs` | `zentao getProductBugs --productId <市场和售后问题跟踪产品ID> --status all --limit 100 --order id_desc --module <模块别名>` | 非测试 / 非开发发现的线上 / 生产 / 客户反馈问题默认走这里；先 `getProducts` 找到 `市场和售后问题跟踪`。 |
+| 线上 Bug（测试/开发自发现） | `getProductBugs` | `zentao getProductBugs --productId <测试产品ID> --status all --limit 100 --order id_desc --module <模块别名>` | 明确是测试或开发在线上发现并记录在测试相关模块下的问题走这里；先 `getProducts` 找到 `测试`，再按模块过滤，例如 `云镜` / `yj`。 |
 | 产品 Bug | `getProductBugs` | `zentao getProductBugs --productId <productId> --status all --limit 100` | 仅在用户明确说“查某个禅道产品下的 Bug”时使用。 |
 | 我的 Bug | `getMyBugs` | `zentao getMyBugs --productId <productId> --limit 50` | 产品内指派给我的 Bug。 |
 | Bug 关联需求 | `getBugRelatedStory` | `zentao getBugRelatedStory --bugId <bugId>` | 从 Bug 查关联需求。 |
 
-线上 / 生产 / 客户反馈问题不要直接按真实业务产品名查产品；按 `reference/bug.md` 的固定口径：先查 `市场和售后问题跟踪` 产品，再按模块匹配真实业务产品。
+线上 / 生产 / 客户反馈问题不要直接按真实业务产品名查产品；先按 `reference/bug.md` 判断来源：市场 / 售后 / 客户反馈查 `市场和售后问题跟踪`，测试 / 开发自发现查 `测试`，再按模块匹配真实业务产品。
 
 ## 需求 / Story
 
@@ -154,6 +155,15 @@ zentao getDevelopmentContext --entityType bug --entityId <bugId>
 ```bash
 zentao getTaskDetail --taskId <toTask>
 ```
+
+### 把 Bug 挂到指定执行
+
+```bash
+zentao getExecutionDetail --executionId <executionId>
+zentao updateBug --bugId <bugId> --project <projectId> --execution <executionId> --confirm true
+```
+
+如果用户只有 `executionId`，先从 `getExecutionDetail` 返回里取 `project` / `projectId`，不要直接猜项目。
 
 ### 从需求追实现风险
 

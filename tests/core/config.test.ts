@@ -30,9 +30,10 @@ describe('config helpers', () => {
 
     const config = normalizeConfig({
       url: ' https://zentao.example.com/zentao/ ',
-      username: 'me',
+      username: ' me ',
       password: 'secret',
       apiBaseUrl: ' https://api.example.com/v1/ ',
+      legacyBaseUrl: ' https://api.example.com/legacy/ ',
     });
 
     expect(config).toEqual({
@@ -41,6 +42,7 @@ describe('config helpers', () => {
       password: 'secret',
       apiVersion: 'v1',
       apiBaseUrl: 'https://api.example.com/v1',
+      legacyBaseUrl: 'https://api.example.com/legacy',
     });
     expect(maskConfig(config)).toEqual({ ...config, password: '******' });
     expect(maskConfig({ ...config, password: '' })).toMatchObject({ password: '' });
@@ -67,6 +69,8 @@ describe('config helpers', () => {
     expect(() => normalizeConfig({})).toThrow('url');
     expect(() => normalizeConfig({ url: 'https://z' })).toThrow('username');
     expect(() => normalizeConfig({ url: 'https://z', username: 'me' })).toThrow('password');
+    expect(() => normalizeConfig({ url: '   ', username: 'me', password: 'secret' })).toThrow('url');
+    expect(() => normalizeConfig({ url: 'https://z', username: '   ', password: 'secret' })).toThrow('username');
   });
 
   it('loads environment config before config file', async () => {
@@ -75,6 +79,7 @@ describe('config helpers', () => {
     process.env.ZENTAO_PASSWORD = 'pw';
     process.env.ZENTAO_API_VERSION = 'v2';
     process.env.ZENTAO_API_BASE_URL = 'https://env.example.com/api/';
+    process.env.ZENTAO_LEGACY_BASE_URL = 'https://env.example.com/legacy/';
     const { loadConfig } = await loadConfigModule({ exists: true, file: JSON.stringify({ url: 'https://file', username: 'file', password: 'file' }) });
 
     expect(loadConfig()).toEqual({
@@ -83,6 +88,75 @@ describe('config helpers', () => {
       password: 'pw',
       apiVersion: 'v2',
       apiBaseUrl: 'https://env.example.com/api',
+      legacyBaseUrl: 'https://env.example.com/legacy',
+    });
+  });
+
+  it('prefers complete environment config even if the config file is malformed', async () => {
+    process.env.ZENTAO_URL = 'https://env.example.com/zentao';
+    process.env.ZENTAO_USERNAME = 'account';
+    process.env.ZENTAO_PASSWORD = 'pw';
+    const { loadConfig } = await loadConfigModule({ exists: true, file: '{invalid json' });
+
+    expect(loadConfig()).toEqual({
+      url: 'https://env.example.com',
+      username: 'account',
+      password: 'pw',
+      apiVersion: 'v1',
+      apiBaseUrl: undefined,
+      legacyBaseUrl: undefined,
+    });
+  });
+
+  it('allows partial environment overrides on top of file config', async () => {
+    process.env.ZENTAO_API_BASE_URL = 'https://env.example.com/api/';
+    process.env.ZENTAO_LEGACY_BASE_URL = 'https://env.example.com/legacy/';
+    const { loadConfig } = await loadConfigModule({
+      exists: true,
+      file: JSON.stringify({
+        url: 'https://file.example.com/zentao',
+        username: 'file-user',
+        password: 'file-password',
+        apiVersion: 'v1',
+      }),
+    });
+
+    expect(loadConfig()).toEqual({
+      url: 'https://file.example.com',
+      username: 'file-user',
+      password: 'file-password',
+      apiVersion: 'v1',
+      apiBaseUrl: 'https://env.example.com/api',
+      legacyBaseUrl: 'https://env.example.com/legacy',
+    });
+  });
+
+  it('ignores whitespace-only environment overrides', async () => {
+    process.env.ZENTAO_URL = '   ';
+    process.env.ZENTAO_USERNAME = '   ';
+    process.env.ZENTAO_PASSWORD = '   ';
+    process.env.ZENTAO_API_VERSION = '   ';
+    process.env.ZENTAO_API_BASE_URL = '   ';
+    process.env.ZENTAO_LEGACY_BASE_URL = '   ';
+    const { loadConfig } = await loadConfigModule({
+      exists: true,
+      file: JSON.stringify({
+        url: 'https://file.example.com/zentao',
+        username: 'file-user',
+        password: 'file-password',
+        apiVersion: 'v2',
+        apiBaseUrl: 'https://file.example.com/api',
+        legacyBaseUrl: 'https://file.example.com/legacy',
+      }),
+    });
+
+    expect(loadConfig()).toEqual({
+      url: 'https://file.example.com',
+      username: 'file-user',
+      password: 'file-password',
+      apiVersion: 'v2',
+      apiBaseUrl: 'https://file.example.com/api',
+      legacyBaseUrl: 'https://file.example.com/legacy',
     });
   });
 
@@ -97,6 +171,39 @@ describe('config helpers', () => {
     expect(store.written?.file).toBe('/tmp/home/.zentao/config.json');
     expect(store.written?.content).toContain('"username": "u"');
     expect(store.written?.options).toEqual({ mode: 0o600 });
+  });
+
+  it('keeps file apiVersion when no environment overrides are provided', async () => {
+    const { loadConfig } = await loadConfigModule({
+      exists: true,
+      file: JSON.stringify({
+        url: 'https://file.example.com/zentao',
+        username: 'u',
+        password: 'p',
+        apiVersion: 'v2',
+      }),
+    });
+
+    expect(loadConfig()).toEqual({
+      url: 'https://file.example.com',
+      username: 'u',
+      password: 'p',
+      apiVersion: 'v2',
+      apiBaseUrl: undefined,
+      legacyBaseUrl: undefined,
+    });
+  });
+
+  it('reports malformed config files with a clear message', async () => {
+    const { loadConfig } = await loadConfigModule({ exists: true, file: '{invalid json' });
+
+    expect(() => loadConfig()).toThrow('禅道配置文件损坏，请检查 /tmp/home/.zentao/config.json');
+  });
+
+  it('rejects non-object config file content with a clear message', async () => {
+    const { loadConfig } = await loadConfigModule({ exists: true, file: '[]' });
+
+    expect(() => loadConfig()).toThrow('禅道配置文件损坏，请检查 /tmp/home/.zentao/config.json：配置内容必须是 JSON 对象');
   });
 
   it('returns null when no config source exists', async () => {

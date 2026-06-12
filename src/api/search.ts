@@ -49,7 +49,8 @@ export class SearchApi {
   ) {}
 
   async searchStories(input: SearchStoriesInput): Promise<unknown> {
-    const { keyword, productId, limit = 20, deepSearch = false } = input;
+    const keyword = this.requireNonBlank(input.keyword, 'keyword 不能为空');
+    const { productId, limit = 20, deepSearch = false } = input;
     const storiesResult = await this.getAllStories(productId);
     const stories = storiesResult.items;
     const lowerKeyword = keyword.toLowerCase();
@@ -104,8 +105,10 @@ export class SearchApi {
   }
 
   async searchStoriesByProductName(productName: string, keyword: string, input: Omit<SearchStoriesInput, 'keyword' | 'productId'> = {}): Promise<unknown> {
+    const normalizedProductName = this.requireNonBlank(productName, 'productName 不能为空');
+    const normalizedKeyword = this.requireNonBlank(keyword, 'keyword 不能为空');
     const productsResult = await this.productApi.getProducts() as { items: Array<Record<string, unknown>> };
-    const matchedProducts = productsResult.items.filter(product => String(product.name ?? '').toLowerCase().includes(productName.toLowerCase()));
+    const matchedProducts = productsResult.items.filter(product => String(product.name ?? '').toLowerCase().includes(normalizedProductName.toLowerCase()));
 
     const results = [] as Array<Record<string, unknown>>;
     let partial = false;
@@ -116,7 +119,7 @@ export class SearchApi {
       const productId = Number(product.id);
       scannedProducts += 1;
       try {
-        const searchResult = await this.searchStories({ ...input, keyword, productId }) as Record<string, unknown>;
+        const searchResult = await this.searchStories({ ...input, keyword: normalizedKeyword, productId }) as Record<string, unknown>;
         partial = partial || Boolean(searchResult.partial);
         deepSearchFailures += Number(searchResult.deepSearchFailures ?? 0);
         results.push({
@@ -139,11 +142,17 @@ export class SearchApi {
       failedProducts,
       scannedProducts,
       deepSearchFailures,
-      productName,
-      keyword,
+      productName: normalizedProductName,
+      keyword: normalizedKeyword,
       matchedProducts: matchedProducts.length,
       items: results,
     };
+  }
+
+  private requireNonBlank(value: string, message: string): string {
+    const normalized = value.trim();
+    if (normalized === '') throw new Error(message);
+    return normalized;
   }
 
   private async getAllStories(productId?: number): Promise<{

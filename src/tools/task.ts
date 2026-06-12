@@ -4,6 +4,11 @@ import { getApi } from '../core/api-provider.js';
 import { previewOrAssertWriteAllowed } from '../core/write-guard.js';
 import { jsonResult } from './shared.js';
 
+const optionalTrimmedText = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.string().trim().optional(),
+);
+
 export function registerTaskTools(server: CliRegistry): void {
   const runActioned = async (
     action: string,
@@ -35,24 +40,37 @@ export function registerTaskTools(server: CliRegistry): void {
   );
 
   server.tool(
+    'recordTaskEstimate',
+    {
+      taskId: z.number().int().positive(),
+      date: z.string().trim().min(1).describe('登记日期，推荐 YYYY-MM-DD。'),
+      consumed: z.number().positive().describe('本次登记消耗工时，必须大于 0。'),
+      left: z.number().nonnegative().describe('登记后剩余工时，可为 0。'),
+      work: optionalTrimmedText.describe('本次工作内容。对应 task-recordEstimate 页面里的 work 字段。'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ confirm, ...input }) => runActioned('recordTaskEstimate', confirm, input, () => getApi().task.recordEstimate(input.taskId, input)),
+  );
+
+  server.tool(
     'updateTask',
     {
       taskId: z.number().int().positive(),
-      name: z.string().optional(),
-      type: z.string().optional(),
-      desc: z.string().optional().describe('任务描述。禅道 18.5 REST PUT 支持 desc 但不支持 comment，备注请通过 finishTask/assignTask 等状态变更操作附带'),
-      assignedTo: z.string().optional(),
+      name: z.string().trim().min(1).optional(),
+      type: optionalTrimmedText,
+      desc: optionalTrimmedText.describe('任务描述。禅道 18.5 REST PUT 支持 desc 但不支持 comment，备注请通过 finishTask/assignTask 等状态变更操作附带'),
+      assignedTo: optionalTrimmedText,
       pri: z.number().optional().describe('优先级 1-4'),
       estimate: z.number().optional(),
       consumed: z.number().optional(),
       left: z.number().optional(),
-      estStarted: z.string().optional(),
-      deadline: z.string().optional(),
+      estStarted: optionalTrimmedText,
+      deadline: optionalTrimmedText,
       module: z.number().int().optional(),
-      story: z.string().optional(),
-      status: z.string().optional(),
-      closedReason: z.string().optional(),
-      mailto: z.string().optional(),
+      story: optionalTrimmedText,
+      status: optionalTrimmedText,
+      closedReason: optionalTrimmedText,
+      mailto: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
     async ({ taskId, confirm, ...update }) => {
@@ -68,10 +86,10 @@ export function registerTaskTools(server: CliRegistry): void {
     {
       taskId: z.number().int().positive(),
       currentConsumed: z.number().nonnegative().describe('本次消耗工时。禅道 18.5 /tasks/{id}/finish 必填'),
-      realStarted: z.string().min(1).describe('实际开始时间或日期。禅道 18.5 /tasks/{id}/finish 必填'),
-      finishedDate: z.string().min(1).describe('完成时间或日期。禅道 18.5 /tasks/{id}/finish 必填'),
-      assignedTo: z.string().optional(),
-      comment: z.string().optional(),
+      realStarted: z.string().trim().min(1).describe('实际开始时间或日期。禅道 18.5 /tasks/{id}/finish 必填'),
+      finishedDate: z.string().trim().min(1).describe('完成时间或日期。禅道 18.5 /tasks/{id}/finish 必填'),
+      assignedTo: optionalTrimmedText,
+      comment: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
     async ({ taskId, confirm, ...update }) => {
@@ -86,10 +104,10 @@ export function registerTaskTools(server: CliRegistry): void {
     'startTask',
     {
       taskId: z.number().int().positive(),
-      assignedTo: z.string().optional(),
+      assignedTo: optionalTrimmedText,
       consumed: z.number().optional(),
       left: z.number().optional(),
-      comment: z.string().optional(),
+      comment: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
     async ({ confirm, ...input }) => runActioned('startTask', confirm, input, () => getApi().task.startTask(input.taskId, input)),
@@ -99,7 +117,7 @@ export function registerTaskTools(server: CliRegistry): void {
     'pauseTask',
     {
       taskId: z.number().int().positive(),
-      comment: z.string().optional(),
+      comment: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
     async ({ confirm, ...input }) => runActioned('pauseTask', confirm, input, () => getApi().task.pauseTask(input.taskId, input)),
@@ -111,7 +129,7 @@ export function registerTaskTools(server: CliRegistry): void {
       taskId: z.number().int().positive(),
       consumed: z.number().optional(),
       left: z.number().optional(),
-      comment: z.string().optional(),
+      comment: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
     async ({ confirm, ...input }) => runActioned('restartTask', confirm, input, () => getApi().task.restartTask(input.taskId, input)),
@@ -121,7 +139,7 @@ export function registerTaskTools(server: CliRegistry): void {
     'closeTask',
     {
       taskId: z.number().int().positive(),
-      comment: z.string().optional(),
+      comment: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
     async ({ confirm, ...input }) => runActioned('closeTask', confirm, input, () => getApi().task.closeTask(input.taskId, input)),
@@ -131,9 +149,9 @@ export function registerTaskTools(server: CliRegistry): void {
     'activateTask',
     {
       taskId: z.number().int().positive(),
-      assignedTo: z.string().optional(),
+      assignedTo: optionalTrimmedText,
       left: z.number().optional(),
-      comment: z.string().optional(),
+      comment: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
     async ({ confirm, ...input }) => runActioned('activateTask', confirm, input, () => getApi().task.activateTask(input.taskId, input)),
@@ -143,8 +161,8 @@ export function registerTaskTools(server: CliRegistry): void {
     'assignTask',
     {
       taskId: z.number().int().positive(),
-      assignedTo: z.string(),
-      comment: z.string().optional(),
+      assignedTo: z.string().trim().min(1),
+      comment: optionalTrimmedText,
       left: z.number().optional(),
       confirm: z.boolean().optional().default(false),
     },

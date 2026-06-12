@@ -1,8 +1,9 @@
 import type { ZentaoHttpClient } from '../core/http.js';
-import { toServerListResult } from '../core/list-result.js';
-import { normalizePagination, normalizeTotalPages } from '../core/pagination.js';
+import { toClientPaginatedListResult, toServerListResult, type ListResult } from '../core/list-result.js';
+import { normalizePagination, normalizeTotalPages, type PaginationInput } from '../core/pagination.js';
 import type { ZentaoBug, ZentaoExecution, ZentaoListResponse, ZentaoTask } from '../types/zentao.js';
 import { toFormUrlEncoded } from '../utils/form.js';
+import { bugMatchesKeyword, bugMatchesModuleAlias, normalizeBugFilterText } from './bug-filter.js';
 
 export interface UpdateExecutionInput {
   project?: number;
@@ -38,6 +39,13 @@ export interface ExecutionDailyBugStatsInput {
   date?: string;
 }
 
+export interface ExecutionBugListParams extends PaginationInput {
+  status?: string;
+  search?: string;
+  module?: string;
+  moduleId?: number;
+}
+
 export class ExecutionApi {
   constructor(private readonly http: ZentaoHttpClient) {}
 
@@ -70,21 +78,84 @@ export class ExecutionApi {
     return toServerListResult(response, ['builds']);
   }
 
-  async getExecutionBugs(executionId: number, params: { page?: number; limit?: number; status?: string } = {}): Promise<unknown> {
-    const pagination = normalizePagination(params);
+  async getExecutionBugs(executionId: number, params: ExecutionBugListParams = {}): Promise<unknown> {
+    const normalizedParams = this.normalizeExecutionBugQueryParams(params);
+    const needsClientFilter = !!(normalizedParams.moduleId || normalizedParams.module || normalizedParams.search);
+
+    if (needsClientFilter) {
+      return this.getExecutionBugsWithClientFilter(executionId, normalizedParams);
+    }
+
+    const pagination = normalizePagination(normalizedParams);
     const response = await this.http.request<ZentaoListResponse<ZentaoBug> & { bugs?: ZentaoBug[] }>('GET', `/executions/${executionId}/bugs`, {
       params: {
         ...pagination,
+        status: normalizedParams.status,
+      },
+    });
+    return toServerListResult(response, ['bugs'], normalizedParams);
+  }
+
+  private async getExecutionBugsWithClientFilter(executionId: number, params: ExecutionBugListParams): Promise<ListResult<ZentaoBug>> {
+    const pageSize = 100;
+    const firstPage = await this.fetchExecutionBugsPage(executionId, params, 1, pageSize);
+    const firstResult = toServerListResult<ZentaoBug>(firstPage, ['bugs']);
+    const total = firstResult.total;
+    const allBugs = [...firstResult.items];
+    const totalPages = normalizeTotalPages(total, pageSize, allBugs.length);
+
+    for (let page = 2; page <= totalPages; page += 1) {
+      const response = await this.fetchExecutionBugsPage(executionId, params, page, pageSize);
+      const result = toServerListResult<ZentaoBug>(response, ['bugs']);
+      allBugs.push(...result.items);
+    }
+
+    let filtered = allBugs;
+
+    if (params.moduleId) {
+      filtered = filtered.filter((bug) => {
+        const bugModuleId = (bug as Record<string, unknown>).module ?? (bug as Record<string, unknown>).moduleId;
+        return Number(bugModuleId) === params.moduleId;
+      });
+    }
+
+    if (params.module) {
+      const keyword = normalizeBugFilterText(params.module);
+      filtered = filtered.filter((bug) => bugMatchesModuleAlias(bug, keyword));
+    }
+
+    if (params.search) {
+      const keyword = normalizeBugFilterText(params.search);
+      filtered = filtered.filter((bug) => bugMatchesKeyword(bug, keyword, ['id', 'title', 'name', 'keywords', 'steps', 'moduleTitle', 'moduleName', 'modulePath', 'path']));
+    }
+
+    const result = toClientPaginatedListResult<ZentaoBug>({ bugs: filtered }, ['bugs'], params);
+    return {
+      ...result,
+      scanned: allBugs.length,
+      ...(filtered.length !== allBugs.length ? { matched: filtered.length } : {}),
+    } as ListResult<ZentaoBug> & { matched?: number };
+  }
+
+  private async fetchExecutionBugsPage(executionId: number, params: ExecutionBugListParams, page: number, limit: number): Promise<unknown> {
+    return this.http.request('GET', `/executions/${executionId}/bugs`, {
+      params: {
+        page,
+        limit,
         status: params.status,
       },
     });
-    return toServerListResult(response, ['bugs'], params);
   }
 
   async getExecutionDailyBugStats(executionId: number, input: ExecutionDailyBugStatsInput = {}): Promise<unknown> {
+    const normalizedInput = {
+      ...input,
+      iterationName: this.normalizeOptionalText(input.iterationName),
+      date: this.normalizeOptionalText(input.date),
+    };
+    const date = this.resolveStatsDate(normalizedInput.date);
     const bugs = await this.getAllExecutionBugs(executionId);
     const tasks = await this.getAllExecutionTasks(executionId);
-    const date = this.resolveStatsDate(input.date);
     const total = bugs.length;
     const reopened = bugs.filter(bug => Number(bug.activatedCount ?? 0) > 0);
     const delayed = bugs.filter(bug => this.isDelayedBug(bug));
@@ -96,7 +167,7 @@ export class ExecutionApi {
     const userNames = await this.resolveUserNames(bugs.map(bug => this.getBugOwner(bug)));
     const participants = this.buildParticipantBugStats(bugs, total, devNotResolvedToday, userNames);
     const highReopenParticipants = participants.filter(item => item.reopened > 0).map(item => item.displayName);
-    const iterationName = input.iterationName ?? `执行 #${executionId}`;
+    const iterationName = normalizedInput.iterationName ?? `执行 #${executionId}`;
 
     const result = {
       source: 'execution-bugs-current-state',
@@ -140,7 +211,7 @@ export class ExecutionApi {
      * 旧版 execution::edit() 控制器直接调用模型 update()，绕过该 bug。
      * 通过 $this->send() 返回 JSON，走 .json 扩展。
      */
-    const formData = toFormUrlEncoded(update as Record<string, unknown>);
+    const formData = toFormUrlEncoded(this.normalizeExecutionUpdate(update) as Record<string, unknown>);
     return this.http.legacyRequest('POST', `/execution-edit-${executionId}.json`, {
       data: formData.toString(),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -148,23 +219,81 @@ export class ExecutionApi {
   }
 
   async startExecution(executionId: number, payload: ExecutionActionInput = {}): Promise<unknown> {
-    return this.http.request('POST', `/executions/${executionId}/start`, { data: payload });
+    return this.http.request('POST', `/executions/${executionId}/start`, { data: this.normalizeExecutionAction(payload) });
   }
 
   async closeExecution(executionId: number, payload: ExecutionActionInput = {}): Promise<unknown> {
-    return this.http.request('POST', `/executions/${executionId}/close`, { data: payload });
+    return this.http.request('POST', `/executions/${executionId}/close`, { data: this.normalizeExecutionAction(payload) });
   }
 
   async suspendExecution(executionId: number, payload: ExecutionActionInput = {}): Promise<unknown> {
-    return this.http.request('POST', `/executions/${executionId}/suspend`, { data: payload });
+    return this.http.request('POST', `/executions/${executionId}/suspend`, { data: this.normalizeExecutionAction(payload) });
   }
 
   async activateExecution(executionId: number, payload: ExecutionActionInput = {}): Promise<unknown> {
-    return this.http.request('POST', `/executions/${executionId}/activate`, { data: payload });
+    return this.http.request('POST', `/executions/${executionId}/activate`, { data: this.normalizeExecutionAction(payload) });
   }
 
   async putoffExecution(executionId: number, payload: PutoffExecutionInput): Promise<unknown> {
-    return this.http.request('POST', `/executions/${executionId}/putoff`, { data: payload });
+    return this.http.request('POST', `/executions/${executionId}/putoff`, { data: this.normalizePutoffExecution(payload) });
+  }
+
+  private normalizeExecutionUpdate(update: UpdateExecutionInput): UpdateExecutionInput {
+    return this.normalizeStringFields(update as Record<string, unknown>, ['name', 'code', 'desc', 'begin', 'end', 'lifetime', 'PO', 'PM', 'QD', 'RD', 'acl'], ['teamMembers', 'whitelist']) as UpdateExecutionInput;
+  }
+
+  private normalizeOptionalText(value?: string): string | undefined {
+    if (typeof value !== 'string') {
+      return value;
+    }
+
+    const trimmed = value.trim();
+    return trimmed === '' ? undefined : trimmed;
+  }
+
+  private normalizeExecutionBugQueryParams(params: ExecutionBugListParams): ExecutionBugListParams {
+    const normalized = { ...params } as ExecutionBugListParams & Record<string, unknown>;
+
+    for (const key of ['status', 'search', 'module'] as const) {
+      const value = normalized[key];
+      if (typeof value !== 'string') continue;
+
+      const trimmed = value.trim();
+      if (trimmed === '') delete normalized[key];
+      else normalized[key] = trimmed;
+    }
+
+    return normalized;
+  }
+
+  private normalizeExecutionAction(payload: ExecutionActionInput): ExecutionActionInput {
+    return this.normalizeStringFields(payload as Record<string, unknown>, ['comment', 'realBegan', 'realEnd']) as ExecutionActionInput;
+  }
+
+  private normalizePutoffExecution(payload: PutoffExecutionInput): PutoffExecutionInput {
+    return this.normalizeStringFields(payload as unknown as Record<string, unknown>, ['comment']) as unknown as PutoffExecutionInput;
+  }
+
+  private normalizeStringFields(input: Record<string, unknown>, stringFields: string[], arrayFields: string[] = []): Record<string, unknown> {
+    const normalized = { ...input };
+
+    for (const field of stringFields) {
+      const value = normalized[field];
+      if (typeof value !== 'string') continue;
+      const trimmed = value.trim();
+      if (trimmed === '') delete normalized[field];
+      else normalized[field] = trimmed;
+    }
+
+    for (const field of arrayFields) {
+      const value = normalized[field];
+      if (!Array.isArray(value)) continue;
+      normalized[field] = value
+        .map((item) => (typeof item === 'string' ? item.trim() : item))
+        .filter((item): item is string => typeof item === 'string' && item !== '');
+    }
+
+    return normalized;
   }
 
   private async getAllExecutionBugs(executionId: number): Promise<ZentaoBug[]> {
@@ -444,11 +573,21 @@ export class ExecutionApi {
   }
 
   private resolveStatsDate(value?: string): string {
-    if (!value || ['today', '今天', '今日'].includes(value)) return this.formatDate(new Date());
-    if (['yesterday', '昨天', '昨日'].includes(value)) return this.formatDate(this.addDays(new Date(), -1));
-    const parsed = value.match(/^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})日?$/);
+    const text = value?.trim();
+    const lowerText = text?.toLowerCase();
+    if (!text || ['today', '今天', '今日'].includes(lowerText ?? text)) return this.formatDate(new Date());
+    if (['yesterday', '昨天', '昨日'].includes(lowerText ?? text)) return this.formatDate(this.addDays(new Date(), -1));
+    const parsed = text.match(/^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})日?$/);
     if (!parsed) throw new Error(`无法解析统计日期: ${value}`);
-    return this.formatDate(new Date(Number(parsed[1]), Number(parsed[2]) - 1, Number(parsed[3])));
+    const date = this.makeDate(Number(parsed[1]), Number(parsed[2]), Number(parsed[3]));
+    if (!date) throw new Error(`无法解析统计日期: ${value}`);
+    return this.formatDate(date);
+  }
+
+  private makeDate(year: number, month: number, day: number): Date | undefined {
+    const date = new Date(year, month - 1, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return undefined;
+    return date;
   }
 
   private parseDate(value: string): Date {

@@ -3,6 +3,11 @@ import type { CliRegistry } from '../core/cli-registry.js';
 import { getApi } from '../core/api-provider.js';
 import { jsonResult } from './shared.js';
 
+const optionalTrimmedText = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.string().trim().optional(),
+);
+
 export function registerTestCaseTools(server: CliRegistry): void {
   server.tool(
     'getProductTestCases',
@@ -10,7 +15,7 @@ export function registerTestCaseTools(server: CliRegistry): void {
       productId: z.number().int().positive(),
       page: z.number().int().positive().optional(),
       limit: z.number().int().positive().max(100).optional(),
-      status: z.string().optional(),
+      status: optionalTrimmedText,
       moduleId: z.number().int().positive().optional(),
     },
     async (input) => jsonResult(await getApi().testcase.getProductTestCases(input)),

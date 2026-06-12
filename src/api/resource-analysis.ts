@@ -34,7 +34,7 @@ export class ResourceAnalysisApi {
   async analyzeObjectResources(input: AnalyzeObjectResourcesInput): Promise<unknown> {
     const detail = await this.getObjectDetail(input.objectType, input.objectID);
     const candidates = dedupeCandidates(findResourceCandidates(detail));
-    const outDir = input.outDir ?? path.join(tmpdir(), 'zentao-cli-resources', `${input.objectType}-${input.objectID}`);
+    const outDir = normalizeOptionalPath(input.outDir) ?? path.join(tmpdir(), 'zentao-cli-resources', `${input.objectType}-${input.objectID}`);
     const maxInlineBytes = input.maxInlineBytes ?? 200 * 1024;
     const shouldDownload = input.download !== false;
 
@@ -217,4 +217,10 @@ function firstNumber(...values: unknown[]): number | undefined {
 
 function safeFileName(name: string): string {
   return name.replace(/[\\/:*?"<>|]/g, '_').slice(0, 180) || 'resource';
+}
+
+function normalizeOptionalPath(value?: string): string | undefined {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  return trimmed === '' ? undefined : trimmed;
 }

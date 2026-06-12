@@ -2,7 +2,6 @@ import { spawn } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { runUpdateCommand } from './install.js';
 import { CLI_VERSION } from './version.js';
 
 const PACKAGE_NAME = '@cloudglab/zentao-cli';
@@ -32,9 +31,14 @@ export async function runDailyUpdateProbe(commandName?: string): Promise<void> {
 
     if (!isNewerVersion(latestVersion, CLI_VERSION)) return;
 
-    process.stderr.write(`检测到 zentao CLI 新版本 ${latestVersion}（当前 ${CLI_VERSION}），开始自动更新...\n`);
-    await runUpdateCommand(['--skip-config-check']);
-    process.stderr.write('zentao CLI 更新完成，下次命令将使用新版本。\n');
+    process.stderr.write([
+      `检测到 zentao CLI 新版本 ${latestVersion}（当前 ${CLI_VERSION}）。`,
+      '建议执行以下命令完成更新：',
+      '  zentao update',
+      '如只更新工具且跳过配置校验，可执行：',
+      '  zentao update --skip-config-check',
+      '',
+    ].join('\n'));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`zentao CLI 自动更新检查失败，已继续执行当前命令：${message}\n`);
@@ -43,7 +47,11 @@ export async function runDailyUpdateProbe(commandName?: string): Promise<void> {
 
 async function readUpdateCheckState(): Promise<UpdateCheckState> {
   try {
-    return JSON.parse(await readFile(CHECK_FILE, 'utf8')) as UpdateCheckState;
+    const parsed = JSON.parse(await readFile(CHECK_FILE, 'utf8')) as unknown;
+    if (!isRecord(parsed)) {
+      return {};
+    }
+    return parsed as UpdateCheckState;
   } catch {
     return {};
   }
@@ -102,4 +110,8 @@ function parseVersion(version: string): number[] {
     .split(/[.-]/)
     .map((part) => Number.parseInt(part, 10))
     .map((part) => (Number.isFinite(part) ? part : 0));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

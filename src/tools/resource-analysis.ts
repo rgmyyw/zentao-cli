@@ -3,8 +3,10 @@ import type { CliRegistry } from '../core/cli-registry.js';
 import { getApi } from '../core/api-provider.js';
 import { jsonResult } from './shared.js';
 
+const optionalTrimmedPath = z.string().trim().optional().transform((value) => (value === '' ? undefined : value));
+
 const resourceInput = {
-  outDir: z.string().optional().describe('资源下载目录。不传时使用系统临时目录。'),
+  outDir: optionalTrimmedPath.describe('资源下载目录。不传时使用系统临时目录。'),
   maxInlineBytes: z.number().int().positive().optional().describe('小文本/日志内联分析的最大字节数，默认 204800。'),
   download: z.boolean().optional().default(true).describe('是否下载资源。false 时仅解析资源线索。'),
 };

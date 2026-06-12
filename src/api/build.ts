@@ -38,11 +38,43 @@ export class BuildApi {
   }
 
   async createBuild(payload: CreateBuildInput): Promise<unknown> {
-    const { project, ...build } = payload;
+    const { project, ...build } = this.normalizeBuildInput(payload, ['name', 'builder']);
     return this.http.request('POST', `/projects/${project}/builds`, { data: build });
   }
 
   async updateBuild(buildId: number, update: UpdateBuildInput): Promise<unknown> {
-    return this.http.request('PUT', `/builds/${buildId}`, { data: update });
+    return this.http.request('PUT', `/builds/${buildId}`, { data: this.normalizeBuildInput(update, []) });
+  }
+
+  private normalizeBuildInput<T extends object>(input: T, requiredFields: Array<'name' | 'builder'>): T {
+    const normalized = { ...(input as Record<string, unknown>) };
+
+    for (const field of ['name', 'builder', 'date', 'desc', 'scmPath', 'filePath'] as const) {
+      const value = normalized[field];
+      if (typeof value !== 'string') continue;
+
+      if (requiredFields.includes(field as 'name' | 'builder')) {
+        normalized[field] = this.requireNonBlank(value, `${field} 不能为空`);
+        continue;
+      }
+
+      const trimmed = this.normalizeOptionalString(value);
+      if (trimmed === undefined) delete normalized[field];
+      else normalized[field] = trimmed;
+    }
+
+    return normalized as T;
+  }
+
+  private normalizeOptionalString(value: string): string | undefined {
+    const trimmed = value.trim();
+    return trimmed === '' ? undefined : trimmed;
+  }
+
+  private requireNonBlank(value: unknown, message: string): string {
+    if (typeof value !== 'string') throw new Error(message);
+    const trimmed = value.trim();
+    if (trimmed === '') throw new Error(message);
+    return trimmed;
   }
 }

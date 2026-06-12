@@ -2,6 +2,8 @@ import type { ZentaoHttpClient } from '../core/http.js';
 import { toClientPaginatedListResult, toServerListResult, type ListResult } from '../core/list-result.js';
 import { normalizePagination, normalizeTotalPages, type PaginationInput } from '../core/pagination.js';
 import type { ZentaoBug, ZentaoListResponse } from '../types/zentao.js';
+import { toFormUrlEncoded } from '../utils/form.js';
+import { bugMatchesKeyword, bugMatchesModuleAlias, normalizeBugFilterText } from './bug-filter.js';
 
 export interface BugListParams extends PaginationInput {
   productId: number;
@@ -32,12 +34,16 @@ export class BugApi {
   constructor(private readonly http: ZentaoHttpClient) {}
 
   async createBug(data: Record<string, unknown> & { product: number }): Promise<unknown> {
-    return this.http.request('POST', `/products/${data.product}/bugs`, { data });
+    return this.http.request('POST', `/products/${data.product}/bugs`, {
+      data: this.normalizeBugWriteInput(data, { requiredFields: ['title'] }),
+    });
   }
 
   async getMyBugs(params: MyBugListParams = {}): Promise<unknown> {
-    if (params.productId) {
-      return this.getProductBugs({ ...params, productId: params.productId, status: 'assigntome' });
+    const normalizedParams = this.normalizeBugQueryParams(params);
+
+    if (normalizedParams.productId) {
+      return this.getProductBugs({ ...normalizedParams, productId: normalizedParams.productId, status: 'assigntome' });
     }
 
     const response = await this.http.request<ZentaoListResponse<{ id: number; name?: string }> & { products?: Array<{ id: number; name?: string }> }>('GET', '/products');
@@ -51,8 +57,8 @@ export class BugApi {
 
       const bugs = await this.getAllMyBugsInProduct({
         productId,
-        branch: params.branch,
-        order: params.order,
+        branch: normalizedParams.branch,
+        order: normalizedParams.order,
       });
 
       allBugs.push(...bugs.map((bug) => ({
@@ -62,8 +68,8 @@ export class BugApi {
       })));
     }
 
-    const sorted = this.sortBugs(allBugs, params.order);
-    const paginated = toClientPaginatedListResult<ZentaoBug>({ bugs: sorted }, ['bugs'], params);
+    const sorted = this.sortBugs(allBugs, normalizedParams.order);
+    const paginated = toClientPaginatedListResult<ZentaoBug>({ bugs: sorted }, ['bugs'], normalizedParams);
     return {
       ...paginated,
       scope: 'global-assigntome',
@@ -72,22 +78,23 @@ export class BugApi {
   }
 
   async getProductBugs(params: BugListParams): Promise<unknown> {
-    const needsClientFilter = !!(params.moduleId || params.module || params.search);
+    const normalizedParams = this.normalizeBugQueryParams(params);
+    const needsClientFilter = !!(normalizedParams.moduleId || normalizedParams.module || normalizedParams.search);
 
     if (needsClientFilter) {
-      return this.getProductBugsWithClientFilter(params);
+      return this.getProductBugsWithClientFilter(normalizedParams);
     }
 
-    const pagination = normalizePagination(params);
-    const response = await this.http.request<ZentaoListResponse<ZentaoBug> & { bugs?: ZentaoBug[] }>('GET', `/products/${params.productId}/bugs`, {
+    const pagination = normalizePagination(normalizedParams);
+    const response = await this.http.request<ZentaoListResponse<ZentaoBug> & { bugs?: ZentaoBug[] }>('GET', `/products/${normalizedParams.productId}/bugs`, {
       params: {
         ...pagination,
-        branch: params.branch ?? 'all',
-        order: params.order ?? 'id_desc',
-        status: params.status === 'all' ? undefined : params.status,
+        branch: normalizedParams.branch ?? 'all',
+        order: normalizedParams.order ?? 'id_desc',
+        status: normalizedParams.status === 'all' ? undefined : normalizedParams.status,
       },
     });
-    return toServerListResult(response, ['bugs'], params);
+    return toServerListResult(response, ['bugs'], normalizedParams);
   }
 
   private async getProductBugsWithClientFilter(params: BugListParams): Promise<ListResult<ZentaoBug>> {
@@ -150,23 +157,37 @@ export class BugApi {
   }
 
   async updateBug(bugId: number, update: Record<string, unknown>): Promise<unknown> {
-    return this.http.request('PUT', `/bugs/${bugId}`, { data: update });
+    const current = await this.getBugDetail(bugId);
+    const preserved = this.pickBugEditDefaults(current);
+    const formData = toFormUrlEncoded(this.normalizeBugWriteInput({ ...preserved, ...update }, { requiredFields: [] }));
+    return this.http.legacyRequest('POST', `/bug-edit-${bugId}.json`, {
+      data: formData,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
   }
 
   async assignBug(bugId: number, data: Record<string, unknown>): Promise<unknown> {
-    return this.http.request('POST', `/bugs/${bugId}/assign`, { data });
+    return this.http.request('POST', `/bugs/${bugId}/assign`, {
+      data: this.normalizeBugWriteInput(data, { requiredFields: ['assignedTo'] }),
+    });
   }
 
   async confirmBug(bugId: number, data: Record<string, unknown> = {}): Promise<unknown> {
-    return this.http.request('POST', `/bugs/${bugId}/confirm`, { data });
+    return this.http.request('POST', `/bugs/${bugId}/confirm`, {
+      data: this.normalizeBugWriteInput(data, { requiredFields: [] }),
+    });
   }
 
   async closeBug(bugId: number, data: Record<string, unknown> = {}): Promise<unknown> {
-    return this.http.request('POST', `/bugs/${bugId}/close`, { data });
+    return this.http.request('POST', `/bugs/${bugId}/close`, {
+      data: this.normalizeBugWriteInput(data, { requiredFields: [] }),
+    });
   }
 
   async activateBug(bugId: number, data: Record<string, unknown> = {}): Promise<unknown> {
-    return this.http.request('POST', `/bugs/${bugId}/activate`, { data });
+    return this.http.request('POST', `/bugs/${bugId}/activate`, {
+      data: this.normalizeBugWriteInput(data, { requiredFields: [] }),
+    });
   }
 
   async deleteBug(bugId: number): Promise<unknown> {
@@ -175,11 +196,13 @@ export class BugApi {
 
   async okBug(bugId: number, data: Record<string, unknown> = {}): Promise<unknown> {
     // 禅道 18.5 REST 没暴露 /bugs/{id}/ok，UI 的 OK 按钮调旧版控制器
-    return this.http.legacyRequest('POST', `/bug-ok-${bugId}.json`, { data });
+    return this.http.legacyRequest('POST', `/bug-ok-${bugId}.json`, {
+      data: this.normalizeBugWriteInput(data, { requiredFields: [] }),
+    });
   }
 
   async resolveBug(bugId: number, input: ResolveBugInput): Promise<unknown> {
-    const payload: ResolveBugInput = { ...input };
+    const payload = this.normalizeBugWriteInput({ ...input }, { requiredFields: [] }) as unknown as ResolveBugInput;
     if (payload.resolution === 'fixed' && !payload.resolvedBuild) payload.resolvedBuild = 'trunk';
     if (payload.resolution === 'duplicate' && !payload.duplicateBug) {
       throw new Error('resolution=duplicate 时必须提供 duplicateBug');
@@ -214,88 +237,112 @@ export class BugApi {
     sorted.sort((a, b) => b.id - a.id);
     return sorted;
   }
-}
 
-function normalizeBugFilterText(value: string): string {
-  return value.trim().toLowerCase();
-}
+  private normalizeBugWriteInput(
+    input: Record<string, unknown>,
+    options: { requiredFields: Array<'title' | 'assignedTo'> },
+  ): Record<string, unknown> {
+    const normalized: Record<string, unknown> = { ...input };
 
-function bugMatchesKeyword(bug: ZentaoBug, keyword: string, fields: string[]): boolean {
-  if (!keyword) return true;
-
-  const record = bug as Record<string, unknown>;
-  for (const field of fields) {
-    const value = record[field];
-    if (value === undefined || value === null) continue;
-    if (String(value).toLowerCase().includes(keyword)) return true;
-  }
-
-  return false;
-}
-
-function bugMatchesModuleAlias(bug: ZentaoBug, keyword: string): boolean {
-  if (!keyword) return true;
-
-  const fields = ['module', 'moduleId', 'moduleName', 'moduleTitle', 'modulePath', 'path', 'title', 'keywords', 'v1', 'v2'];
-  if (bugMatchesKeyword(bug, keyword, fields)) return true;
-
-  const record = bug as Record<string, unknown>;
-  const aliasSources = fields
-    .map((field) => record[field])
-    .filter((value): value is string | number => value !== undefined && value !== null)
-    .map((value) => String(value));
-
-  return aliasSources.some((value) => normalizeAliasText(value).includes(keyword));
-}
-
-function normalizeAliasText(value: string): string {
-  let result = '';
-
-  for (const char of value.toLowerCase()) {
-    if (/[a-z0-9]/.test(char)) {
-      result += char;
-      continue;
+    for (const field of options.requiredFields) {
+      if (!Object.prototype.hasOwnProperty.call(normalized, field)) {
+        throw new Error(`${field} 不能为空`);
+      }
+      normalized[field] = this.requireNonBlank(normalized[field], `${field} 不能为空`);
     }
 
-    const initial = chineseInitialMap[char];
-    if (initial) {
-      result += initial;
+    for (const key of ['title', 'assignedTo', 'comment', 'resolvedBuild', 'resolvedDate', 'openedBuild', 'type', 'steps', 'keywords', 'mailto', 'status', 'resolution', 'project', 'execution', 'plan'] as const) {
+      if (!Object.prototype.hasOwnProperty.call(normalized, key)) {
+        continue;
+      }
+
+      const value = normalized[key];
+      if (typeof value !== 'string') {
+        continue;
+      }
+
+      const trimmed = value.trim();
+      if (!trimmed && (key === 'assignedTo' || key === 'title')) {
+        delete normalized[key];
+        continue;
+      }
+
+      normalized[key] = trimmed;
     }
+
+    return normalized;
   }
 
-  return result;
-}
+  private pickBugEditDefaults(bug: ZentaoBug): Record<string, unknown> {
+    const openedBuild = Array.isArray(bug.openedBuild)
+      ? bug.openedBuild
+          .map((item) => (item && typeof item === 'object' && 'id' in item ? String(item.id) : ''))
+          .filter(Boolean)
+          .join(',')
+      : typeof bug.openedBuild === 'string'
+        ? bug.openedBuild
+        : undefined;
 
-const chineseInitialMap: Record<string, string> = {
-  '超': 'c',
-  '管': 'g',
-  '云': 'y',
-  '镜': 'j',
-  '助': 'z',
-  '手': 's',
-  '脉': 'm',
-  '眺': 't',
-  '警': 'j',
-  '务': 'w',
-  '数': 's',
-  '盘': 'p',
-  '析': 'x',
-  '案': 'a',
-  '系': 'x',
-  '统': 't',
-  '寻': 'x',
-  '迹': 'j',
-  '客': 'k',
-  '户': 'h',
-  '成': 'c',
-  '功': 'g',
-  '部': 'b',
-  '服': 'f',
-  '止': 'z',
-  '付': 'f',
-  '通': 't',
-  '两': 'l',
-  '卡': 'k',
-  '其': 'q',
-  '他': 't',
-};
+    const assignedTo = bug.assignedTo && typeof bug.assignedTo === 'object' && 'account' in bug.assignedTo
+      ? String(bug.assignedTo.account ?? '')
+      : typeof bug.assignedTo === 'string'
+        ? bug.assignedTo
+        : undefined;
+
+    return {
+      title: bug.title,
+      keywords: bug.keywords,
+      severity: bug.severity,
+      pri: bug.pri,
+      type: bug.type,
+      steps: bug.steps,
+      story: bug.story,
+      task: bug.task,
+      module: bug.module,
+      project: bug.project,
+      execution: bug.execution,
+      plan: bug.plan,
+      openedBuild,
+      assignedTo,
+    };
+  }
+
+  private requireNonBlank(value: unknown, message: string): string {
+    if (typeof value !== 'string') {
+      throw new Error(message);
+    }
+
+    const normalized = value.trim();
+    if (!normalized) {
+      throw new Error(message);
+    }
+
+    return normalized;
+  }
+
+  private normalizeBugQueryParams<T extends PaginationInput & {
+    branch?: string;
+    order?: string;
+    status?: string;
+    search?: string;
+    module?: string;
+  }>(params: T): T {
+    const normalized = { ...params } as T & Record<string, unknown>;
+
+    for (const key of ['branch', 'order', 'status', 'search', 'module'] as const) {
+      const value = normalized[key];
+      if (typeof value !== 'string') {
+        continue;
+      }
+
+      const trimmed = value.trim();
+      if (trimmed === '') {
+        delete normalized[key];
+      } else {
+        normalized[key] = trimmed;
+      }
+    }
+
+    return normalized;
+  }
+}

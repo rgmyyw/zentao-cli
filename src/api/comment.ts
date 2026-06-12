@@ -1,4 +1,4 @@
-import type { ZentaoHttpClient } from '../core/http.js';
+import type { HttpError, ZentaoHttpClient } from '../core/http.js';
 
 export type CommentObjectType = 'task' | 'bug' | 'story' | 'product' | 'project' | 'execution' | string;
 
@@ -21,7 +21,7 @@ export class CommentApi {
     try {
       return await this.http.request('GET', `/comments/${objectType}/${objectID}`);
     } catch (error) {
-      if (error instanceof Error && error.message.includes('404')) {
+      if (isHttpStatusError(error, 404) || (error instanceof Error && error.message.includes('404'))) {
         return this.getActionsFromObjectDetail(objectType, objectID);
       }
       throw error;
@@ -38,9 +38,10 @@ export class CommentApi {
      * 非 API 模式返回 HTML：js::reload('parent') = 成功，其他 = 失败。
      * 备注实际已写入数据库，这里通过检查 HTML 模式判断成功与否。
      */
+    const comment = requireNonBlank(input.comment, 'comment 不能为空');
     const url = `/action-comment-${input.objectType}-${input.objectID}.json`;
     const formData = new URLSearchParams();
-    formData.append('comment', input.comment);
+    formData.append('comment', comment);
 
     try {
       return await this.http.legacyRequest('POST', url, {
@@ -85,4 +86,21 @@ export class CommentApi {
         throw new Error(`不支持从详情回退获取评论: ${objectType}`);
     }
   }
+}
+
+function isHttpStatusError(error: unknown, statusCode: number): error is HttpError {
+  return error instanceof Error && 'statusCode' in error && (error as HttpError).statusCode === statusCode;
+}
+
+function requireNonBlank(value: unknown, message: string): string {
+  if (typeof value !== 'string') {
+    throw new Error(message);
+  }
+
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new Error(message);
+  }
+
+  return normalized;
 }

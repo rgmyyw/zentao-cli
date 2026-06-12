@@ -13,15 +13,35 @@ export class PlanApi {
   constructor(private readonly http: ZentaoHttpClient) {}
 
   async getProductPlans(input: ProductPlanListInput): Promise<unknown> {
-    const response = await this.http.request('GET', `/products/${input.productId}/plans`, {
+    const normalizedInput = this.normalizePlanListInput(input);
+    const response = await this.http.request('GET', `/products/${normalizedInput.productId}/plans`, {
       params: {
-        branch: input.branch,
-        status: input.status,
-        query: input.query,
-        order: input.order,
+        branch: normalizedInput.branch,
+        status: normalizedInput.status,
+        query: normalizedInput.query,
+        order: normalizedInput.order,
       },
     });
     return toServerListResult(response, ['plans']);
+  }
+
+  private normalizePlanListInput(input: ProductPlanListInput): ProductPlanListInput {
+    return {
+      ...input,
+      branch: this.normalizeOptionalString(input.branch),
+      status: this.normalizeOptionalString(input.status),
+      query: this.normalizeOptionalString(input.query),
+      order: this.normalizeOptionalString(input.order),
+    };
+  }
+
+  private normalizeOptionalString(value?: string): string | undefined {
+    if (typeof value !== 'string') {
+      return value;
+    }
+
+    const normalized = value.trim();
+    return normalized === '' ? undefined : normalized;
   }
 
   async getPlanDetail(planId: number): Promise<unknown> {

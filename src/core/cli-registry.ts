@@ -49,7 +49,7 @@ export function parseCommandInput(schema: ZodRawShape, args: string[]): Record<s
 
   for (const [key, fieldSchema] of Object.entries(schema)) {
     if (!(key in raw)) continue;
-    converted[key] = coerceValue(raw[key], fieldSchema);
+    converted[key] = coerceValue(selectValueForSchema(raw[key], fieldSchema), fieldSchema);
   }
 
   const parsed = z.object(schema).strict().parse(converted);
@@ -97,6 +97,12 @@ function appendArg(target: Record<string, unknown>, key: string, value: unknown)
   target[key] = [current, value];
 }
 
+function selectValueForSchema(value: unknown, schema: ZodTypeAny): unknown {
+  if (!Array.isArray(value)) return value;
+  const unwrapped = unwrapSchema(schema);
+  return unwrapped instanceof z.ZodArray ? value : value[value.length - 1];
+}
+
 function coerceValue(value: unknown, schema: ZodTypeAny): unknown {
   const unwrapped = unwrapSchema(schema);
 
@@ -112,7 +118,7 @@ function coerceValue(value: unknown, schema: ZodTypeAny): unknown {
     const items: unknown[] = Array.isArray(value)
       ? value
       : typeof value === 'string' && value.trim().startsWith('[')
-        ? JSON.parse(value) as unknown[]
+        ? parseJsonValue(value, '数组参数') as unknown[]
         : typeof value === 'string'
           ? value.split(',').map((item) => item.trim()).filter(Boolean)
           : [value];
@@ -122,7 +128,7 @@ function coerceValue(value: unknown, schema: ZodTypeAny): unknown {
 
   if (unwrapped instanceof z.ZodObject) {
     if (typeof value !== 'string') return value;
-    return JSON.parse(value);
+    return parseJsonValue(value, '对象参数');
   }
 
   if (unwrapped instanceof z.ZodUnion) {
@@ -137,6 +143,15 @@ function coerceValue(value: unknown, schema: ZodTypeAny): unknown {
   }
 
   return value;
+}
+
+function parseJsonValue(value: string, label: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`无法解析${label}: ${value}（${message}）`);
+  }
 }
 
 function unwrapSchema(schema: ZodTypeAny): ZodTypeAny {
@@ -169,7 +184,7 @@ function toNumber(value: unknown): number {
   if (typeof value === 'number') return value;
   if (typeof value === 'string' && value.trim() !== '') {
     const parsed = Number(value);
-    if (!Number.isNaN(parsed)) return parsed;
+    if (Number.isFinite(parsed)) return parsed;
   }
   throw new Error(`无法解析数字: ${String(value)}`);
 }

@@ -66,6 +66,22 @@ describe('parseCommandInput', () => {
     });
   });
 
+  it('对非数组字段的重复参数使用最后一个值', () => {
+    const schema = {
+      page: z.number(),
+      force: z.boolean().optional(),
+      name: z.string(),
+    };
+
+    expect(
+      parseCommandInput(schema, ['--page', '1', '--page', '2', '--force', '--force', 'false', '--name', 'old', '--name', 'new']),
+    ).toEqual({
+      page: 2,
+      force: false,
+      name: 'new',
+    });
+  });
+
   it('拒绝 schema 外参数', () => {
     const schema = { name: z.string() };
 
@@ -80,5 +96,12 @@ describe('parseCommandInput', () => {
   it('对非法布尔值和数字抛错', () => {
     expect(() => parseCommandInput({ force: z.boolean() }, ['--force', 'maybe'])).toThrow('无法解析布尔值: maybe');
     expect(() => parseCommandInput({ page: z.number() }, ['--page', 'NaNish'])).toThrow('无法解析数字: NaNish');
+    expect(() => parseCommandInput({ estimate: z.number() }, ['--estimate', 'Infinity'])).toThrow('无法解析数字: Infinity');
+    expect(() => parseCommandInput({ estimate: z.number() }, ['--estimate', '-Infinity'])).toThrow('无法解析数字: -Infinity');
+  });
+
+  it('对非法 JSON 对象和数组参数抛清晰错误', () => {
+    expect(() => parseCommandInput({ meta: z.object({ enabled: z.boolean() }) }, ['--meta', '{bad json}'])).toThrow('无法解析对象参数: {bad json}');
+    expect(() => parseCommandInput({ items: z.array(z.number()) }, ['--items', '[1, bad]'])).toThrow('无法解析数组参数: [1, bad]');
   });
 });

@@ -24,12 +24,14 @@ function normalizeServerUrl(url: string): string {
 
 function normalizeApiBaseUrl(apiBaseUrl?: string): string | undefined {
   if (!apiBaseUrl) return undefined;
-  return apiBaseUrl.trim().replace(/\/+$/, '');
+  const normalized = apiBaseUrl.trim().replace(/\/+$/, '');
+  return normalized || undefined;
 }
 
 function normalizeLegacyBaseUrl(legacyBaseUrl?: string): string | undefined {
   if (!legacyBaseUrl) return undefined;
-  return legacyBaseUrl.trim().replace(/\/+$/, '');
+  const normalized = legacyBaseUrl.trim().replace(/\/+$/, '');
+  return normalized || undefined;
 }
 
 function normalizeApiVersion(apiVersion?: string): string {
@@ -46,13 +48,13 @@ export function maskConfig(config: ZentaoConfig): Omit<ZentaoConfig, 'password'>
 }
 
 export function normalizeConfig(config: Partial<ZentaoConfig>): ZentaoConfig {
-  if (!config.url) throw new Error('缺少禅道地址 url');
-  if (!config.username) throw new Error('缺少禅道用户名 username');
-  if (!config.password) throw new Error('缺少禅道密码 password');
+  const url = requireNonBlank(config.url, '缺少禅道地址 url');
+  const username = requireNonBlank(config.username, '缺少禅道用户名 username');
+  if (!config.password?.trim()) throw new Error('缺少禅道密码 password');
 
   return {
-    url: normalizeServerUrl(config.url),
-    username: config.username,
+    url: normalizeServerUrl(url),
+    username,
     password: config.password,
     apiVersion: normalizeApiVersion(config.apiVersion),
     apiBaseUrl: normalizeApiBaseUrl(config.apiBaseUrl),
@@ -62,22 +64,58 @@ export function normalizeConfig(config: Partial<ZentaoConfig>): ZentaoConfig {
 
 export function loadConfig(): ZentaoConfig | null {
   const envConfig: Partial<ZentaoConfig> = {
-    url: process.env.ZENTAO_URL,
-    username: process.env.ZENTAO_USERNAME || process.env.ZENTAO_ACCOUNT,
-    password: process.env.ZENTAO_PASSWORD,
-    apiVersion: normalizeApiVersion(process.env.ZENTAO_API_VERSION),
-    apiBaseUrl: process.env.ZENTAO_API_BASE_URL,
-    legacyBaseUrl: process.env.ZENTAO_LEGACY_BASE_URL,
+    url: normalizeOptionalEnvValue(process.env.ZENTAO_URL),
+    username: normalizeOptionalEnvValue(process.env.ZENTAO_USERNAME) || normalizeOptionalEnvValue(process.env.ZENTAO_ACCOUNT),
+    password: normalizeOptionalEnvValue(process.env.ZENTAO_PASSWORD),
+    apiVersion: normalizeOptionalEnvValue(process.env.ZENTAO_API_VERSION),
+    apiBaseUrl: normalizeOptionalEnvValue(process.env.ZENTAO_API_BASE_URL),
+    legacyBaseUrl: normalizeOptionalEnvValue(process.env.ZENTAO_LEGACY_BASE_URL),
   };
 
-  if (envConfig.url && envConfig.username && envConfig.password) {
-    return normalizeConfig(envConfig);
+  const hasAnyEnvOverride = Object.values(envConfig).some((value) => value !== undefined && value !== '');
+  const hasCompleteEnvConfig = Boolean(envConfig.url && envConfig.username && envConfig.password);
+
+  if (hasCompleteEnvConfig) return normalizeConfig(envConfig);
+
+  if (!existsSync(CONFIG_FILE)) {
+    return null;
   }
 
-  if (!existsSync(CONFIG_FILE)) return null;
+  const raw = readConfigFile();
+  if (!hasAnyEnvOverride) return normalizeConfig(raw);
 
-  const raw = JSON.parse(readFileSync(CONFIG_FILE, 'utf8')) as Partial<ZentaoConfig>;
-  return normalizeConfig(raw);
+  return normalizeConfig({
+    ...raw,
+    ...Object.fromEntries(Object.entries(envConfig).filter(([, value]) => value !== undefined && value !== '')),
+  });
+}
+
+function readConfigFile(): Partial<ZentaoConfig> {
+  try {
+    const parsed = JSON.parse(readFileSync(CONFIG_FILE, 'utf8')) as unknown;
+    if (!isRecord(parsed)) {
+      throw new Error('配置内容必须是 JSON 对象');
+    }
+    return parsed as Partial<ZentaoConfig>;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`禅道配置文件损坏，请检查 ${CONFIG_FILE}：${message}`);
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function requireNonBlank(value: string | undefined, message: string): string {
+  const normalized = value?.trim();
+  if (!normalized) throw new Error(message);
+  return normalized;
+}
+
+function normalizeOptionalEnvValue(value: string | undefined): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  return value.trim() === '' ? undefined : value;
 }
 
 export function saveConfig(config: ZentaoConfig): void {

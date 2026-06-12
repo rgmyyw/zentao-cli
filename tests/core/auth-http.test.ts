@@ -61,6 +61,18 @@ describe('ZentaoAuth', () => {
     await expect(new ZentaoAuth({ post: vi.fn().mockRejectedValue(axiosError(404, { error: 'missing' })) } as never, config).getToken()).rejects.toThrow('token 接口不存在');
     await expect(new ZentaoAuth({ post: vi.fn().mockRejectedValue(axiosError(500, { error: 'server' })) } as never, config).getToken()).rejects.toThrow('服务端异常');
   });
+
+  it('keeps plain text auth error details instead of masking them with JSON parse errors', async () => {
+    mockAxios();
+    const { ZentaoAuth } = await import('../../src/core/auth.js');
+
+    await expect(
+      new ZentaoAuth({ post: vi.fn().mockRejectedValue(axiosError(404, '<html>not found</html>')) } as never, config).getToken(),
+    ).rejects.toThrow('token 接口不存在');
+    await expect(
+      new ZentaoAuth({ post: vi.fn().mockRejectedValue(axiosError(404, '<html>not found</html>')) } as never, config).getToken(),
+    ).rejects.toThrow('<html>not found</html>');
+  });
 });
 
 describe('ZentaoHttpClient', () => {
@@ -112,6 +124,24 @@ describe('ZentaoHttpClient', () => {
 
     await expect(http.request('GET', '/bad')).rejects.toThrow('请求失败: 500');
     await expect(http.legacyRequest('GET', '/old')).rejects.toThrow('旧版页面请求失败: 404');
+  });
+
+  it('treats empty success responses as empty objects', async () => {
+    const axiosMock = mockAxios();
+    const client = {
+      post: vi.fn(async () => ({ data: { token: 'token' } })),
+      request: vi.fn()
+        .mockResolvedValueOnce({ data: '' })
+        .mockResolvedValueOnce({ data: undefined }),
+    };
+    axiosMock.create.mockReturnValue(client);
+    axiosMock.request.mockResolvedValueOnce({ data: '' });
+    const { ZentaoHttpClient } = await import('../../src/core/http.js');
+    const http = new ZentaoHttpClient(config);
+
+    await expect(http.request('DELETE', '/tasks/1')).resolves.toEqual({});
+    await expect(http.request('POST', '/tasks/1/finish')).resolves.toEqual({});
+    await expect(http.legacyRequest('POST', '/testtask-edit-1.json')).resolves.toEqual({});
   });
 
   it('uses configured legacy base URL and retries legacy 401 once', async () => {

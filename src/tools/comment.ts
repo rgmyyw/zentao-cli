@@ -21,7 +21,7 @@ export function registerCommentTools(server: CliRegistry): void {
     {
       objectType: objectTypeSchema,
       objectID: z.number().int().positive(),
-      comment: z.string().min(1),
+      comment: z.string().trim().min(1),
       confirm: z.boolean().optional().default(false),
     },
     async ({ confirm, ...input }) => {

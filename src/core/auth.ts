@@ -86,8 +86,7 @@ export class ZentaoAuth {
     }
 
     const status = error.response.status;
-    const rawData = sanitizeJsonLikeResponse(error.response.data);
-    const data = typeof rawData === 'string' ? rawData : JSON.stringify(rawData);
+    const data = describeResponseData(error.response.data);
 
     if (status === 401 || status === 403) {
       return new ZentaoAuthError(`登录失败：账号或密码错误，HTTP ${status}。`, 'invalid-credentials');
@@ -106,4 +105,21 @@ export class ZentaoAuth {
 
     return new ZentaoAuthError(`登录失败：HTTP ${status}，返回=${data}`, 'bad-response');
   }
+}
+
+function describeResponseData(data: unknown): string {
+  if (typeof data === 'string') {
+    const trimmed = data.trim();
+    if (!trimmed) return '';
+
+    try {
+      const parsed = sanitizeJsonLikeResponse(trimmed);
+      return typeof parsed === 'string' ? parsed : JSON.stringify(parsed);
+    } catch {
+      return trimmed;
+    }
+  }
+
+  if (data === null || data === undefined) return '';
+  return JSON.stringify(data);
 }

@@ -46,8 +46,9 @@ export class StatisticsApi {
   }
 
   async getMyWeeklyActivity(input: ActivityQueryInput): Promise<unknown> {
+    const account = this.requireNonBlank(input.account, 'account 不能为空');
     const range = this.resolveActivityRange(input);
-    const response = await this.getUserDynamic(input.account, range.legacyPeriod, range.anchorTimestamp);
+    const response = await this.getUserDynamic(account, range.legacyPeriod, range.anchorTimestamp);
     const actions = this.extractActions(response);
     const normalizedActions = actions
       .map(action => this.normalizeAction(action))
@@ -64,7 +65,7 @@ export class StatisticsApi {
     return {
       source: 'legacy-user-dynamic',
       note: '近似读取：调用禅道旧版动态页面 JSON 获取动态原始数据，再按 originalDate/date 在客户端筛选日期范围。若旧版页面权限或 Token 不兼容，需服务端补 REST dynamic 接口。',
-      account: input.account,
+      account,
       query: {
         week: input.week ?? 'last',
         dateRange: input.dateRange,
@@ -153,22 +154,25 @@ export class StatisticsApi {
   }
 
   private resolveActivityRange(input: ActivityQueryInput): ActivityDateRange {
-    if (input.startDate || input.endDate) {
-      const start = input.startDate ? this.parseDate(input.startDate) : undefined;
-      const end = input.endDate ? this.parseDate(input.endDate) : undefined;
-      if (!start && input.startDate) throw new Error(`无法解析开始日期: ${input.startDate}`);
-      if (!end && input.endDate) throw new Error(`无法解析结束日期: ${input.endDate}`);
+    const startDateText = this.normalizeOptionalText(input.startDate);
+    const endDateText = this.normalizeOptionalText(input.endDate);
+
+    if (startDateText || endDateText) {
+      const start = startDateText ? this.parseDate(startDateText) : undefined;
+      const end = endDateText ? this.parseDate(endDateText) : undefined;
+      if (!start && startDateText) throw new Error(`无法解析开始日期: ${input.startDate}`);
+      if (!end && endDateText) throw new Error(`无法解析结束日期: ${input.endDate}`);
       const startDate = this.formatDate(start ?? end ?? new Date());
       const endDate = this.formatDate(end ?? start ?? new Date());
       return this.withLegacyAnchor(this.normalizeDateRange({ label: `${startDate}..${endDate}`, startDate, endDate, legacyPeriod: 'all', source: 'explicit-date' }));
     }
 
+    if (input.dateRange) return this.parseNaturalDateRange(input.dateRange);
+
     if (input.days !== undefined) {
       if (input.days < 1) throw new Error('days 必须大于 0');
       return this.rangeForRecentDays(input.days, `最近${input.days}天`);
     }
-
-    if (input.dateRange) return this.parseNaturalDateRange(input.dateRange);
 
     return this.rangeForWeek(input.week ?? 'last');
   }
@@ -183,7 +187,11 @@ export class StatisticsApi {
     if (['yesterday', '昨天', '昨日'].includes(normalized)) return this.rangeForPeriodDay('昨天', this.addDays(new Date(), -1), 'yesterday');
 
     const recentDays = normalized.match(/(?:最近|近|last|past)\s*(\d+)\s*(?:天|days?|日)?/);
-    if (recentDays) return this.rangeForRecentDays(Number(recentDays[1]), text);
+    if (recentDays) {
+      const days = Number(recentDays[1]);
+      if (days < 1) throw new Error('dateRange 中的最近天数必须大于 0');
+      return this.rangeForRecentDays(days, text);
+    }
 
     const daysAgo = normalized.match(/(\d+)\s*天前/);
     if (daysAgo) return this.rangeForPeriodDay(text, this.addDays(new Date(), -Number(daysAgo[1])), 'all');
@@ -262,6 +270,17 @@ export class StatisticsApi {
     const date = new Date(year, month - 1, day);
     if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return undefined;
     return this.startOfDay(date);
+  }
+
+  private normalizeOptionalText(value?: string): string | undefined {
+    const text = value?.trim();
+    return text ? text : undefined;
+  }
+
+  private requireNonBlank(value: string, message: string): string {
+    const text = value.trim();
+    if (!text) throw new Error(message);
+    return text;
   }
 
   private isInDateRange(date: string, startDate: string, endDate: string): boolean {

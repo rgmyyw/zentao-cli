@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.19 - 2026-06-12
+
+### Added
+
+- `getExecutionBugs` 新增 `--search`、`--module` 和 `--moduleId` 参数，支持在明确查询某个执行 / 迭代 Bug 时按关键词、模块名、模块别名或模块 ID 做客户端过滤。
+- 新增共享 Bug 过滤逻辑，产品 Bug 与执行 Bug 均支持中文模块首字母别名匹配，例如 `云镜` 可用 `yj`。
+- 测试覆盖补充执行 Bug 模块过滤、线上问题来源分流提示、CLI 参数解析、更新探针和安装配置链路。
+
+### Changed
+
+- 线上 / 生产 / 客户反馈问题的文档与工具提示统一为“先判断来源”：市场 / 售后 / 客户反馈查 `市场和售后问题跟踪`，测试 / 开发自发现查 `测试`，再按模块过滤真实业务产品。
+- Bug 写操作补齐禅道 18.5 兼容处理，更新 Bug 改为走旧版编辑表单以保留必要字段，其他 Bug 流转会统一清理空白输入。
+- 普通命令的每日更新探针与安装 / 更新配置流程继续收敛，只提示更新命令，不在查询时自动改动本机环境。
+
 ## 0.1.18 - 2026-06-11
 
 ### Added
@@ -15,13 +29,14 @@ All notable changes to this project will be documented in this file.
 - `startTask` 针对禅道 18.5 REST start 行为异常增加状态和负责人恢复逻辑，避免开始任务后被错误置为完成。
 - `resolveBug` 支持 `tostory` 解决方案，覆盖转需求场景。
 - 发布前查询回归脚本补充 `okBug` 命令面检查。
+- 每日更新探针改为只提示更新命令，不再在普通查询命令里自动执行安装；同时补齐 `legacyBaseUrl` 的配置录入链路。
 
 ## 0.1.17 - 2026-06-11
 
 ### Added
 
 - `getProductBugs` 新增 `--search`、`--module` 和 `--moduleId` 参数，支持按关键词、模块别名或模块 ID 查询产品 Bug。
-- 线上 / 生产 / 客户反馈 Bug 场景默认先定位固定产品 `市场和售后问题跟踪`，再通过模块匹配真实业务产品；模块别名大小写不敏感，常见中文模块支持首字母缩写，例如 `云镜` 可用 `yj`。
+- 线上 / 生产 / 客户反馈 Bug 场景支持按来源分流：市场 / 售后 / 客户反馈来源查 `市场和售后问题跟踪`，测试 / 开发自发现来源查 `测试`，再通过模块匹配真实业务产品；模块别名大小写不敏感，常见中文模块支持首字母缩写，例如 `云镜` 可用 `yj`。
 
 ### Fixed
 
@@ -217,7 +232,7 @@ All notable changes to this project will be documented in this file.
 - 新增更稳的认证错误分类：区分账号密码错误、接口不存在、服务端异常、网络错误、响应异常。
 - 新增 `ZENTAO_API_BASE_URL` 配置，支持非标准禅道 API 部署路径。
 - 新增 `initZentao --save` 显式落盘控制，默认仅校验当前会话配置。
-- 新增线上 Bug 查询强制判断与固定口径文档：`市场和售后问题跟踪` + 模块匹配。
+- 新增线上 Bug 查询强制判断与默认口径文档：`市场和售后问题跟踪` + 模块匹配。
 - 新增 `getMyBugs` / `getMyBugStatistics` 默认跨产品查询能力，`productId` 改为可选收窄条件。
 - 新增 GitHub Actions 发布链路：push `v*` tag 后自动校验、构建、发布 npm、创建 GitHub Release。
 - 新增纯 CLI 运行层：`zentao help`、`zentao list`、`zentao --version`。

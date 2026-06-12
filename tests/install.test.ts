@@ -49,6 +49,7 @@ function mockInstallDependencies() {
 describe('install command', () => {
   afterEach(() => {
     commandCalls.length = 0;
+    delete process.env.ZENTAO_API_VERSION;
     vi.resetModules();
     vi.restoreAllMocks();
   });
@@ -107,6 +108,67 @@ describe('install command', () => {
     ]);
   });
 
+  it('supports equals syntax for install and update options', async () => {
+    mockSpawn(new Map([
+      ['npm pack @cloudglab/zentao-cli@latest --pack-destination /tmp/zentao-cli-skill-abc --silent', 'cloudglab-zentao-cli-0.1.5.tgz\n'],
+    ]));
+    mockInstallDependencies();
+    const { runInstallCommand, runUpdateCommand } = await import('../src/install.js');
+
+    await runInstallCommand(['--skill-source=npm', '--skip-config-check=true']);
+    await runUpdateCommand(['--skill-local-path=./local-skill', '--skill-only=true', '--skip-config-check=false']);
+
+    expect(commandCalls).toEqual([
+      { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
+      { command: 'npm', args: ['pack', '@cloudglab/zentao-cli@latest', '--pack-destination', '/tmp/zentao-cli-skill-abc', '--silent'] },
+      { command: 'tar', args: ['-xzf', '/tmp/zentao-cli-skill-abc/cloudglab-zentao-cli-0.1.5.tgz', '-C', '/tmp/zentao-cli-skill-abc'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', '-g', '/tmp/zentao-cli-skill-abc/package'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', '-g', path.resolve('./local-skill')] },
+    ]);
+  });
+
+  it('supports space syntax for boolean install and update options', async () => {
+    mockSpawn();
+    mockInstallDependencies();
+    const { runInstallCommand, runUpdateCommand } = await import('../src/install.js');
+
+    await runInstallCommand(['--skill-source', 'git', '--cli-only', 'false', '--skip-config-check', 'true']);
+    await runUpdateCommand(['--skill-source', 'git', '--skill-only', 'false', '--skip-config-check', 'true']);
+
+    expect(commandCalls).toEqual([
+      { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', '-g', 'cloudglab/zentao-cli'] },
+      { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', '-g', 'cloudglab/zentao-cli'] },
+    ]);
+  });
+
+  it('rejects invalid boolean values in equals syntax', async () => {
+    mockSpawn();
+    mockInstallDependencies();
+    const { runInstallCommand } = await import('../src/install.js');
+
+    await expect(runInstallCommand(['--skip-config-check=maybe'])).rejects.toThrow('--skip-config-check 只支持 true 或 false');
+  });
+
+  it('rejects invalid boolean values in space syntax', async () => {
+    mockSpawn();
+    mockInstallDependencies();
+    const { runInstallCommand } = await import('../src/install.js');
+
+    await expect(runInstallCommand(['--cli-only', 'maybe'])).rejects.toThrow('--cli-only 只支持 true 或 false');
+  });
+
+  it('rejects missing values for string install options without swallowing following flags', async () => {
+    mockSpawn();
+    mockInstallDependencies();
+    const { runInstallCommand } = await import('../src/install.js');
+
+    await expect(runInstallCommand(['--skill-local-path', '--skip-config-check'])).rejects.toThrow('--skill-local-path 需要传入本地目录路径');
+    await expect(runInstallCommand(['--skill-source', '--skip-config-check'])).rejects.toThrow('--skill-source 需要传入参数值');
+    await expect(runInstallCommand(['--skill-local-path='])).rejects.toThrow('--skill-local-path 需要传入本地目录路径');
+  });
+
   it('installs the skill from the GitHub source explicitly', async () => {
     mockSpawn();
     mockInstallDependencies();
@@ -133,5 +195,57 @@ describe('install command', () => {
       { command: 'tar', args: ['-xzf', '/tmp/zentao-cli-skill-abc/cloudglab-zentao-cli-0.1.5.tgz', '-C', '/tmp/zentao-cli-skill-abc'] },
       { command: 'npx', args: ['-y', 'skills', 'add', '-g', '/tmp/zentao-cli-skill-abc/package'] },
     ]);
+  });
+
+  it('warns that environment variables still take precedence when only api version is set', async () => {
+    process.env.ZENTAO_API_VERSION = 'v2';
+    mockSpawn(new Map([['npm root -g', '/usr/local/lib/node_modules\n']]));
+    mockInstallDependencies();
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const { runInstallCommand } = await import('../src/install.js');
+
+    await runInstallCommand([]);
+
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('当前 shell 存在 ZENTAO_* 环境变量'));
+  });
+
+  it('does not warn for whitespace-only environment variables', async () => {
+    process.env.ZENTAO_API_VERSION = '   ';
+    mockSpawn(new Map([['npm root -g', '/usr/local/lib/node_modules\n']]));
+    mockInstallDependencies();
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const { runInstallCommand } = await import('../src/install.js');
+
+    await runInstallCommand([]);
+
+    expect(write).not.toHaveBeenCalledWith(expect.stringContaining('当前 shell 存在 ZENTAO_* 环境变量'));
+  });
+
+  it('surfaces malformed config errors in non-interactive environments', async () => {
+    mockSpawn(new Map([['npm root -g', '/usr/local/lib/node_modules\n']]));
+    vi.doMock('node:fs/promises', () => ({
+      access: vi.fn(async () => undefined),
+      mkdtemp: vi.fn(async () => '/tmp/zentao-cli-skill-abc'),
+      rm: vi.fn(async () => undefined),
+    }));
+    vi.doMock('node:os', () => ({ default: { tmpdir: () => '/tmp' } }));
+    vi.doMock('../src/api/index.js', () => ({
+      ZentaoApi: class {
+        getToken = vi.fn(async () => 'token');
+      },
+    }));
+    vi.doMock('../src/core/config.js', () => ({
+      loadConfig: vi.fn(() => {
+        throw new Error('禅道配置文件损坏，请检查 /tmp/home/.zentao/config.json：配置内容必须是 JSON 对象');
+      }),
+      maskConfig: vi.fn((config: { password?: string }) => ({ ...config, password: config.password ? '******' : config.password })),
+      normalizeConfig: vi.fn((config: unknown) => config),
+      saveConfig: vi.fn(),
+    }));
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const { runInstallCommand } = await import('../src/install.js');
+
+    await expect(runInstallCommand([])).rejects.toThrow('禅道配置文件损坏，请检查 /tmp/home/.zentao/config.json：配置内容必须是 JSON 对象');
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('检测到禅道配置文件异常：禅道配置文件损坏'));
   });
 });

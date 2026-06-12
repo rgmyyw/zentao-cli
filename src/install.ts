@@ -51,38 +51,41 @@ function parseInstallOptions(args: string[]): InstallOptions {
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
-    if (arg === '--skill-source') {
-      const value = args[index + 1];
+    if (arg === '--skill-source' || arg.startsWith('--skill-source=')) {
+      const value = readRequiredOptionValue(args, index, '--skill-source');
       if (value !== 'local' && value !== 'git' && value !== 'npm') {
         throw new Error('--skill-source 只支持 local、git 或 npm');
       }
       skillSource = value;
-      index += 1;
+      if (arg === '--skill-source') index += 1;
       continue;
     }
 
-    if (arg === '--skill-local-path') {
-      const value = args[index + 1];
-      if (!value) {
-        throw new Error('--skill-local-path 需要传入本地目录路径');
-      }
+    if (arg === '--skill-local-path' || arg.startsWith('--skill-local-path=')) {
+      const value = readRequiredOptionValue(args, index, '--skill-local-path');
       skillLocalPath = value;
-      index += 1;
+      if (arg === '--skill-local-path') index += 1;
       continue;
     }
 
-    if (arg === '--skip-config-check') {
-      skipConfigCheck = true;
+    if (arg === '--skip-config-check' || arg.startsWith('--skip-config-check=')) {
+      const parsed = readBooleanFlag(args, index, '--skip-config-check');
+      skipConfigCheck = parsed.value;
+      index += parsed.consumedArgs;
       continue;
     }
 
-    if (arg === '--cli-only') {
-      cliOnly = true;
+    if (arg === '--cli-only' || arg.startsWith('--cli-only=')) {
+      const parsed = readBooleanFlag(args, index, '--cli-only');
+      cliOnly = parsed.value;
+      index += parsed.consumedArgs;
       continue;
     }
 
-    if (arg === '--skill-only') {
-      skillOnly = true;
+    if (arg === '--skill-only' || arg.startsWith('--skill-only=')) {
+      const parsed = readBooleanFlag(args, index, '--skill-only');
+      skillOnly = parsed.value;
+      index += parsed.consumedArgs;
       continue;
     }
 
@@ -94,6 +97,60 @@ function parseInstallOptions(args: string[]): InstallOptions {
   }
 
   return { skillSource, skillLocalPath, skipConfigCheck, cliOnly, skillOnly };
+}
+
+function readOptionValue(arg: string, optionName: string): string | undefined {
+  const prefix = `${optionName}=`;
+  if (!arg.startsWith(prefix)) return undefined;
+  return arg.slice(prefix.length);
+}
+
+function readRequiredOptionValue(args: string[], index: number, optionName: string): string {
+  const arg = args[index];
+  const inlineValue = readOptionValue(arg, optionName);
+  if (inlineValue !== undefined) {
+    if (inlineValue.trim() === '') {
+      throw createMissingOptionValueError(optionName);
+    }
+    return inlineValue;
+  }
+
+  const next = args[index + 1];
+  if (typeof next !== 'string' || next.startsWith('--')) {
+    throw createMissingOptionValueError(optionName);
+  }
+
+  return next;
+}
+
+function createMissingOptionValueError(optionName: string): Error {
+  if (optionName === '--skill-local-path') {
+    return new Error('--skill-local-path 需要传入本地目录路径');
+  }
+
+  return new Error(`${optionName} 需要传入参数值`);
+}
+
+function readBooleanFlag(args: string[], index: number, optionName: string): { value: boolean; consumedArgs: number } {
+  const arg = args[index];
+  const inlineValue = readOptionValue(arg, optionName);
+  if (inlineValue !== undefined) {
+    return { value: parseBooleanValue(inlineValue, optionName), consumedArgs: 0 };
+  }
+
+  const next = args[index + 1];
+  if (typeof next === 'string' && !next.startsWith('--')) {
+    return { value: parseBooleanValue(next, optionName), consumedArgs: 1 };
+  }
+
+  return { value: true, consumedArgs: 0 };
+}
+
+function parseBooleanValue(value: string, optionName: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  if (['true', '1', 'yes', 'y', 'on'].includes(normalized)) return true;
+  if (['false', '0', 'no', 'n', 'off'].includes(normalized)) return false;
+  throw new Error(`${optionName} 只支持 true 或 false`);
 }
 
 async function installPackageAndSkill(action: '安装' | '更新', options: InstallOptions): Promise<void> {
@@ -204,15 +261,21 @@ function runCommandOutput(command: string, args: string[]): Promise<string> {
 }
 
 async function ensureValidZentaoConfig(): Promise<void> {
-  const existing = tryLoadConfig();
+  const { config: existing, error: loadError } = tryLoadConfig();
   if (existing && await validateConfig(existing)) {
     process.stdout.write(`\n检测到已有禅道配置，校验通过：${JSON.stringify(maskConfig(existing))}\n`);
     printWriteGuardNotice();
+    printEnvOverrideNotice();
     return;
   }
 
   if (existing) {
     process.stdout.write('\n检测到已有禅道配置，但登录校验失败，请重新输入。\n');
+  } else if (loadError) {
+    process.stdout.write(`\n检测到禅道配置文件异常：${loadError.message}\n`);
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
+      throw loadError;
+    }
   } else {
     process.stdout.write('\n未检测到可用禅道配置，请输入配置。\n');
   }
@@ -222,25 +285,39 @@ async function ensureValidZentaoConfig(): Promise<void> {
   saveConfig(config);
   process.stdout.write(`已保存禅道配置：${JSON.stringify(maskConfig(config))}\n`);
   printWriteGuardNotice();
-  if (hasZentaoEnvConfig()) {
-    process.stdout.write('提示：当前 shell 存在 ZENTAO_* 环境变量，后续命令会优先使用环境变量；如果仍登录失败，请同步更新或清除这些环境变量。\n');
-  }
+  printEnvOverrideNotice();
 }
 
 function printWriteGuardNotice(): void {
   process.stdout.write('写操作默认支持；真实写入仍需在命令参数中传 confirm=true。如需禁用写操作，请设置 ZENTAO_DISABLE_WRITE=true。\n');
 }
 
-function tryLoadConfig(): ZentaoConfig | null {
+function printEnvOverrideNotice(): void {
+  if (!hasZentaoEnvConfig()) return;
+  process.stdout.write('提示：当前 shell 存在 ZENTAO_* 环境变量，后续命令会优先使用环境变量；如果仍登录失败，请同步更新或清除这些环境变量。\n');
+}
+
+function tryLoadConfig(): { config: ZentaoConfig | null; error?: Error } {
   try {
-    return loadConfig();
-  } catch {
-    return null;
+    return { config: loadConfig() };
+  } catch (error) {
+    return {
+      config: null,
+      error: error instanceof Error ? error : new Error(String(error)),
+    };
   }
 }
 
 function hasZentaoEnvConfig(): boolean {
-  return Boolean(process.env.ZENTAO_URL || process.env.ZENTAO_USERNAME || process.env.ZENTAO_ACCOUNT || process.env.ZENTAO_PASSWORD || process.env.ZENTAO_API_BASE_URL);
+  return [
+    process.env.ZENTAO_URL,
+    process.env.ZENTAO_USERNAME,
+    process.env.ZENTAO_ACCOUNT,
+    process.env.ZENTAO_PASSWORD,
+    process.env.ZENTAO_API_VERSION,
+    process.env.ZENTAO_API_BASE_URL,
+    process.env.ZENTAO_LEGACY_BASE_URL,
+  ].some((value) => typeof value === 'string' && value.trim() !== '');
 }
 
 async function validateConfig(config: ZentaoConfig): Promise<boolean> {
@@ -270,6 +347,7 @@ async function promptForConfig(defaults?: ZentaoConfig): Promise<ZentaoConfig> {
     const defaultApiVersion = defaults?.apiVersion === 'legacy' ? 'v1' : defaults?.apiVersion ?? 'v1';
     const apiVersion = await ask(rl, 'API 版本', defaultApiVersion);
     const apiBaseUrl = await ask(rl, 'API 基础地址（可选，直接回车跳过）', defaults?.apiBaseUrl ?? '');
+    const legacyBaseUrl = await ask(rl, '旧版页面 JSON 基础地址（可选，直接回车跳过）', defaults?.legacyBaseUrl ?? '');
 
     return normalizeConfig({
       url,
@@ -277,6 +355,7 @@ async function promptForConfig(defaults?: ZentaoConfig): Promise<ZentaoConfig> {
       password: password || defaults?.password,
       apiVersion,
       apiBaseUrl: apiBaseUrl || undefined,
+      legacyBaseUrl: legacyBaseUrl || undefined,
     });
   } finally {
     rl.close();

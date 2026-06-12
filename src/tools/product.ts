@@ -13,7 +13,7 @@ export function registerProductTools(server: CliRegistry): void {
   server.tool(
     'getProductDetail',
     {
-      productId: z.number().int().positive().describe('禅道产品 ID。若用户问的是业务产品的线上/客户反馈/售后/生产问题，不要先用业务产品名找禅道产品；应固定查询“市场和售后问题跟踪”产品，再按 Bug 模块匹配真实业务产品。'),
+      productId: z.number().int().positive().describe('禅道产品 ID。若用户问的是外部线上/客户反馈/售后/生产问题，不要先用业务产品名找禅道产品；应固定查询“市场和售后问题跟踪”产品，再按 Bug 模块匹配真实业务产品。若明确是测试或开发在线上发现并记录到“测试”下的问题，应查询“测试”产品并按模块过滤。'),
     },
     async ({ productId }) => jsonResult(await getApi().product.getProductDetail(productId)),
   );

@@ -421,23 +421,27 @@
 
     <section class="grid" aria-label="命令速查">
       <div class="section">
-        <h2>基础</h2>
+        <h2>常用场景</h2>
+        <ul>
+          <li>今天要做什么<code>zentao getMyTasks --status all --limit 20</code></li>
+          <li>我名下 Bug<code>zentao getMyBugs --limit 50</code></li>
+          <li>最近三天工作<code>zentao getMyWeeklyActivity --dateRange 最近3天</code></li>
+          <li>迭代每日质量报告<code>zentao getExecutionDailyBugStats --executionId 2130 --iterationName 1.2.3迭代</code></li>
+          <li>从需求看开发上下文<code>zentao getDevelopmentContext --entityType story --entityId 10154 --productId 153</code></li>
+          <li>从 Bug 看关联上下文<code>zentao getDevelopmentContext --entityType bug --entityId 84362</code></li>
+        </ul>
+      </div>
+      <div class="section">
+        <h2>基础 / 登录</h2>
         <ul>
           <li>一键安装<code>npx -y @cloudglab/zentao-cli@latest install</code></li>
           <li>更新 CLI<code>zentao update</code></li>
           <li>查看版本<code>zentao version</code></li>
           <li>列出命令<code>zentao list</code></li>
           <li>查看参数<code>zentao help getExecutionDetail</code></li>
+          <li>初始化配置<code>zentao initZentao --url https://your-zentao.example.com --username your-account --password your-password</code></li>
           <li>查看当前用户<code>zentao whoami</code></li>
-        </ul>
-      </div>
-      <div class="section">
-        <h2>我的工作</h2>
-        <ul>
-          <li>我的任务<code>zentao getMyTasks --status all --limit 20</code></li>
-          <li>我的 Bug<code>zentao getMyBugs --limit 50</code></li>
-          <li>任务统计<code>zentao getMyTaskStatistics</code></li>
-          <li>最近工作<code>zentao getMyWeeklyActivity --dateRange 最近3天</code></li>
+          <li>查看个人资料<code>zentao getMyProfile</code></li>
         </ul>
       </div>
       <div class="section">
@@ -450,23 +454,158 @@
         </ul>
       </div>
       <div class="section">
-        <h2>执行 / 迭代</h2>
+        <h2>我的工作 / 统计</h2>
         <ul>
-          <li>执行详情<code>zentao getExecutionDetail --executionId 2130</code></li>
-          <li>执行 Bug<code>zentao getExecutionBugs --executionId 2130 --limit 100</code></li>
-          <li>执行构建<code>zentao getExecutionBuilds --executionId 2130</code></li>
-          <li>项目发布<code>zentao getProjectReleases --projectId 1772</code></li>
-          <li>发布详情<code>zentao getReleaseDetail --releaseId 1</code></li>
-          <li>每日统计<code>zentao getExecutionDailyBugStats --executionId 2130</code></li>
+          <li>我的任务<code>zentao getMyTasks --status all --limit 20</code></li>
+          <li>我的 Bug<code>zentao getMyBugs --limit 50</code></li>
+          <li>我的待办<code>zentao getMyTodos</code></li>
+          <li>任务统计<code>zentao getMyTaskStatistics</code></li>
+          <li>Bug 统计<code>zentao getMyBugStatistics</code></li>
+          <li>本周工作<code>zentao getMyWeeklyActivity --week this</code></li>
+          <li>指定日期范围<code>zentao getMyWeeklyActivity --dateRange 2026-05-25到2026-05-29</code></li>
         </ul>
       </div>
       <div class="section">
-        <h2>产品 / 需求</h2>
+        <h2>任务链路</h2>
+        <ul>
+          <li>任务详情<code>zentao getTaskDetail --taskId 79922</code></li>
+          <li>更新任务<code>zentao updateTask --taskId 79922 --assignedTo lixm1 --confirm true</code></li>
+          <li>开始任务<code>zentao startTask --taskId 79922 --left 2 --confirm true</code></li>
+          <li>完成任务<code>zentao finishTask --taskId 79922 --currentConsumed 1 --realStarted 2026-06-11 --finishedDate 2026-06-11 --confirm true</code></li>
+          <li>指派任务<code>zentao assignTask --taskId 79922 --assignedTo lixm1 --confirm true</code></li>
+          <li>暂停 / 继续任务<code>zentao pauseTask --taskId 79922 --confirm true</code></li>
+          <li>重启任务<code>zentao restartTask --taskId 79922 --left 1 --confirm true</code></li>
+          <li>关闭任务<code>zentao closeTask --taskId 79922 --confirm true</code></li>
+          <li>激活任务<code>zentao activateTask --taskId 79922 --assignedTo lixm1 --left 1 --confirm true</code></li>
+        </ul>
+      </div>
+      <div class="section">
+        <h2>Bug 链路</h2>
+        <ul>
+          <li>Bug 详情<code>zentao getBugDetail --bugId 84362</code></li>
+          <li>产品 Bug<code>zentao getProductBugs --productId 153 --status all --limit 50</code></li>
+          <li>创建 Bug<code>zentao createBug --product 153 --title "登录失败" --assignedTo lixm1 --confirm true</code></li>
+          <li>更新 Bug<code>zentao updateBug --bugId 84362 --assignedTo lixm1 --confirm true</code></li>
+          <li>确认 Bug<code>zentao confirmBug --bugId 84362 --confirm true</code></li>
+          <li>指派 Bug<code>zentao assignBug --bugId 84362 --assignedTo lixm1 --confirm true</code></li>
+          <li>解决 Bug<code>zentao resolveBug --bugId 84362 --resolution fixed --resolvedBuild trunk --confirm true</code></li>
+          <li>转需求解决<code>zentao resolveBug --bugId 84362 --resolution tostory --confirm true</code></li>
+          <li>验证通过<code>zentao okBug --bugId 84362 --comment "回归通过" --confirm true</code></li>
+          <li>关闭 / 激活 Bug<code>zentao closeBug --bugId 84362 --confirm true</code></li>
+        </ul>
+      </div>
+      <div class="section">
+        <h2>需求链路</h2>
+        <ul>
+          <li>产品需求<code>zentao getProductStories --productId 153 --limit 50</code></li>
+          <li>需求详情<code>zentao getStoryDetail --storyId 10154</code></li>
+          <li>搜索需求<code>zentao searchStories --productId 153 --keyword 登录 --limit 10</code></li>
+          <li>按产品名搜索<code>zentao searchStoriesByProductName --productName 云战AIFZ --keyword 登录</code></li>
+          <li>创建需求<code>zentao createStory --product 153 --title "支持扫码登录" --confirm true</code></li>
+          <li>更新需求<code>zentao updateStory --storyId 10154 --title "登录优化" --confirm true</code></li>
+          <li>变更需求<code>zentao changeStory --storyId 10154 --title "登录优化" --comment "范围调整" --confirm true</code></li>
+          <li>评审需求<code>zentao reviewStory --storyId 10154 --result pass --confirm true</code></li>
+          <li>指派 / 关闭需求<code>zentao assignStory --storyId 10154 --assignedTo lixm1 --confirm true</code></li>
+        </ul>
+      </div>
+      <div class="section">
+        <h2>产品 / 项目 / 计划</h2>
         <ul>
           <li>产品列表<code>zentao getProducts</code></li>
-          <li>需求详情<code>zentao getStoryDetail --storyId 10154</code></li>
-          <li>搜索需求<code>zentao searchStories --keyword 登录</code></li>
+          <li>产品详情<code>zentao getProductDetail --productId 153</code></li>
+          <li>项目列表<code>zentao getProjects --limit 20</code></li>
+          <li>项目详情<code>zentao getProjectDetail --projectId 1772</code></li>
+          <li>项目集列表<code>zentao getPrograms --order id_desc</code></li>
+          <li>项目集详情<code>zentao getProgramDetail --programId 620</code></li>
+          <li>产品计划<code>zentao getProductPlans --productId 153 --order id_desc</code></li>
           <li>计划详情<code>zentao getPlanDetail --planId 360</code></li>
+          <li>需求关联计划<code>zentao linkStoriesToPlan --planId 360 --storyIds 10154 --confirm true</code></li>
+          <li>Bug 关联计划<code>zentao linkBugsToPlan --planId 360 --bugIds 84362 --confirm true</code></li>
+        </ul>
+      </div>
+      <div class="section">
+        <h2>执行 / 迭代</h2>
+        <ul>
+          <li>项目执行<code>zentao getProjectExecutions --projectId 1772</code></li>
+          <li>执行详情<code>zentao getExecutionDetail --executionId 2130</code></li>
+          <li>执行动态<code>zentao getExecutionDynamic --executionId 2130</code></li>
+          <li>执行 Bug<code>zentao getExecutionBugs --executionId 2130 --limit 100</code></li>
+          <li>执行构建<code>zentao getExecutionBuilds --executionId 2130</code></li>
+          <li>每日统计<code>zentao getExecutionDailyBugStats --executionId 2130 --date today</code></li>
+          <li>更新执行<code>zentao updateExecution --executionId 2130 --name "1.2.3迭代" --confirm true</code></li>
+          <li>开始 / 关闭执行<code>zentao startExecution --executionId 2130 --confirm true</code></li>
+          <li>挂起 / 激活执行<code>zentao suspendExecution --executionId 2130 --confirm true</code></li>
+          <li>延期执行<code>zentao putoffExecution --executionId 2130 --days 1 --confirm true</code></li>
+        </ul>
+      </div>
+      <div class="section">
+        <h2>构建 / 发布</h2>
+        <ul>
+          <li>项目构建<code>zentao getProjectBuilds --projectId 1772</code></li>
+          <li>执行构建<code>zentao getExecutionBuilds --executionId 2130</code></li>
+          <li>构建详情<code>zentao getBuildDetail --buildId 5648</code></li>
+          <li>创建构建<code>zentao createBuild --project 1772 --execution 2130 --product 153 --name "v1.2.3" --builder lixm1 --confirm true</code></li>
+          <li>更新构建<code>zentao updateBuild --buildId 5648 --name "v1.2.3-hotfix" --confirm true</code></li>
+          <li>项目发布<code>zentao getProjectReleases --projectId 1772</code></li>
+          <li>发布详情<code>zentao getReleaseDetail --releaseId 1</code></li>
+        </ul>
+      </div>
+      <div class="section">
+        <h2>测试链路</h2>
+        <ul>
+          <li>产品用例<code>zentao getProductTestCases --productId 153 --limit 50</code></li>
+          <li>用例详情<code>zentao getTestCaseDetail --testCaseId 58191</code></li>
+          <li>创建用例<code>zentao createTestCase --productId 153 --title "登录成功" --type feature --steps '[{"desc":"输入账号密码","expect":"登录成功"}]' --confirm true</code></li>
+          <li>更新用例<code>zentao updateTestCase --testCaseId 58191 --title "登录成功" --confirm true</code></li>
+          <li>测试单列表<code>zentao getTestTasks --productId 153 --limit 20</code></li>
+          <li>测试单详情<code>zentao getTestTaskDetail --testTaskId 2319</code></li>
+          <li>创建测试单<code>zentao createTestTask --project 1772 --productID 153 --name "v1.2.3回归" --build 5648 --begin 2026-06-11 --end 2026-06-14 --confirm true</code></li>
+          <li>更新测试单<code>zentao updateTestTask --testTaskId 2319 --name "v1.2.3回归" --confirm true</code></li>
+        </ul>
+      </div>
+      <div class="section">
+        <h2>评论 / 动态</h2>
+        <ul>
+          <li>执行评论<code>zentao getComments --objectType execution --objectID 2130</code></li>
+          <li>需求评论<code>zentao getComments --objectType story --objectID 10154</code></li>
+          <li>Bug 评论<code>zentao getComments --objectType bug --objectID 84362</code></li>
+          <li>任务评论<code>zentao getComments --objectType task --objectID 79922</code></li>
+          <li>添加评论<code>zentao addComment --objectType bug --objectID 84362 --comment "已回归" --confirm true</code></li>
+          <li>执行动态<code>zentao getExecutionDynamic --executionId 2130</code></li>
+        </ul>
+      </div>
+      <div class="section">
+        <h2>关联 / 转化</h2>
+        <ul>
+          <li>需求关联 Bug<code>zentao getStoryRelatedBugs --storyId 10154 --productId 153</code></li>
+          <li>Bug 关联需求<code>zentao getBugRelatedStory --bugId 84362</code></li>
+          <li>需求开发上下文<code>zentao getDevelopmentContext --entityType story --entityId 10154 --productId 153</code></li>
+          <li>Bug 开发上下文<code>zentao getDevelopmentContext --entityType bug --entityId 84362</code></li>
+          <li>需求转任务<code>zentao createTaskFromStory --storyId 10154 --execution 2130 --taskName "实现扫码登录" --assignedTo lixm1 --estStarted 2026-06-11 --deadline 2026-06-14 --confirm true</code></li>
+          <li>Bug 转任务<code>zentao createTaskFromBug --bugId 84362 --execution 2130 --assignedTo lixm1 --estStarted 2026-06-11 --deadline 2026-06-14 --confirm true</code></li>
+          <li>取消需求计划关联<code>zentao unlinkStoriesFromPlan --planId 360 --storyIds 10154 --confirm true</code></li>
+          <li>取消 Bug 计划关联<code>zentao unlinkBugsFromPlan --planId 360 --bugIds 84362 --confirm true</code></li>
+        </ul>
+      </div>
+      <div class="section">
+        <h2>待办</h2>
+        <ul>
+          <li>我的待办<code>zentao getMyTodos</code></li>
+          <li>待办详情<code>zentao getTodoDetail --todoId 123</code></li>
+          <li>创建待办<code>zentao createTodo --name "跟进回归" --date 2026-06-11 --confirm true</code></li>
+          <li>更新待办<code>zentao updateTodo --todoId 123 --name "跟进回归" --confirm true</code></li>
+          <li>完成待办<code>zentao finishTodo --todoId 123 --confirm true</code></li>
+          <li>激活待办<code>zentao activateTodo --todoId 123 --confirm true</code></li>
+          <li>删除待办<code>zentao deleteTodo --todoId 123 --confirm true</code></li>
+        </ul>
+      </div>
+      <div class="section">
+        <h2>附件 / 资源分析</h2>
+        <ul>
+          <li>分析 Bug 附件<code>zentao analyzeBugResources --bugId 84362</code></li>
+          <li>只列资源不下载<code>zentao analyzeBugResources --bugId 84362 --download false</code></li>
+          <li>分析任务附件<code>zentao analyzeTaskResources --taskId 79922</code></li>
+          <li>指定输出目录<code>zentao analyzeTaskResources --taskId 79922 --outDir ./zentao-resources</code></li>
         </ul>
       </div>
       <div class="section">
@@ -476,6 +615,8 @@
           <li>账号<code>export ZENTAO_USERNAME="your-account"</code></li>
           <li>密码<code>export ZENTAO_PASSWORD="your-password"</code></li>
           <li>API 版本<code>export ZENTAO_API_VERSION="v1"</code></li>
+          <li>自定义 API 地址<code>export ZENTAO_API_BASE_URL="https://your-zentao.example.com/api.php/v1"</code></li>
+          <li>禁用写操作<code>export ZENTAO_DISABLE_WRITE=true</code></li>
         </ul>
       </div>
     </section>

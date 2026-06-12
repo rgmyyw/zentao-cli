@@ -4,6 +4,11 @@ import { getApi } from '../core/api-provider.js';
 import { previewOrAssertWriteAllowed } from '../core/write-guard.js';
 import { jsonResult } from './shared.js';
 
+const optionalTrimmedText = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.string().trim().optional(),
+);
+
 const runActioned = async (action: string, confirm: boolean, params: Record<string, unknown>, fn: () => Promise<unknown>) => {
   const preview = previewOrAssertWriteAllowed({ action, confirm, payload: params });
   if (preview) return jsonResult(preview);
@@ -18,13 +23,13 @@ export function registerTodoTools(server: CliRegistry): void {
   }, async ({ todoId }) => jsonResult(await getApi().todo.getTodoDetail(todoId)));
 
   server.tool('createTodo', {
-    name: z.string().min(1),
-    desc: z.string().optional(),
-    begin: z.string().optional(),
-    end: z.string().optional(),
-    type: z.string().optional(),
+    name: z.string().trim().min(1),
+    desc: optionalTrimmedText,
+    begin: optionalTrimmedText,
+    end: optionalTrimmedText,
+    type: optionalTrimmedText,
     pri: z.number().optional(),
-    status: z.string().optional(),
+    status: optionalTrimmedText,
     private: z.boolean().optional(),
     confirm: z.boolean().optional().default(false),
   }, async ({ confirm, ...input }) => {
@@ -33,13 +38,13 @@ export function registerTodoTools(server: CliRegistry): void {
 
   server.tool('updateTodo', {
     todoId: z.number().int().positive(),
-    name: z.string().optional(),
-    desc: z.string().optional(),
-    begin: z.string().optional(),
-    end: z.string().optional(),
-    type: z.string().optional(),
+    name: z.string().trim().min(1).optional(),
+    desc: optionalTrimmedText,
+    begin: optionalTrimmedText,
+    end: optionalTrimmedText,
+    type: optionalTrimmedText,
     pri: z.number().optional(),
-    status: z.string().optional(),
+    status: optionalTrimmedText,
     private: z.boolean().optional(),
     confirm: z.boolean().optional().default(false),
   }, async ({ confirm, todoId, ...update }) => {
