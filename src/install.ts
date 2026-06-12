@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { access, mkdtemp, rm } from 'node:fs/promises';
+import { access, mkdtemp, readdir, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
@@ -16,6 +16,13 @@ interface InstallOptions {
   skillSource: SkillSource;
   skillLocalPath?: string;
   skipConfigCheck: boolean;
+  cliOnly: boolean;
+  skillOnly: boolean;
+}
+
+interface UninstallOptions {
+  confirm: boolean;
+  keepConfig: boolean;
   cliOnly: boolean;
   skillOnly: boolean;
 }
@@ -40,6 +47,26 @@ export async function runUpdateCommand(args: string[] = []): Promise<void> {
   }
   await ensureValidZentaoConfig();
   printSuccessGuide('更新', '禅道配置校验通过。');
+}
+
+export async function runUninstallCommand(args: string[] = []): Promise<void> {
+  const options = parseUninstallOptions(args);
+  if (!options.confirm) {
+    printUninstallPreview(options);
+    return;
+  }
+
+  if (!options.cliOnly) {
+    await uninstallSkill();
+  }
+  if (!options.skillOnly) {
+    await uninstallPackage();
+  }
+  if (shouldRemoveConfig(options)) {
+    await removeConfigFile();
+  }
+
+  process.stdout.write('\n卸载完成。\n');
 }
 
 function printSuccessGuide(action: '安装' | '更新', status: string): void {
@@ -74,6 +101,10 @@ function renderBanner(): string {
 
 function createSkillAddArgs(source: string): string[] {
   return ['-y', 'skills', 'add', source, '--yes'];
+}
+
+function createSkillRemoveArgs(global = false): string[] {
+  return ['-y', 'skills', 'remove', 'zentao-cli', '--yes', ...(global ? ['--global'] : [])];
 }
 
 function parseInstallOptions(args: string[]): InstallOptions {
@@ -131,6 +162,65 @@ function parseInstallOptions(args: string[]): InstallOptions {
   }
 
   return { skillSource, skillLocalPath, skipConfigCheck, cliOnly, skillOnly };
+}
+
+function parseUninstallOptions(args: string[]): UninstallOptions {
+  let confirm = false;
+  let keepConfig = false;
+  let cliOnly = false;
+  let skillOnly = false;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === '--confirm' || arg.startsWith('--confirm=')) {
+      const parsed = readBooleanFlag(args, index, '--confirm');
+      confirm = parsed.value;
+      index += parsed.consumedArgs;
+      continue;
+    }
+
+    if (arg === '--keep-config' || arg.startsWith('--keep-config=')) {
+      const parsed = readBooleanFlag(args, index, '--keep-config');
+      keepConfig = parsed.value;
+      index += parsed.consumedArgs;
+      continue;
+    }
+
+    if (arg === '--cli-only' || arg.startsWith('--cli-only=')) {
+      const parsed = readBooleanFlag(args, index, '--cli-only');
+      cliOnly = parsed.value;
+      index += parsed.consumedArgs;
+      continue;
+    }
+
+    if (arg === '--skill-only' || arg.startsWith('--skill-only=')) {
+      const parsed = readBooleanFlag(args, index, '--skill-only');
+      skillOnly = parsed.value;
+      index += parsed.consumedArgs;
+      continue;
+    }
+
+    throw new Error(`未知卸载参数: ${arg}`);
+  }
+
+  if (cliOnly && skillOnly) {
+    throw new Error('--cli-only 和 --skill-only 不能同时使用');
+  }
+
+  return { confirm, keepConfig, cliOnly, skillOnly };
+}
+
+function printUninstallPreview(options: UninstallOptions): void {
+  const steps = [
+    ...(!options.cliOnly ? ['卸载 zentao skill（项目级和全局级）'] : []),
+    ...(!options.skillOnly ? ['卸载全局 CLI 包并清理 npm 残留目录'] : []),
+    ...(shouldRemoveConfig(options) ? ['删除 ~/.zentao/config.json'] : ['保留 ~/.zentao/config.json']),
+  ];
+  process.stdout.write(`卸载预览：\n${steps.map((step) => `  - ${step}`).join('\n')}\n\n真实执行请运行：\n  zentao uninstall --confirm true\n  npx -y ${PACKAGE_NAME}@latest uninstall --confirm true\n\n可选参数：\n  --keep-config true   保留禅道配置\n  --cli-only true      只卸载 CLI\n  --skill-only true    只卸载 skill\n`);
+}
+
+function shouldRemoveConfig(options: UninstallOptions): boolean {
+  return !options.keepConfig && !options.cliOnly && !options.skillOnly;
 }
 
 function readOptionValue(arg: string, optionName: string): string | undefined {
@@ -249,6 +339,37 @@ async function installSkillFromNpmPackage(action: '安装' | '更新'): Promise<
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
+}
+
+async function uninstallSkill(): Promise<void> {
+  await runStep('卸载项目级 zentao skill', 'npx', createSkillRemoveArgs(false));
+  await runStep('卸载全局级 zentao skill', 'npx', createSkillRemoveArgs(true));
+}
+
+async function uninstallPackage(): Promise<void> {
+  await runStep('卸载 zentao CLI', 'npm', ['uninstall', '-g', PACKAGE_NAME]);
+  await cleanupGlobalPackageResidues();
+}
+
+async function cleanupGlobalPackageResidues(): Promise<void> {
+  const globalNodeModules = (await runCommandOutput('npm', ['root', '-g'])).trim();
+  if (!globalNodeModules) return;
+
+  await rm(path.join(globalNodeModules, PACKAGE_NAME), { recursive: true, force: true });
+  const scopeDir = path.join(globalNodeModules, '@cloudglab');
+  let entries: string[] = [];
+  try {
+    entries = await readdir(scopeDir);
+  } catch {
+    return;
+  }
+  await Promise.all(entries
+    .filter((entry) => entry.startsWith('.zentao-cli-'))
+    .map((entry) => rm(path.join(scopeDir, entry), { recursive: true, force: true })));
+}
+
+async function removeConfigFile(): Promise<void> {
+  await rm(path.join(os.homedir(), '.zentao', 'config.json'), { force: true });
 }
 
 async function runStep(title: string, command: string, args: string[]): Promise<void> {

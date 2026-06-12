@@ -138,6 +138,15 @@ zentao update --cli-only
 zentao update --skill-only
 ```
 
+卸载 CLI + skill。默认只预览；真实卸载必须显式确认。本机 `zentao` 损坏时可直接用 `npx`：
+
+```bash
+zentao uninstall
+zentao uninstall --confirm true
+npx -y @cloudglab/zentao-cli@latest uninstall --confirm true
+npx -y @cloudglab/zentao-cli@latest uninstall --confirm true --keep-config true
+```
+
 ```bash
 npm i -g @cloudglab/zentao-cli@latest
 zentao --version

@@ -58,6 +58,24 @@ zentao update --cli-only
 zentao update --skill-only
 ```
 
+## 卸载
+
+默认只打印卸载预览，不会真实删除：
+
+```bash
+zentao uninstall
+```
+
+真实卸载必须显式确认；如果本机 `zentao` 命令已损坏，也可以直接用最新 npm 包执行：
+
+```bash
+zentao uninstall --confirm true
+npx -y @cloudglab/zentao-cli@latest uninstall --confirm true
+npx -y @cloudglab/zentao-cli@latest uninstall --confirm true --keep-config true
+```
+
+默认会移除 zentao skill、全局 CLI、npm 残留目录和 `~/.zentao/config.json`。如需保留配置请加 `--keep-config true`；也可以用 `--cli-only true` 或 `--skill-only true` 只卸载其中一部分。
+
 ## 安装 CLI
 
 ```bash

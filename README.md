@@ -80,6 +80,17 @@ zentao update --cli-only
 zentao update --skill-only
 ```
 
+需要卸载时，默认先打印预览；真实卸载必须显式确认。`npx` 方式适合本机命令已损坏或不想依赖本地旧版 CLI 时使用：
+
+```bash
+zentao uninstall
+zentao uninstall --confirm true
+npx -y @cloudglab/zentao-cli@latest uninstall --confirm true
+npx -y @cloudglab/zentao-cli@latest uninstall --confirm true --keep-config true
+```
+
+卸载默认会移除 zentao skill、全局 CLI、npm 残留目录和 `~/.zentao/config.json`。如需保留配置请加 `--keep-config true`；也可以用 `--cli-only true` 或 `--skill-only true` 只卸载其中一部分。
+
 如果需要在脚本或 CI 中关闭每日更新探针，可以设置：
 
 ```bash

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const commandCalls: Array<{ command: string; args: string[] }> = [];
+const rmCalls: string[] = [];
 
 function mockSpawn(stdoutByCommand = new Map<string, string>()) {
   vi.doMock('node:child_process', () => ({
@@ -30,9 +31,12 @@ function mockInstallDependencies() {
   vi.doMock('node:fs/promises', () => ({
     access: vi.fn(async () => undefined),
     mkdtemp: vi.fn(async () => '/tmp/zentao-cli-skill-abc'),
-    rm: vi.fn(async () => undefined),
+    readdir: vi.fn(async () => []),
+    rm: vi.fn(async (target: string) => {
+      rmCalls.push(target);
+    }),
   }));
-  vi.doMock('node:os', () => ({ default: { tmpdir: () => '/tmp' } }));
+  vi.doMock('node:os', () => ({ default: { homedir: () => '/home/me', tmpdir: () => '/tmp' } }));
   vi.doMock('../src/api/index.js', () => ({
     ZentaoApi: class {
       getToken = vi.fn(async () => 'token');
@@ -49,6 +53,7 @@ function mockInstallDependencies() {
 describe('install command', () => {
   afterEach(() => {
     commandCalls.length = 0;
+    rmCalls.length = 0;
     delete process.env.ZENTAO_API_VERSION;
     vi.resetModules();
     vi.restoreAllMocks();
@@ -209,6 +214,48 @@ describe('install command', () => {
     expect(write).toHaveBeenCalledWith(expect.stringContaining('当前 shell 存在 ZENTAO_* 环境变量'));
   });
 
+  it('previews uninstall unless confirm is true', async () => {
+    mockSpawn();
+    mockInstallDependencies();
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const { runUninstallCommand } = await import('../src/install.js');
+
+    await runUninstallCommand([]);
+
+    expect(commandCalls).toEqual([]);
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('npx -y @cloudglab/zentao-cli@latest uninstall --confirm true'));
+  });
+
+  it('uninstalls skill, package, residues, and config when confirmed', async () => {
+    mockSpawn(new Map([['npm root -g', '/usr/local/lib/node_modules\n']]));
+    mockInstallDependencies();
+    const { runUninstallCommand } = await import('../src/install.js');
+
+    await runUninstallCommand(['--confirm', 'true']);
+
+    expect(commandCalls).toEqual([
+      { command: 'npx', args: ['-y', 'skills', 'remove', 'zentao-cli', '--yes'] },
+      { command: 'npx', args: ['-y', 'skills', 'remove', 'zentao-cli', '--yes', '--global'] },
+      { command: 'npm', args: ['uninstall', '-g', '@cloudglab/zentao-cli'] },
+      { command: 'npm', args: ['root', '-g'] },
+    ]);
+    expect(rmCalls).toContain('/home/me/.zentao/config.json');
+  });
+
+  it('keeps config for partial uninstall modes', async () => {
+    mockSpawn(new Map([['npm root -g', '/usr/local/lib/node_modules\n']]));
+    mockInstallDependencies();
+    const { runUninstallCommand } = await import('../src/install.js');
+
+    await runUninstallCommand(['--confirm=true', '--skill-only=true']);
+
+    expect(commandCalls).toEqual([
+      { command: 'npx', args: ['-y', 'skills', 'remove', 'zentao-cli', '--yes'] },
+      { command: 'npx', args: ['-y', 'skills', 'remove', 'zentao-cli', '--yes', '--global'] },
+    ]);
+    expect(rmCalls).not.toContain('/home/me/.zentao/config.json');
+  });
+
   it('does not warn for whitespace-only environment variables', async () => {
     process.env.ZENTAO_API_VERSION = '   ';
     mockSpawn(new Map([['npm root -g', '/usr/local/lib/node_modules\n']]));
@@ -226,9 +273,10 @@ describe('install command', () => {
     vi.doMock('node:fs/promises', () => ({
       access: vi.fn(async () => undefined),
       mkdtemp: vi.fn(async () => '/tmp/zentao-cli-skill-abc'),
+      readdir: vi.fn(async () => []),
       rm: vi.fn(async () => undefined),
     }));
-    vi.doMock('node:os', () => ({ default: { tmpdir: () => '/tmp' } }));
+    vi.doMock('node:os', () => ({ default: { homedir: () => '/home/me', tmpdir: () => '/tmp' } }));
     vi.doMock('../src/api/index.js', () => ({
       ZentaoApi: class {
         getToken = vi.fn(async () => 'token');

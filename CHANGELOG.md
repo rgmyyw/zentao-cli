@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.22 - 2026-06-13
+
+### Added
+
+- 新增 `zentao uninstall` / `zentao remove` 主动卸载命令，支持 `--confirm true` 真实卸载、`--keep-config true` 保留配置、`--cli-only true` / `--skill-only true` 部分卸载；同时补充 `npx -y @cloudglab/zentao-cli@latest uninstall --confirm true` 用法。
+- `zentao whoami` 优化为人性化菜单展示：根据时间给出问候语（早上好/中午好/下午好/傍晚好/深夜好/凌晨好），按 projects/products/sprints 参与范围计算等级（黑铁/青铜/白银/黄金/铂金/翡翠/钻石/王者），汇总任务/Bug 数量和状态分布，提供工作量和工作重心小分析。
+- `zentao list` 改为分组展示（开始使用/我的工作/测试·构建·发布/任务·Bug·需求/执行·项目·产品·计划/评论·动态·统计·搜索/其他），`zentao list --raw` 保留原始字母序命令名输出。
+- `zentao help` 精简：增加版本适配说明、运行时要求、常用命令分组和查看更多提示。
+
 ## 0.1.21 - 2026-06-12
 
 ### Fixed

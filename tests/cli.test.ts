@@ -9,14 +9,50 @@ describe('runCli', () => {
   });
 
   it('maps "who am i" to the current user profile command', async () => {
-    const getMyProfile = vi.fn(async () => ({ account: 'me' }));
+    const getMyProfile = vi.fn(async () => ({
+      profile: {
+        account: 'me',
+        realname: '李小明',
+        role: { name: '研发' },
+        visits: 42,
+        view: {
+          projects: '1,2',
+          products: '10,20',
+          sprints: '100,101,102',
+        },
+      },
+    }));
+    const getMyTasks = vi.fn(async () => ({
+      total: 2,
+      scanned: 2,
+      items: [
+        { id: 1, name: '开发 A', status: 'doing', productName: '产品甲', executionName: 'Sprint 1' },
+        { id: 2, name: '开发 B', status: 'wait', productName: '产品乙', executionName: 'Sprint 1' },
+      ],
+    }));
+    const getMyBugs = vi.fn(async () => ({
+      total: 1,
+      items: [
+        { id: 3, title: '修复 C', status: 'active', productName: '产品甲', executionName: 'Sprint 2' },
+      ],
+    }));
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    setApi({ user: { getMyProfile } } as never);
+    setApi({ user: { getMyProfile }, task: { getMyTasks }, bug: { getMyBugs } } as never);
 
     await runCli(['who', 'am', 'i']);
 
     expect(getMyProfile).toHaveBeenCalledWith();
-    expect(write).toHaveBeenCalledWith(`${JSON.stringify({ account: 'me' }, null, 2)}\n`);
+    expect(getMyTasks).toHaveBeenCalledWith({ status: 'all', limit: 100 });
+    expect(getMyBugs).toHaveBeenCalledWith({ limit: 100 });
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('李小明'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('你现在是 青铜 · 研发 工程师'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('账号：me'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('感谢您的第 42 次访问'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('任务：2 个'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('Bug：1 个'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('参与项目：1、2'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('等级依据：项目 2 / 产品 4 / Sprint 5'));
+    expect(write.mock.calls[0]?.[0]).not.toContain('卓越');
   });
 
   it('maps "help who am i" to the whoami command help', async () => {
@@ -37,7 +73,8 @@ describe('runCli', () => {
     await runCli(['help']);
 
     expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao CLI'));
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('可用命令：'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('适配版本：优先适配禅道 18.5 REST v1 API'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('常用命令：'));
   });
 
   it('prints command help without validating command args', async () => {
@@ -174,24 +211,36 @@ describe('runCli', () => {
     expect(write).toHaveBeenCalledWith(expect.stringContaining('--cli-only true|false'));
   });
 
-  it('includes upgrade in builtin command listings', async () => {
+  it('includes upgrade in raw builtin command listings', async () => {
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
-    await runCli(['list']);
+    await runCli(['list', '--raw']);
 
     expect(write).toHaveBeenCalledWith('upgrade\n');
   });
 
-  it('prints list output in alphabetical order', async () => {
+  it('prints raw list output in alphabetical order', async () => {
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
-    await runCli(['list']);
+    await runCli(['list', '--raw']);
 
     const output = write.mock.calls
       .map(([value]) => String(value).trim())
       .filter(Boolean);
     const sorted = [...output].sort((left, right) => left.localeCompare(right));
     expect(output).toEqual(sorted);
+  });
+
+  it('prints grouped command list with explanations and hints', async () => {
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    await runCli(['list']);
+
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao 可用命令'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('开始使用：'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('whoami'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('友好展示当前禅道账号'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao list --raw'));
   });
 
   it('prints top-level help with inline role, key=value, and legacy shortcut examples', async () => {
@@ -202,6 +251,7 @@ describe('runCli', () => {
     expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao [--role=full|dev|pm|qa] <command> [--key=value ...]'));
     expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao --role=qa getMyBugs --limit=50'));
     expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao execution-bug-2130.html'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('Node.js >= 16'));
   });
 
   it('supports inline role syntax before commands', async () => {
@@ -268,7 +318,7 @@ describe('runCli', () => {
     await runCli(['help', '--help']);
 
     expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao CLI'));
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('可用命令：'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('查看更多：'));
   });
 
   it('prints version command help when help flag is provided', async () => {
