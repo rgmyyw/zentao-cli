@@ -16,6 +16,17 @@ npx -y @cloudglab/zentao-cli@latest install
 
 该命令会安装全局 CLI 和内置 Skill，并在禅道配置缺失或登录校验失败时引导输入配置。配置完成后可以执行写操作；真实写入仍需要显式传入 `confirm=true`，也可以通过 `ZENTAO_DISABLE_WRITE=true` 临时禁用写入。
 
+安装成功后会打印 `zentao-cli` ASCII 标识、快速开始命令和写操作提示，便于直接复制下一步命令：
+
+```text
+快速开始：
+  zentao help                    查看帮助
+  zentao list                    查看可用命令
+  zentao whoami                  校验当前账号
+  zentao getMyTasks --limit 10   查看我的任务
+  zentao getMyBugs --limit 10    查看我的 Bug
+```
+
 如果需要强制重新下载 npm 静态包，可改用 npm 模式：
 
 ```bash
@@ -52,6 +63,14 @@ zentao update --skip-config-check
 
 ```bash
 npx -y @cloudglab/zentao-cli@latest update
+```
+
+如果 npm 全局目录存在上次失败留下的残留目录，安装 / 更新会提示 `ENOTEMPTY` 清理建议，可按提示执行：
+
+```bash
+npm uninstall -g @cloudglab/zentao-cli
+rm -rf "$(npm root -g)/@cloudglab/zentao-cli" "$(npm root -g)/@cloudglab/.zentao-cli-"*
+npm install -g @cloudglab/zentao-cli@latest
 ```
 
 只更新其中一部分时可使用：

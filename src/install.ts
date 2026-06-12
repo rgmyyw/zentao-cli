@@ -24,22 +24,52 @@ export async function runInstallCommand(args: string[] = []): Promise<void> {
   const options = parseInstallOptions(args);
   await installPackageAndSkill('安装', options);
   if (options.skipConfigCheck) {
-    process.stdout.write('安装完成，已跳过禅道配置校验。\n');
+    printSuccessGuide('安装', '已跳过禅道配置校验。');
     return;
   }
   await ensureValidZentaoConfig();
-  process.stdout.write('安装完成，禅道配置校验通过。\n');
+  printSuccessGuide('安装', '禅道配置校验通过。');
 }
 
 export async function runUpdateCommand(args: string[] = []): Promise<void> {
   const options = parseInstallOptions(args);
   await installPackageAndSkill('更新', options);
   if (options.skipConfigCheck) {
-    process.stdout.write('更新完成，已跳过禅道配置校验。\n');
+    printSuccessGuide('更新', '已跳过禅道配置校验。');
     return;
   }
   await ensureValidZentaoConfig();
-  process.stdout.write('更新完成，禅道配置校验通过。\n');
+  printSuccessGuide('更新', '禅道配置校验通过。');
+}
+
+function printSuccessGuide(action: '安装' | '更新', status: string): void {
+  process.stdout.write(`\n${action}完成，${status}\n\n${renderBanner()}\n\n`);
+  process.stdout.write(`快速开始：
+  zentao help                    查看帮助
+  zentao list                    查看可用命令
+  zentao whoami                  校验当前账号
+  zentao getMyTasks --limit 10   查看我的任务
+  zentao getMyBugs --limit 10    查看我的 Bug
+
+常用配置：
+  zentao update                  更新 CLI 和 Skill
+  zentao install --skip-config-check 仅安装，跳过配置校验
+  ZENTAO_DISABLE_WRITE=true      禁用真实写操作
+
+写操作提示：真实写入仍需显式传 confirm=true。
+`);
+}
+
+function renderBanner(): string {
+  return [
+    '     ___       ___       ___       ___       ___       ___       ___       ___       ___   ',
+    '    /\\  \\     /\\  \\     /\\__\\     /\\  \\     /\\  \\     /\\  \\     /\\  \\     /\\__\\     /\\  \\  ',
+    '   _\\:\\  \\   /::\\  \\   /:| _|_    \\:\\  \\   /::\\  \\   /::\\  \\   /::\\  \\   /:/  /    _\\:\\  \\ ',
+    '  /::::\\__\\ /::\\:\\__\\ /::|/\\__\\   /::\\__\\ /::\\:\\__\\ /:/\\:\\__\\ /:/\\:\\__\\ /:/__/    /\\/::\\__\\',
+    '  \\::;;/__/ \\:\\:\\/  / \\/|::/  /  /:/\\/__/ \\/\\::/  / \\:\\/:/  / \\:\\ \\/__/ \\:\\  \\    \\::/\\/__/',
+    '   \\:\\__\\    \\:\\/  /    |:/  /   \\/__/      /:/  /   \\::/  /   \\:\\__\\    \\:\\__\\    \\:\\__\\  ',
+    '    \\/__/     \\/__/     \\/__/               \\/__/     \\/__/     \\/__/     \\/__/     \\/__/ ',
+  ].join('\n');
 }
 
 function parseInstallOptions(args: string[]): InstallOptions {
@@ -224,7 +254,17 @@ async function runStep(title: string, command: string, args: string[]): Promise<
 
 function runCommand(command: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: 'inherit', shell: process.platform === 'win32' });
+    const child = spawn(command, args, { shell: process.platform === 'win32' });
+    let stderr = '';
+
+    child.stdout?.on('data', (chunk: Buffer) => {
+      process.stdout.write(chunk);
+    });
+    child.stderr?.on('data', (chunk: Buffer) => {
+      const text = chunk.toString('utf8');
+      stderr += text;
+      process.stderr.write(text);
+    });
 
     child.on('error', reject);
     child.on('close', (code) => {
@@ -232,9 +272,18 @@ function runCommand(command: string, args: string[]): Promise<void> {
         resolve();
         return;
       }
-      reject(new Error(`${command} ${args.join(' ')} 执行失败，退出码 ${String(code)}`));
+      reject(createCommandFailedError(command, args, code, stderr));
     });
   });
+}
+
+function createCommandFailedError(command: string, args: string[], code: number | null, stderr: string): Error {
+  const baseMessage = `${command} ${args.join(' ')} 执行失败，退出码 ${String(code)}`;
+  if (command === 'npm' && args[0] === 'install' && args.includes('-g') && stderr.includes('ENOTEMPTY')) {
+    return new Error(`${baseMessage}\n检测到 npm 全局安装目录残留，建议执行：\nnpm uninstall -g ${PACKAGE_NAME}\nrm -rf "$(npm root -g)/@cloudglab/zentao-cli" "$(npm root -g)/@cloudglab/.zentao-cli-*"\nnpm install -g ${PACKAGE_NAME}@latest`);
+  }
+
+  return new Error(baseMessage);
 }
 
 function runCommandOutput(command: string, args: string[]): Promise<string> {

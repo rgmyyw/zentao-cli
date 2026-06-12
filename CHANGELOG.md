@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.20 - 2026-06-12
+
+### Added
+
+- `zentao install` / `zentao update` 成功后新增 `zentao-cli` ASCII banner、快速开始命令和写操作提示，便于安装后直接确认下一步用法。
+- 安装 / 更新执行 `npm install -g` 遇到 `ENOTEMPTY` 全局目录残留时，会输出可复制的清理和重装命令。
+
+### Fixed
+
+- 构建后自动修正 `dist/bin/*.js` 可执行权限，避免 npm 全局安装后 `zentao` / `zentao-cli` 因 bin 文件无执行权限而无法启动。
+
 ## 0.1.19 - 2026-06-12
 
 ### Added
