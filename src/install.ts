@@ -72,6 +72,10 @@ function renderBanner(): string {
   ].join('\n');
 }
 
+function createSkillAddArgs(source: string): string[] {
+  return ['-y', 'skills', 'add', source, '--yes'];
+}
+
 function parseInstallOptions(args: string[]): InstallOptions {
   let skillSource: SkillSource = 'local';
   let skillLocalPath: string | undefined;
@@ -194,7 +198,7 @@ async function installPackageAndSkill(action: '安装' | '更新', options: Inst
 
 async function installSkill(action: '安装' | '更新', options: InstallOptions): Promise<void> {
   if (options.skillLocalPath) {
-    await runStep(`${action} zentao skill`, 'npx', ['-y', 'skills', 'add', '-g', path.resolve(options.skillLocalPath)]);
+    await runStep(`${action} zentao skill`, 'npx', createSkillAddArgs(path.resolve(options.skillLocalPath)));
     return;
   }
 
@@ -204,7 +208,7 @@ async function installSkill(action: '安装' | '更新', options: InstallOptions
   }
 
   if (options.skillSource === 'git') {
-    await runStep(`${action} zentao skill`, 'npx', ['-y', 'skills', 'add', '-g', GIT_SKILL_SOURCE]);
+    await runStep(`${action} zentao skill`, 'npx', createSkillAddArgs(GIT_SKILL_SOURCE));
     return;
   }
 
@@ -219,7 +223,7 @@ async function installSkillFromInstalledPackage(action: '安装' | '更新'): Pr
     throw new Error(`未找到已安装包内的 zentao skill：${skillPath}。可重试 --skill-source npm 或 --skill-source git。`);
   }
 
-  await runStep(`${action} zentao skill`, 'npx', ['-y', 'skills', 'add', '-g', skillPath]);
+  await runStep(`${action} zentao skill`, 'npx', createSkillAddArgs(skillPath));
 }
 
 async function getInstalledPackageSkillPath(): Promise<string> {
@@ -241,7 +245,7 @@ async function installSkillFromNpmPackage(action: '安装' | '更新'): Promise<
 
     const tarballPath = path.join(tempDir, tarballName);
     await runStep('解压 zentao npm 包', 'tar', ['-xzf', tarballPath, '-C', tempDir]);
-    await runStep(`${action} zentao skill`, 'npx', ['-y', 'skills', 'add', '-g', path.join(tempDir, 'package')]);
+    await runStep(`${action} zentao skill`, 'npx', createSkillAddArgs(path.join(tempDir, 'package')));
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }

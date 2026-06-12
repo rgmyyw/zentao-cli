@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.21 - 2026-06-12
+
+### Fixed
+
+- 修复 `zentao install` / `zentao update` 安装 skill 时进入 `skills` agent 选择交互界面后无法响应 Enter 的问题；现在统一调用 `skills add <source> --yes`，保持安装 / 更新流程非交互执行。
+- 避免安装 skill 时传入 `--global` 触发 `PromptScript does not support global skill installation`，确保默认 skill 安装路径可正常完成。
+
 ## 0.1.20 - 2026-06-12
 
 ### Added

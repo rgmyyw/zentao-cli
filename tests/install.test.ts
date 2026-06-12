@@ -65,7 +65,7 @@ describe('install command', () => {
     expect(commandCalls).toEqual([
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
       { command: 'npm', args: ['root', '-g'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', '-g', expectedSkillPath] },
+      { command: 'npx', args: ['-y', 'skills', 'add', expectedSkillPath, '--yes'] },
     ]);
   });
 
@@ -79,7 +79,7 @@ describe('install command', () => {
     expect(commandCalls).toEqual([
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
       { command: 'npm', args: ['root', '-g'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', '-g', path.join('/usr/local/lib/node_modules', '@cloudglab/zentao-cli', 'skills', 'zentao-cli')] },
+      { command: 'npx', args: ['-y', 'skills', 'add', path.join('/usr/local/lib/node_modules', '@cloudglab/zentao-cli', 'skills', 'zentao-cli'), '--yes'] },
     ]);
   });
 
@@ -104,7 +104,7 @@ describe('install command', () => {
 
     expect(commandCalls).toEqual([
       { command: 'npm', args: ['root', '-g'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', '-g', path.join('/usr/local/lib/node_modules', '@cloudglab/zentao-cli', 'skills', 'zentao-cli')] },
+      { command: 'npx', args: ['-y', 'skills', 'add', path.join('/usr/local/lib/node_modules', '@cloudglab/zentao-cli', 'skills', 'zentao-cli'), '--yes'] },
     ]);
   });
 
@@ -122,8 +122,8 @@ describe('install command', () => {
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
       { command: 'npm', args: ['pack', '@cloudglab/zentao-cli@latest', '--pack-destination', '/tmp/zentao-cli-skill-abc', '--silent'] },
       { command: 'tar', args: ['-xzf', '/tmp/zentao-cli-skill-abc/cloudglab-zentao-cli-0.1.5.tgz', '-C', '/tmp/zentao-cli-skill-abc'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', '-g', '/tmp/zentao-cli-skill-abc/package'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', '-g', path.resolve('./local-skill')] },
+      { command: 'npx', args: ['-y', 'skills', 'add', '/tmp/zentao-cli-skill-abc/package', '--yes'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', path.resolve('./local-skill'), '--yes'] },
     ]);
   });
 
@@ -137,9 +137,9 @@ describe('install command', () => {
 
     expect(commandCalls).toEqual([
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', '-g', 'cloudglab/zentao-cli'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', 'cloudglab/zentao-cli', '--yes'] },
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', '-g', 'cloudglab/zentao-cli'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', 'cloudglab/zentao-cli', '--yes'] },
     ]);
   });
 
@@ -178,7 +178,7 @@ describe('install command', () => {
 
     expect(commandCalls).toEqual([
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', '-g', 'cloudglab/zentao-cli'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', 'cloudglab/zentao-cli', '--yes'] },
     ]);
   });
 
@@ -193,7 +193,7 @@ describe('install command', () => {
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
       { command: 'npm', args: ['pack', '@cloudglab/zentao-cli@latest', '--pack-destination', '/tmp/zentao-cli-skill-abc', '--silent'] },
       { command: 'tar', args: ['-xzf', '/tmp/zentao-cli-skill-abc/cloudglab-zentao-cli-0.1.5.tgz', '-C', '/tmp/zentao-cli-skill-abc'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', '-g', '/tmp/zentao-cli-skill-abc/package'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', '/tmp/zentao-cli-skill-abc/package', '--yes'] },
     ]);
   });
 
