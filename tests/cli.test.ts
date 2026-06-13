@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { runCli } from '../src/cli.js';
 import { setApi } from '../src/core/api-provider.js';
+import { CLI_VERSION } from '../src/version.js';
 import * as installModule from '../src/install.js';
 
 describe('runCli', () => {
@@ -344,5 +345,66 @@ describe('runCli', () => {
   it('rejects extra args after help target command', async () => {
     await expect(runCli(['help', 'getExecutionDetail', 'extra'])).rejects.toThrow('help 只支持一个命令目标，检测到多余参数: extra');
     await expect(runCli(['help', 'who', 'am', 'i', 'extra'])).rejects.toThrow('help 只支持一个命令目标，检测到多余参数: extra');
+  });
+
+  it('prints recent changelog by default', async () => {
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    await runCli(['changelog']);
+
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao CLI 最近更新'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining(`## ${CLI_VERSION} -`));
+  });
+
+  it('prints full changelog with --limit all', async () => {
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    await runCli(['changelog', '--limit', 'all']);
+
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('## 0.1.0 -'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining(`## ${CLI_VERSION} -`));
+  });
+
+  it('prints a specific version changelog', async () => {
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    await runCli(['changelog', '--version', '0.1.0']);
+
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao CLI 0.1.0 更新内容'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('## 0.1.0 -'));
+    expect(write).not.toHaveBeenCalledWith(expect.stringContaining('## 0.1.1 -'));
+  });
+
+  it('prints changelog from a specific version to latest', async () => {
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    await runCli(['changelog', '--since', '0.1.0']);
+
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('## 0.1.0 -'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining(`## ${CLI_VERSION} -`));
+  });
+
+  it('prints raw changelog markdown', async () => {
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    await runCli(['changelog', '--raw']);
+
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('# Changelog'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining(`## ${CLI_VERSION} -`));
+  });
+
+  it('prints changelog builtin help', async () => {
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    await runCli(['help', 'changelog']);
+
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao changelog'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('--limit <number|all>'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('--raw'));
+  });
+
+  it('rejects invalid changelog args', async () => {
+    await expect(runCli(['changelog', '--unknown'])).rejects.toThrow('changelog 不支持参数: --unknown');
+    await expect(runCli(['changelog', '--limit', '0'])).rejects.toThrow('changelog --limit 必须是正整数或 all');
   });
 });

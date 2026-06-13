@@ -1,6 +1,6 @@
 import type { HttpError, ZentaoHttpClient } from '../core/http.js';
 import { extractItems, toClientPaginatedListResult, toServerListResult } from '../core/list-result.js';
-import { normalizePagination, type PaginationInput } from '../core/pagination.js';
+import { fetchRemainingPagesConcurrently, normalizePagination, type PaginationInput } from '../core/pagination.js';
 import type { ZentaoTask } from '../types/zentao.js';
 import { toFormUrlEncoded } from '../utils/form.js';
 
@@ -90,21 +90,30 @@ export class TaskApi {
 
   private async getAllMyTasksByPages(total: number): Promise<ZentaoTask[]> {
     const limit = 100;
-    const totalPages = Math.min(Math.ceil(total / limit), 1000);
-    const tasks: ZentaoTask[] = [];
 
-    for (let page = 1; page <= totalPages; page += 1) {
-      const response = await this.http.request<{ tasks?: ZentaoTask[] } | ZentaoTask[]>('GET', '/tasks', {
-        params: {
-          assignedTo: this.http.username,
-          page,
-          limit,
-        },
-      });
-      tasks.push(...extractItems<ZentaoTask>(response, ['tasks']));
-    }
+    const firstResponse = await this.http.request<{ tasks?: ZentaoTask[] } | ZentaoTask[]>('GET', '/tasks', {
+      params: {
+        assignedTo: this.http.username,
+        page: 1,
+        limit,
+      },
+    });
+    const firstPageItems = extractItems<ZentaoTask>(firstResponse, ['tasks']);
 
-    return tasks;
+    return fetchRemainingPagesConcurrently(
+      { items: firstPageItems, total },
+      async (page) => {
+        const response = await this.http.request<{ tasks?: ZentaoTask[] } | ZentaoTask[]>('GET', '/tasks', {
+          params: {
+            assignedTo: this.http.username,
+            page,
+            limit,
+          },
+        });
+        return extractItems<ZentaoTask>(response, ['tasks']);
+      },
+      { limit },
+    );
   }
 
   async updateTask(taskId: number, update: Record<string, unknown>): Promise<unknown> {

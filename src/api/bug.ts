@@ -1,6 +1,6 @@
 import type { ZentaoHttpClient } from '../core/http.js';
 import { toClientPaginatedListResult, toServerListResult, type ListResult } from '../core/list-result.js';
-import { normalizePagination, normalizeTotalPages, type PaginationInput } from '../core/pagination.js';
+import { fetchRemainingPagesConcurrently, normalizePagination, type PaginationInput } from '../core/pagination.js';
 import type { ZentaoBug, ZentaoListResponse } from '../types/zentao.js';
 import { toFormUrlEncoded } from '../utils/form.js';
 import { bugMatchesKeyword, bugMatchesModuleAlias, normalizeBugFilterText } from './bug-filter.js';
@@ -102,14 +102,15 @@ export class BugApi {
     const firstPage = await this.fetchProductBugsPage(params, 1, pageSize);
     const firstResult = toServerListResult<ZentaoBug>(firstPage, ['bugs']);
     const total = firstResult.total;
-    const allBugs = [...firstResult.items];
-    const totalPages = normalizeTotalPages(total, pageSize, allBugs.length);
-
-    for (let page = 2; page <= totalPages; page += 1) {
-      const response = await this.fetchProductBugsPage(params, page, pageSize);
-      const result = toServerListResult<ZentaoBug>(response, ['bugs']);
-      allBugs.push(...result.items);
-    }
+    const allBugs = await fetchRemainingPagesConcurrently(
+      { items: firstResult.items, total },
+      async (page) => {
+        const response = await this.fetchProductBugsPage(params, page, pageSize);
+        const result = toServerListResult<ZentaoBug>(response, ['bugs']);
+        return result.items;
+      },
+      { limit: pageSize },
+    );
 
     let filtered = allBugs;
 
@@ -214,15 +215,14 @@ export class BugApi {
   private async getAllMyBugsInProduct(params: Omit<BugListParams, 'status' | 'page' | 'limit'>): Promise<ZentaoBug[]> {
     const limit = 100;
     const firstPage = await this.getProductBugs({ ...params, status: 'assigntome', page: 1, limit }) as ListResult<ZentaoBug>;
-    const bugs = [...firstPage.items];
-    const totalPages = normalizeTotalPages(firstPage.total, limit, bugs.length);
-
-    for (let page = 2; page <= totalPages; page += 1) {
-      const response = await this.getProductBugs({ ...params, status: 'assigntome', page, limit }) as ListResult<ZentaoBug>;
-      bugs.push(...response.items);
-    }
-
-    return bugs;
+    return fetchRemainingPagesConcurrently(
+      { items: firstPage.items, total: firstPage.total },
+      async (page) => {
+        const response = await this.getProductBugs({ ...params, status: 'assigntome', page, limit }) as ListResult<ZentaoBug>;
+        return response.items;
+      },
+      { limit },
+    );
   }
 
   private sortBugs(bugs: ZentaoBug[], order?: string): ZentaoBug[] {

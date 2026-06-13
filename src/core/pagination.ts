@@ -33,3 +33,27 @@ export function normalizeTotalPages(total: unknown, limit: number, fallbackItemC
   const safeLimit = Number.isFinite(limit) && limit > 0 ? limit : DEFAULT_LIMIT;
   return Math.min(Math.ceil(safeTotal / safeLimit), MAX_TOTAL_PAGES);
 }
+
+export async function fetchRemainingPagesConcurrently<T>(
+  firstPage: { items: T[]; total?: unknown },
+  fetchPage: (page: number) => Promise<T[]>,
+  options: { limit?: number; concurrency?: number } = {},
+): Promise<T[]> {
+  const limit = options.limit ?? DEFAULT_LIMIT;
+  const concurrency = options.concurrency ?? 3;
+  const totalPages = normalizeTotalPages(firstPage.total, limit, firstPage.items.length);
+
+  const allItems = [...firstPage.items];
+  if (totalPages <= 1) return allItems;
+
+  for (let startPage = 2; startPage <= totalPages; startPage += concurrency) {
+    const endPage = Math.min(startPage + concurrency - 1, totalPages);
+    const pageIndexes = Array.from({ length: endPage - startPage + 1 }, (_, index) => startPage + index);
+    const pages = await Promise.all(pageIndexes.map((page) => fetchPage(page)));
+    for (const items of pages) {
+      allItems.push(...items);
+    }
+  }
+
+  return allItems;
+}

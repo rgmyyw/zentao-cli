@@ -2,7 +2,7 @@ import type { BugApi } from './bug.js';
 import type { TaskApi } from './task.js';
 import type { ListResult } from '../core/list-result.js';
 import type { ZentaoHttpClient } from '../core/http.js';
-import { normalizeTotalPages } from '../core/pagination.js';
+import { fetchRemainingPagesConcurrently } from '../core/pagination.js';
 import type { ZentaoBug, ZentaoTask } from '../types/zentao.js';
 
 function countBy<T>(items: T[], getter: (item: T) => string | number | undefined): Record<string, number> {
@@ -107,29 +107,27 @@ export class StatisticsApi {
   private async getAllMyBugs(productId?: number): Promise<ZentaoBug[]> {
     const limit = 100;
     const firstPage = await this.bugApi.getMyBugs({ productId, page: 1, limit }) as ListResult<ZentaoBug>;
-    const bugs = [...firstPage.items];
-    const totalPages = normalizeTotalPages(firstPage.total, limit, bugs.length);
-
-    for (let page = 2; page <= totalPages; page += 1) {
-      const response = await this.bugApi.getMyBugs({ productId, page, limit }) as ListResult<ZentaoBug>;
-      bugs.push(...response.items);
-    }
-
-    return bugs;
+    return fetchRemainingPagesConcurrently(
+      { items: firstPage.items, total: firstPage.total },
+      async (page) => {
+        const response = await this.bugApi.getMyBugs({ productId, page, limit }) as ListResult<ZentaoBug>;
+        return response.items;
+      },
+      { limit },
+    );
   }
 
   private async getAllMyTasks(): Promise<ZentaoTask[]> {
     const limit = 100;
     const firstPage = await this.taskApi.getMyTasks({ status: 'all', page: 1, limit }) as ListResult<ZentaoTask>;
-    const tasks = [...firstPage.items];
-    const totalPages = normalizeTotalPages(firstPage.total, limit, tasks.length);
-
-    for (let page = 2; page <= totalPages; page += 1) {
-      const response = await this.taskApi.getMyTasks({ status: 'all', page, limit }) as ListResult<ZentaoTask>;
-      tasks.push(...response.items);
-    }
-
-    return tasks;
+    return fetchRemainingPagesConcurrently(
+      { items: firstPage.items, total: firstPage.total },
+      async (page) => {
+        const response = await this.taskApi.getMyTasks({ status: 'all', page, limit }) as ListResult<ZentaoTask>;
+        return response.items;
+      },
+      { limit },
+    );
   }
 
   private pickTasks(tasks: ZentaoTask[]): Array<Pick<ZentaoTask, 'id' | 'name' | 'status'>> {

@@ -16,6 +16,7 @@ export interface CliRegistry {
     schema: TShape,
     handler: CliHandler<z.infer<z.ZodObject<TShape>>>,
   ): void;
+  listCommands(): CliCommandDefinition[];
 }
 
 export class InMemoryCliRegistry implements CliRegistry {

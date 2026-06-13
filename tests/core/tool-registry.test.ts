@@ -13,10 +13,10 @@ describe('registerTools', () => {
     delete process.env.ZENTAO_DISABLE_WRITE;
   });
 
-  it('registers the full role command surface', () => {
+  it('registers the full role command surface', async () => {
     const registry = new InMemoryCliRegistry();
 
-    registerTools(registry, 'full');
+    await registerTools(registry, 'full');
 
     expect(registry.listCommands().map((command) => command.name)).toEqual([
       'activateBug',
@@ -118,10 +118,10 @@ describe('registerTools', () => {
     ]);
   });
 
-  it('filters commands by role', () => {
+  it('filters commands by role', async () => {
     const registry = new InMemoryCliRegistry();
 
-    registerTools(registry, 'pm');
+    await registerTools(registry, 'pm');
 
     const names = registry.listCommands().map((command) => command.name);
     expect(names).toContain('getProducts');
@@ -136,7 +136,7 @@ describe('registerTools', () => {
     const getMyTasks = vi.fn(async (input: unknown) => ({ ok: true, input }));
     setApi({ task: { getMyTasks } } as never);
 
-    registerTools(registry, 'dev');
+    await registerTools(registry, 'dev');
     const command = registry.getCommand('getMyTasks');
     expect(command).toBeDefined();
 
@@ -147,21 +147,21 @@ describe('registerTools', () => {
     expect(parseResult(result)).toEqual({ ok: true, input: { status: 'doing', page: 2, limit: 5 } });
   });
 
-  it('rejects unknown CLI args instead of silently ignoring them', () => {
+  it('rejects unknown CLI args instead of silently ignoring them', async () => {
     const registry = new InMemoryCliRegistry();
     setApi({ task: { getMyTasks: vi.fn() } } as never);
 
-    registerTools(registry, 'dev');
+    await registerTools(registry, 'dev');
     const command = registry.getCommand('getMyTasks');
 
     expect(() => parseCommandInput(command!.schema, ['--statsu', 'doing'])).toThrow('未知参数: --statsu');
   });
 
-  it('parses getProductBugs search keyword', () => {
+  it('parses getProductBugs search keyword', async () => {
     const registry = new InMemoryCliRegistry();
     setApi({ bug: { getProductBugs: vi.fn() } } as never);
 
-    registerTools(registry, 'dev');
+    await registerTools(registry, 'dev');
     const command = registry.getCommand('getProductBugs');
 
     expect(parseCommandInput(command!.schema, ['--productId', '87', '--status', 'all', '--limit', '100', '--order', 'id_desc', '--search', '浙江'])).toMatchObject({
@@ -173,11 +173,11 @@ describe('registerTools', () => {
     });
   });
 
-  it('parses getProductBugs module alias keyword', () => {
+  it('parses getProductBugs module alias keyword', async () => {
     const registry = new InMemoryCliRegistry();
     setApi({ bug: { getProductBugs: vi.fn() } } as never);
 
-    registerTools(registry, 'dev');
+    await registerTools(registry, 'dev');
     const command = registry.getCommand('getProductBugs');
 
     expect(parseCommandInput(command!.schema, ['--productId', '87', '--module', 'Yj'])).toMatchObject({
@@ -186,11 +186,11 @@ describe('registerTools', () => {
     });
   });
 
-  it('parses updateBug project, execution, plan and openedBuild args', () => {
+  it('parses updateBug project, execution, plan and openedBuild args', async () => {
     const registry = new InMemoryCliRegistry();
     setApi({ bug: { updateBug: vi.fn() } } as never);
 
-    registerTools(registry, 'dev');
+    await registerTools(registry, 'dev');
     const command = registry.getCommand('updateBug');
 
     expect(parseCommandInput(command!.schema, ['--bugId', '84733', '--project', '1772', '--execution', '2140', '--plan', '2140', '--openedBuild', 'trunk'])).toMatchObject({
@@ -203,11 +203,11 @@ describe('registerTools', () => {
     });
   });
 
-  it('parses recordTaskEstimate args', () => {
+  it('parses recordTaskEstimate args', async () => {
     const registry = new InMemoryCliRegistry();
     setApi({ task: { recordEstimate: vi.fn() } } as never);
 
-    registerTools(registry, 'dev');
+    await registerTools(registry, 'dev');
     const command = registry.getCommand('recordTaskEstimate');
 
     expect(parseCommandInput(command!.schema, ['--taskId', '79945', '--date', ' 2026-06-12 ', '--consumed', '2', '--left', '18', '--work', ' 今天处理联调 '])).toMatchObject({
@@ -220,11 +220,11 @@ describe('registerTools', () => {
     });
   });
 
-  it('parses inline --key=value CLI args', () => {
+  it('parses inline --key=value CLI args', async () => {
     const registry = new InMemoryCliRegistry();
     setApi({ task: { getMyTasks: vi.fn() } } as never);
 
-    registerTools(registry, 'dev');
+    await registerTools(registry, 'dev');
     const command = registry.getCommand('getMyTasks');
 
     expect(parseCommandInput(command!.schema, ['--status=doing', '--page=2', '--limit=5'])).toEqual({
@@ -234,10 +234,10 @@ describe('registerTools', () => {
     });
   });
 
-  it('accepts legacyBaseUrl in initZentao args', () => {
+  it('accepts legacyBaseUrl in initZentao args', async () => {
     const registry = new InMemoryCliRegistry();
 
-    registerTools(registry, 'full');
+    await registerTools(registry, 'full');
     const command = registry.getCommand('initZentao');
 
     expect(parseCommandInput(command!.schema, ['--url', 'https://host', '--username', 'u', '--password', 'p', '--legacyBaseUrl', 'https://host/custom'])).toMatchObject({
@@ -271,10 +271,10 @@ describe('registerTools', () => {
       .not.toThrow();
   });
 
-  it('trims todo and comment write strings in schemas', () => {
+  it('trims todo and comment write strings in schemas', async () => {
     const registry = new InMemoryCliRegistry();
 
-    registerTools(registry, 'full');
+    await registerTools(registry, 'full');
     const createTodoCommand = registry.getCommand('createTodo');
     const updateTodoCommand = registry.getCommand('updateTodo');
     const addCommentCommand = registry.getCommand('addComment');
@@ -300,10 +300,10 @@ describe('registerTools', () => {
     expect(() => parseCommandInput(addCommentCommand!.schema, ['--objectType', 'bug', '--objectID', '1', '--comment', '   '])).toThrow();
   });
 
-  it('trims bug and story write strings in schemas', () => {
+  it('trims bug and story write strings in schemas', async () => {
     const registry = new InMemoryCliRegistry();
 
-    registerTools(registry, 'full');
+    await registerTools(registry, 'full');
     const createBugCommand = registry.getCommand('createBug');
     const assignBugCommand = registry.getCommand('assignBug');
     const confirmBugCommand = registry.getCommand('confirmBug');
@@ -356,10 +356,10 @@ describe('registerTools', () => {
     expect(() => parseCommandInput(assignStoryCommand!.schema, ['--storyId', '1', '--assignedTo', '   '])).toThrow();
   });
 
-  it('trims build, test case and test task write strings in schemas', () => {
+  it('trims build, test case and test task write strings in schemas', async () => {
     const registry = new InMemoryCliRegistry();
 
-    registerTools(registry, 'full');
+    await registerTools(registry, 'full');
     const createBuildCommand = registry.getCommand('createBuild');
     const createTestCaseCommand = registry.getCommand('createTestCase');
     const updateTestCaseCommand = registry.getCommand('updateTestCase');
@@ -401,9 +401,9 @@ describe('registerTools', () => {
     expect(() => parseCommandInput(createTestTaskCommand!.schema, ['--project', '1', '--productID', '2', '--name', 'ok', '--build', '   ', '--begin', '2026-01-01', '--end', '2026-01-02'])).toThrow();
   });
 
-  it('converts blank optional write strings to undefined in schemas', () => {
+  it('converts blank optional write strings to undefined in schemas', async () => {
     const registry = new InMemoryCliRegistry();
-    registerTools(registry, 'full');
+    await registerTools(registry, 'full');
 
     const updateStory = registry.getCommand('updateStory');
     const updateExecution = registry.getCommand('updateExecution');
@@ -432,10 +432,10 @@ describe('registerTools', () => {
     });
   });
 
-  it('trims execution write strings in schemas', () => {
+  it('trims execution write strings in schemas', async () => {
     const registry = new InMemoryCliRegistry();
 
-    registerTools(registry, 'full');
+    await registerTools(registry, 'full');
     const updateExecutionCommand = registry.getCommand('updateExecution');
     const startExecutionCommand = registry.getCommand('startExecution');
 
@@ -456,10 +456,10 @@ describe('registerTools', () => {
     expect(() => parseCommandInput(updateExecutionCommand!.schema, ['--executionId', '1', '--name', '   '])).toThrow();
   });
 
-  it('trims execution and statistics read strings in schemas', () => {
+  it('trims execution and statistics read strings in schemas', async () => {
     const registry = new InMemoryCliRegistry();
 
-    registerTools(registry, 'full');
+    await registerTools(registry, 'full');
     const getExecutionBugsCommand = registry.getCommand('getExecutionBugs');
     const getExecutionDailyBugStatsCommand = registry.getCommand('getExecutionDailyBugStats');
     const getMyWeeklyActivityCommand = registry.getCommand('getMyWeeklyActivity');
@@ -496,10 +496,10 @@ describe('registerTools', () => {
     expect(() => parseCommandInput(getMyWeeklyActivityCommand!.schema, ['--account', '   '])).toThrow();
   });
 
-  it('trims low-frequency read query strings in schemas', () => {
+  it('trims low-frequency read query strings in schemas', async () => {
     const registry = new InMemoryCliRegistry();
 
-    registerTools(registry, 'full');
+    await registerTools(registry, 'full');
     const getMyBugsCommand = registry.getCommand('getMyBugs');
     const getProductBugsCommand = registry.getCommand('getProductBugs');
     const getProductPlansCommand = registry.getCommand('getProductPlans');
@@ -548,10 +548,10 @@ describe('registerTools', () => {
     });
   });
 
-  it('trims low-frequency path strings in resource analysis schemas', () => {
+  it('trims low-frequency path strings in resource analysis schemas', async () => {
     const registry = new InMemoryCliRegistry();
 
-    registerTools(registry, 'full');
+    await registerTools(registry, 'full');
     const analyzeBugResourcesCommand = registry.getCommand('analyzeBugResources');
 
     expect(parseCommandInput(analyzeBugResourcesCommand!.schema, ['--bugId', '1', '--outDir', ' /tmp/zentao-resources '])).toMatchObject({
@@ -571,7 +571,7 @@ describe('registerTools', () => {
     const updateTask = vi.fn();
     setApi({ task: { updateTask } } as never);
 
-    registerTools(registry, 'dev');
+    await registerTools(registry, 'dev');
     const command = registry.getCommand('updateTask');
     const input = parseCommandInput(command!.schema, ['--taskId', '9', '--name', 'next']);
     const result = await command!.handler(input);
@@ -589,7 +589,7 @@ describe('registerTools', () => {
     const registry = new InMemoryCliRegistry();
     setApi({ story: { updateStory: vi.fn() } } as never);
 
-    registerTools(registry, 'full');
+    await registerTools(registry, 'full');
     const command = registry.getCommand('updateStory');
     const input = parseCommandInput(command!.schema, ['--storyId', '9', '--reviewer', '   ', '--sourceNote', ' note ']);
     const result = await command!.handler(input);
@@ -614,7 +614,7 @@ describe('registerTools', () => {
     const updateTask = vi.fn();
     setApi({ task: { updateTask } } as never);
 
-    registerTools(registry, 'dev');
+    await registerTools(registry, 'dev');
     const command = registry.getCommand('updateTask');
     const input = parseCommandInput(command!.schema, ['--taskId', '9', '--name', 'next', '--confirm']);
     const result = await command!.handler(input);
@@ -633,7 +633,7 @@ describe('registerTools', () => {
     const updateTestTask = vi.fn(async () => ({ status: 'success' }));
     setApi({ testtask: { updateTestTask } } as never);
 
-    registerTools(registry, 'full');
+    await registerTools(registry, 'full');
     const command = registry.getCommand('updateTestTask');
     const input = parseCommandInput(command!.schema, ['--testTaskId', '1', '--name', 'test', '--confirm']);
     const result = await command!.handler(input);
@@ -642,9 +642,9 @@ describe('registerTools', () => {
     expect(parseResult(result)).toEqual({ status: 'success' });
   });
 
-  it('trims task write strings and rejects whitespace-only required values in schemas', () => {
+  it('trims task write strings and rejects whitespace-only required values in schemas', async () => {
     const registry = new InMemoryCliRegistry();
-    registerTools(registry, 'dev');
+    await registerTools(registry, 'dev');
 
     const finishTask = registry.getCommand('finishTask');
     const assignTask = registry.getCommand('assignTask');
@@ -674,7 +674,7 @@ describe('registerTools', () => {
     const registry = new InMemoryCliRegistry();
     setApi({ task: { updateTask: vi.fn() } } as never);
 
-    registerTools(registry, 'dev');
+    await registerTools(registry, 'dev');
     const command = registry.getCommand('updateTask');
     const input = parseCommandInput(command!.schema, ['--taskId', '9', '--assignedTo', '   ', '--desc', ' note ']);
     const result = await command!.handler(input);
@@ -701,7 +701,7 @@ describe('registerTools', () => {
       task: { createTask },
     } as never);
 
-    registerTools(registry, 'full');
+    await registerTools(registry, 'full');
     const command = registry.getCommand('createTaskFromBug');
     const result = await command!.handler({
       bugId: 1,
@@ -765,7 +765,7 @@ describe('registerTools', () => {
       user: { getMyProfile: vi.fn(async () => ({ name: 'getMyProfile' })) },
     };
     setApi(api as never);
-    registerTools(registry, 'full');
+    await registerTools(registry, 'full');
 
     const calls: Array<[string, Record<string, unknown>]> = [
       ['getMyBugs', { productId: 1 }], ['getProductBugs', { productId: 1 }], ['getBugDetail', { bugId: 1 }],
@@ -825,7 +825,7 @@ describe('registerTools', () => {
       },
     };
     setApi(api as never);
-    registerTools(registry, 'full');
+    await registerTools(registry, 'full');
 
     const calls: Array<[string, Record<string, unknown>]> = [
       ['updateTask', { taskId: 1, name: 't', confirm: true }],
@@ -867,5 +867,33 @@ describe('registerTools', () => {
 
     expect(api.task.createTask).toHaveBeenCalledTimes(2);
     expect(api.execution.putoffExecution).toHaveBeenCalledWith(1, { days: 2 });
+  });
+});
+
+describe('registerTools lazy loading metrics', () => {
+  it('按 commandName 注册时只加载对应 group', async () => {
+    const registry = new InMemoryCliRegistry();
+    const loadedGroups: string[] = [];
+
+    await registerTools(registry, 'full', {
+      commandName: 'getMyTasks',
+      onGroupRegister: (group) => { loadedGroups.push(group); },
+    });
+
+    expect(loadedGroups).toEqual(['task']);
+    expect(registry.listCommands().map((command) => command.name)).toContain('getMyTasks');
+  });
+
+  it('无 commandName 时加载全部可见 group', async () => {
+    const registry = new InMemoryCliRegistry();
+    const loadedGroups: string[] = [];
+
+    await registerTools(registry, 'full', {
+      onGroupRegister: (group) => { loadedGroups.push(group); },
+    });
+
+    expect(loadedGroups.length).toBeGreaterThan(1);
+    expect(loadedGroups).toContain('task');
+    expect(loadedGroups).toContain('bug');
   });
 });

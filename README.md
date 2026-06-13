@@ -6,6 +6,11 @@
 
 除了标准 REST API，本工具还补充了部分扩展场景：会在必要时读取页面 JSON、详情页动作记录，或模拟禅道前端请求，把标准接口不好覆盖的查询、统计和流转动作封装成可调用命令。
 
+## 版本要求
+
+- **禅道版本**：优先适配禅道 **18.5** 的 REST v1 API，部分扩展能力依赖旧版页面 JSON，建议目标环境为 18.x 系列。
+- **Node.js 版本**：需要 **Node.js >= 16.0.0**。推荐在 Node 18/20/22 LTS 上运行，以获得更稳定的 `fetch`、定时器和子进程行为。
+
 ## 安装方式
 
 ### 推荐：一键安装 CLI + Skill
@@ -65,7 +70,7 @@ zentao update --skip-config-check
 npx -y @cloudglab/zentao-cli@latest update
 ```
 
-如果 npm 全局目录存在上次失败留下的残留目录，安装 / 更新会提示 `ENOTEMPTY` 清理建议，可按提示执行：
+如果 npm 全局目录存在上次失败留下的残留目录，安装 / 更新会自动清理并重试一次；若仍失败，可按提示执行手动清理：
 
 ```bash
 npm uninstall -g @cloudglab/zentao-cli
@@ -279,6 +284,16 @@ Skill / Agent 处理禅道请求时，优先按下面格式路由：
 - 创建任务前先查父任务，优先复用“技术方案”和“任务实施”父任务。
 - 已拆分任务的调整不是重新拆任务：只有新增独立工作项时才补建任务；改时间、负责人、工时、状态、父子归属时优先更新原任务。
 - 最多只创建父子两层，不创建孙任务。
+
+## 查看更新记录
+
+```bash
+zentao changelog
+zentao changelog --limit 5
+zentao changelog --version 0.1.23
+zentao changelog --since 0.1.20
+zentao changelog --raw
+```
 
 ## 常用命令示例
 

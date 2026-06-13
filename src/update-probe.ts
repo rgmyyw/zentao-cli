@@ -9,7 +9,7 @@ const CHECK_FILE = path.join(homedir(), '.zentao', 'update-check.json');
 const SKIP_COMMANDS = new Set(['help', 'list', 'version', 'install', 'update', 'upgrade', '--help', '-h', '--version', '-v']);
 
 interface UpdateCheckState {
-  checkedDate?: string;
+  lastCheckedDate?: string;
   latestVersion?: string;
   currentVersion?: string;
 }
@@ -22,27 +22,38 @@ export async function runDailyUpdateProbe(commandName?: string): Promise<void> {
   try {
     const today = new Date().toISOString().slice(0, 10);
     const state = await readUpdateCheckState();
-    if (state.checkedDate === today) return;
 
-    await writeUpdateCheckState({ ...state, checkedDate: today, currentVersion: CLI_VERSION });
+    notifyIfUpdateAvailable(state.latestVersion);
 
-    const latestVersion = await getLatestPackageVersion();
-    await writeUpdateCheckState({ checkedDate: today, latestVersion, currentVersion: CLI_VERSION });
+    if (state.lastCheckedDate === today) return;
 
-    if (!isNewerVersion(latestVersion, CLI_VERSION)) return;
-
-    process.stderr.write([
-      `检测到 zentao CLI 新版本 ${latestVersion}（当前 ${CLI_VERSION}）。`,
-      '建议执行以下命令完成更新：',
-      '  zentao update',
-      '如只更新工具且跳过配置校验，可执行：',
-      '  zentao update --skip-config-check',
-      '',
-    ].join('\n'));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`zentao CLI 自动更新检查失败，已继续执行当前命令：${message}\n`);
+    await writeUpdateCheckState({ ...state, lastCheckedDate: today, currentVersion: CLI_VERSION });
+    triggerBackgroundVersionCheck();
+  } catch {
+    // 更新检查失败不应阻塞主命令
   }
+}
+
+export async function writeUpdateCacheAfterInstall(version?: string): Promise<void> {
+  const today = new Date().toISOString().slice(0, 10);
+  await writeUpdateCheckState({
+    lastCheckedDate: today,
+    latestVersion: version ?? CLI_VERSION,
+    currentVersion: CLI_VERSION,
+  });
+}
+
+function notifyIfUpdateAvailable(latestVersion?: string): void {
+  if (!latestVersion || !isNewerVersion(latestVersion, CLI_VERSION)) return;
+
+  process.stderr.write([
+    `检测到 zentao CLI 新版本 ${latestVersion}（当前 ${CLI_VERSION}）。`,
+    '建议执行以下命令完成更新：',
+    '  zentao update',
+    '如只更新工具且跳过配置校验，可执行：',
+    '  zentao update --skip-config-check',
+    '',
+  ].join('\n'));
 }
 
 async function readUpdateCheckState(): Promise<UpdateCheckState> {
@@ -62,34 +73,42 @@ async function writeUpdateCheckState(state: UpdateCheckState): Promise<void> {
   await writeFile(CHECK_FILE, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
 }
 
-async function getLatestPackageVersion(): Promise<string> {
-  const stdout = await runCommandOutput('npm', ['view', PACKAGE_NAME, 'version', '--silent']);
-  const version = stdout.trim();
-  if (!version) throw new Error('npm view 没有返回最新版本号');
-  return version;
-}
+function triggerBackgroundVersionCheck(): void {
+  const script = `
+    const { spawn } = require('child_process');
+    const { mkdirSync, writeFileSync } = require('fs');
+    const { homedir } = require('os');
+    const path = require('path');
 
-function runCommandOutput(command: string, args: string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { shell: process.platform === 'win32' });
+    const packageName = ${JSON.stringify(PACKAGE_NAME)};
+    const cliVersion = ${JSON.stringify(CLI_VERSION)};
+    const shell = ${process.platform === 'win32'};
+
+    const npm = spawn('npm', ['view', packageName, 'version', '--silent'], {
+      shell,
+      detached: true,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+
     let stdout = '';
-    let stderr = '';
+    npm.stdout.on('data', (chunk) => { stdout += chunk.toString('utf8'); });
 
-    child.stdout?.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString('utf8');
+    npm.on('close', (code) => {
+      if (code !== 0) return;
+      const latestVersion = stdout.trim();
+      if (!latestVersion) return;
+      const today = new Date().toISOString().slice(0, 10);
+      const checkFile = path.join(homedir(), '.zentao', 'update-check.json');
+      mkdirSync(path.dirname(checkFile), { recursive: true, mode: 0o700 });
+      writeFileSync(checkFile, JSON.stringify({ lastCheckedDate: today, latestVersion, currentVersion: cliVersion }, null, 2) + '\\n', { mode: 0o600 });
     });
-    child.stderr?.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString('utf8');
-    });
-    child.on('error', reject);
-    child.on('close', (code) => {
-      if (code === 0) {
-        resolve(stdout);
-        return;
-      }
-      reject(new Error(`${command} ${args.join(' ')} 执行失败，退出码 ${String(code)}${stderr ? `：${stderr.trim()}` : ''}`));
-    });
+  `;
+
+  const child = spawn(process.execPath, ['-e', script], {
+    detached: true,
+    stdio: 'ignore',
   });
+  child.unref();
 }
 
 function isNewerVersion(latestVersion: string, currentVersion: string): boolean {

@@ -1,6 +1,6 @@
 import type { ProductApi } from './product.js';
 import type { StoryApi } from './story.js';
-import { normalizeTotalPages } from '../core/pagination.js';
+import { fetchRemainingPagesConcurrently } from '../core/pagination.js';
 
 export interface SearchStoriesInput {
   keyword: string;
@@ -190,14 +190,13 @@ export class SearchApi {
 
   private async getAllStoriesByProduct(productId: number): Promise<Array<Record<string, unknown>>> {
     const firstPage = await this.storyApi.getProductStories({ productId, page: 1, limit: 100 }) as { total: number; items: Array<Record<string, unknown>> };
-    const stories = [...firstPage.items];
-    const totalPages = normalizeTotalPages(firstPage.total, 100, stories.length);
-
-    for (let page = 2; page <= totalPages; page += 1) {
-      const result = await this.storyApi.getProductStories({ productId, page, limit: 100 }) as { items: Array<Record<string, unknown>> };
-      stories.push(...result.items);
-    }
-
-    return stories;
+    return fetchRemainingPagesConcurrently(
+      { items: firstPage.items, total: firstPage.total },
+      async (page) => {
+        const result = await this.storyApi.getProductStories({ productId, page, limit: 100 }) as { items: Array<Record<string, unknown>> };
+        return result.items;
+      },
+      { limit: 100 },
+    );
   }
 }

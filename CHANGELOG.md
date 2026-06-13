@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.24 - 2026-06-13
+
+### Added
+
+- 新增 `zentao changelog` 内置命令，支持 `--limit`、`--version`、`--since`、`--raw` 等选项查看 CHANGELOG。
+- README 新增「版本要求」章节，明确禅道 **18.5** / 18.x 与 **Node.js >= 16.0.0** 的适配范围。
+- 构建时静态 manifest 生成：`scripts/generate-manifest.ts` 扫描全部命令并生成 `src/core/command-groups.generated.ts` 与 `dist/manifest.json`；`cli.ts` 中 `help` / `list` / `--version` 直接走 manifest，真实命令按命令名懒加载对应 group。
+- 命令级懒加载：`src/core/tool-registry.ts` 改为 `groupLoaders` 动态 import，`registerTools` 支持 `commandName` 选项，只加载目标命令所属 group，显著降低启动 import 开销。
+- HTTP keep-alive：axios 实例启用 `http.Agent({ keepAlive: true })` 与 `https.Agent({ keepAlive: true })`。
+- 分页并发拉取：新增 `fetchRemainingPagesConcurrently`，有 `total` 时按总页数并发剩余页（默认并发 3），无 `total` 时顺序拉取至空页停。
+- `ZentaoHttpClient` 新增请求计数能力 `getRequestCount()` / `resetRequestCount()`，便于测试和运行时观测真实 HTTP 调用次数。
+- 新增防回退指标测试：分页并发请求次数、命令懒加载 group 数量。
+
+### Changed
+
+- 每日更新探针去阻塞化：`runDailyUpdateProbe` 改为只读缓存、后台触发 `npm view`；安装/更新成功后调用 `writeUpdateCacheAfterInstall()` 同步写缓存。
+- `zentao install` / `zentao update` 成功后写操作提示简化为「写操作默认已开启。写命令需要加 `--confirm` 才会真正执行。如需禁用写操作，设置 `ZENTAO_DISABLE_WRITE=true`。」
+
+### Fixed
+
+- `zentao update` 在 `npm install -g` 遇到 `ENOTEMPTY` 全局目录残留时，先自动清理再重试一次安装。
+
 ## 0.1.23 - 2026-06-13
 
 ### Fixed

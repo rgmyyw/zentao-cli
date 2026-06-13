@@ -27,16 +27,13 @@ afterEach(() => {
 });
 
 describe('runDailyUpdateProbe', () => {
-  it('prompts for manual update instead of auto-installing', async () => {
+  it('notifies when cache has a newer version', async () => {
     process.env.NODE_ENV = 'development';
 
-    mockSpawn('0.1.24\n');
     vi.doMock('node:os', () => ({ homedir: () => '/tmp/home' }));
     vi.doMock('node:fs/promises', () => ({
       mkdir: vi.fn(async () => undefined),
-      readFile: vi.fn(async () => {
-        throw new Error('missing');
-      }),
+      readFile: vi.fn(async () => JSON.stringify({ lastCheckedDate: '2026-01-01', latestVersion: '0.1.25', currentVersion: '0.1.24' })),
       writeFile: vi.fn(async () => undefined),
     }));
 
@@ -45,12 +42,11 @@ describe('runDailyUpdateProbe', () => {
 
     await runDailyUpdateProbe('getMyTasks');
 
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('检测到 zentao CLI 新版本 0.1.24（当前 0.1.23）。'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('检测到 zentao CLI 新版本 0.1.25（当前 0.1.24）。'));
     expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao update --skip-config-check'));
-    expect(write).not.toHaveBeenCalledWith(expect.stringContaining('开始自动更新'));
   });
 
-  it('ignores non-object update check state files', async () => {
+  it('ignores non-object update check state files and does not throw', async () => {
     process.env.NODE_ENV = 'development';
 
     mockSpawn('0.1.24\n');
@@ -64,9 +60,7 @@ describe('runDailyUpdateProbe', () => {
     const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     const { runDailyUpdateProbe } = await import('../src/update-probe.js');
 
-    await runDailyUpdateProbe('getMyTasks');
-
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('检测到 zentao CLI 新版本 0.1.24（当前 0.1.23）。'));
+    await expect(runDailyUpdateProbe('getMyTasks')).resolves.toBeUndefined();
     expect(write).not.toHaveBeenCalledWith(expect.stringContaining('自动更新检查失败'));
   });
 });

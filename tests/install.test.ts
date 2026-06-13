@@ -30,13 +30,16 @@ function mockSpawn(stdoutByCommand = new Map<string, string>()) {
 function mockInstallDependencies() {
   vi.doMock('node:fs/promises', () => ({
     access: vi.fn(async () => undefined),
+    mkdir: vi.fn(async () => undefined),
     mkdtemp: vi.fn(async () => '/tmp/zentao-cli-skill-abc'),
+    readFile: vi.fn(async () => { throw new Error('missing'); }),
     readdir: vi.fn(async () => []),
     rm: vi.fn(async (target: string) => {
       rmCalls.push(target);
     }),
+    writeFile: vi.fn(async () => undefined),
   }));
-  vi.doMock('node:os', () => ({ default: { homedir: () => '/home/me', tmpdir: () => '/tmp' } }));
+  vi.doMock('node:os', () => ({ default: { homedir: () => '/home/me', tmpdir: () => '/tmp' }, homedir: () => '/home/me', tmpdir: () => '/tmp' }));
   vi.doMock('../src/api/index.js', () => ({
     ZentaoApi: class {
       getToken = vi.fn(async () => 'token');
@@ -280,11 +283,14 @@ describe('install command', () => {
     mockSpawn(new Map([['npm root -g', '/usr/local/lib/node_modules\n']]));
     vi.doMock('node:fs/promises', () => ({
       access: vi.fn(async () => undefined),
+      mkdir: vi.fn(async () => undefined),
       mkdtemp: vi.fn(async () => '/tmp/zentao-cli-skill-abc'),
+      readFile: vi.fn(async () => { throw new Error('missing'); }),
       readdir: vi.fn(async () => []),
       rm: vi.fn(async () => undefined),
+      writeFile: vi.fn(async () => undefined),
     }));
-    vi.doMock('node:os', () => ({ default: { homedir: () => '/home/me', tmpdir: () => '/tmp' } }));
+    vi.doMock('node:os', () => ({ default: { homedir: () => '/home/me', tmpdir: () => '/tmp' }, homedir: () => '/home/me', tmpdir: () => '/tmp' }));
     vi.doMock('../src/api/index.js', () => ({
       ZentaoApi: class {
         getToken = vi.fn(async () => 'token');

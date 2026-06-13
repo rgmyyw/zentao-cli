@@ -1,6 +1,7 @@
-import { InMemoryCliRegistry, parseCommandInput } from './core/cli-registry.js';
+import { parseCommandInput } from './core/cli-registry.js';
+import { loadChangelogRaw, loadChangelogSections } from './core/changelog.js';
 import { getApi } from './core/api-provider.js';
-import { registerTools } from './core/tool-registry.js';
+import { buildRegistryForCommand, getAvailableCommandNames } from './core/manifest.js';
 import { runInstallCommand, runUninstallCommand, runUpdateCommand } from './install.js';
 import type { Role } from './types/common.js';
 import { runDailyUpdateProbe } from './update-probe.js';
@@ -9,13 +10,12 @@ import { z, type ZodRawShape, type ZodTypeAny } from 'zod';
 
 const VALID_ROLES = new Set<Role>(['full', 'dev', 'pm', 'qa']);
 
+const BUILTIN_COMMAND_NAMES = ['help', 'list', 'version', 'changelog', 'install', 'uninstall', 'remove', 'update', 'upgrade'];
+
 export async function runCli(rawArgs: string[]): Promise<void> {
   const { role, commandName, commandArgs } = parseCliArgs(rawArgs);
-  const registry = new InMemoryCliRegistry();
-  registerTools(registry, role);
-  const builtinCommandNames = ['help', 'list', 'version', 'install', 'uninstall', 'remove', 'update', 'upgrade'];
-  const registeredCommandNames = registry.listCommands().map((item) => item.name);
-  const commandNames = [...builtinCommandNames, ...registeredCommandNames]
+  const registeredCommandNames = await getAvailableCommandNames(role);
+  const commandNames = [...BUILTIN_COMMAND_NAMES, ...registeredCommandNames]
     .sort((left, right) => left.localeCompare(right));
 
   if (!commandName || commandName === '--help' || commandName === '-h') {
@@ -46,7 +46,8 @@ export async function runCli(rawArgs: string[]): Promise<void> {
       process.stdout.write(`${builtinHelp}\n`);
       return;
     }
-    const targetCommandDef = registry.getCommand(targetCommandName);
+    const targetRegistry = await buildRegistryForCommand(role, targetCommandName);
+    const targetCommandDef = targetRegistry.getCommand(targetCommandName);
     if (!targetCommandDef) {
       throw new Error(`未找到命令: ${targetCommandName}`);
     }
@@ -78,7 +79,18 @@ export async function runCli(rawArgs: string[]): Promise<void> {
       }
       return;
     }
-    printCommandList(role, registeredCommandNames, builtinCommandNames);
+    printCommandList(role, registeredCommandNames, BUILTIN_COMMAND_NAMES);
+    return;
+  }
+
+  if (commandName === 'changelog') {
+    if (hasHelpFlag(commandArgs)) {
+      ensureNoUnexpectedBuiltinArgs('changelog', commandArgs);
+      process.stdout.write(`${getBuiltinCommandHelp('changelog')}\n`);
+      return;
+    }
+    const options = parseChangelogOptions(commandArgs);
+    process.stdout.write(`${await renderChangelog(options)}\n`);
     return;
   }
 
@@ -109,6 +121,7 @@ export async function runCli(rawArgs: string[]): Promise<void> {
     return;
   }
 
+  const registry = await buildRegistryForCommand(role, commandName);
   const command = registry.getCommand(commandName);
   if (!command) {
     throw new Error(`未找到命令: ${commandName}`);
@@ -134,6 +147,97 @@ function parseListOptions(args: string[]): { raw: boolean } {
   }
 
   return { raw: args.includes('--raw') };
+}
+
+interface ChangelogOptions {
+  limit: number | 'all';
+  version?: string;
+  since?: string;
+  raw: boolean;
+}
+
+function parseChangelogOptions(args: string[]): ChangelogOptions {
+  const options: ChangelogOptions = { limit: 5, raw: false };
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === '--raw') {
+      options.raw = true;
+      continue;
+    }
+
+    if (arg === '--limit' || arg.startsWith('--limit=')) {
+      const value = arg.startsWith('--limit=') ? arg.slice('--limit='.length) : args[++index];
+      if (value === undefined) {
+        throw new Error('changelog --limit 需要一个值');
+      }
+      if (value === 'all') {
+        options.limit = 'all';
+        continue;
+      }
+      const parsed = Number(value);
+      if (!Number.isInteger(parsed) || parsed <= 0) {
+        throw new Error(`changelog --limit 必须是正整数或 all，收到: ${value}`);
+      }
+      options.limit = parsed;
+      continue;
+    }
+
+    if (arg === '--version' || arg.startsWith('--version=')) {
+      const value = arg.startsWith('--version=') ? arg.slice('--version='.length) : args[++index];
+      if (!value) {
+        throw new Error('changelog --version 需要一个值');
+      }
+      options.version = value;
+      continue;
+    }
+
+    if (arg === '--since' || arg.startsWith('--since=')) {
+      const value = arg.startsWith('--since=') ? arg.slice('--since='.length) : args[++index];
+      if (!value) {
+        throw new Error('changelog --since 需要一个值');
+      }
+      options.since = value;
+      continue;
+    }
+
+    throw new Error(`changelog 不支持参数: ${arg}`);
+  }
+
+  return options;
+}
+
+async function renderChangelog(options: ChangelogOptions): Promise<string> {
+  if (options.raw) {
+    return loadChangelogRaw();
+  }
+
+  const sections = await loadChangelogSections();
+  if (sections.length === 0) {
+    throw new Error('CHANGELOG.md 中没有版本记录');
+  }
+
+  let selected = sections;
+  if (options.version) {
+    selected = sections.filter((section) => section.version === options.version);
+    if (selected.length === 0) {
+      throw new Error(`未找到版本 ${options.version} 的更新记录`);
+    }
+  } else if (options.since) {
+    const sinceIndex = sections.findIndex((section) => section.version === options.since);
+    if (sinceIndex === -1) {
+      throw new Error(`未找到起始版本 ${options.since}`);
+    }
+    selected = sections.slice(0, sinceIndex + 1);
+  } else if (options.limit !== 'all') {
+    selected = sections.slice(0, options.limit);
+  }
+
+  const header = options.version
+    ? `zentao CLI ${options.version} 更新内容`
+    : `zentao CLI 最近更新（共 ${sections.length} 个版本）`;
+
+  return [header, '', ...selected.map((section) => section.content)].join('\n').trimEnd() + '\n';
 }
 
 function parseCliArgs(rawArgs: string[]): { role: Role; commandName?: string; commandArgs: string[] } {
@@ -302,7 +406,9 @@ function printHelp(role: Role, commands: string[]): void {
     '  zentao [--role=full|dev|pm|qa] <command> [--key=value ...]',
     '  zentao list',
     '  zentao help',
+    '  zentao list',
     '  zentao version',
+    '  zentao changelog',
     '  zentao update',
     '  zentao update --skip-config-check',
     '  zentao update --cli-only',
@@ -384,7 +490,7 @@ interface CommandListGroup {
 
 function buildCommandGroups(commandNames: string[]): CommandListGroup[] {
   const groups: CommandListGroup[] = [
-    { title: '开始使用', match: (name) => ['help', 'list', 'version', 'install', 'update', 'upgrade', 'uninstall', 'remove', 'initZentao', 'whoami', 'who-am-i', 'getMyProfile'].includes(name), commands: [] },
+    { title: '开始使用', match: (name) => ['help', 'list', 'version', 'changelog', 'install', 'update', 'upgrade', 'uninstall', 'remove', 'initZentao', 'whoami', 'who-am-i', 'getMyProfile'].includes(name), commands: [] },
     { title: '我的工作', match: (name) => ['getMyTasks', 'getMyBugs', 'getMyTaskStatistics', 'getMyBugStatistics', 'getMyWeeklyActivity'].includes(name), commands: [] },
     { title: '测试 / 构建 / 发布', match: (name) => /Test|Case|Build|Release/.test(name), commands: [] },
     { title: '任务 / Bug / 需求', match: (name) => /Task|Bug|Story|Stories/.test(name), commands: [] },
@@ -419,6 +525,7 @@ function describeCommand(commandName: string): string {
     help: '查看总帮助或指定命令参数',
     list: '按场景列出可用命令',
     version: '查看 CLI 版本',
+    changelog: '查看 CLI 更新日志',
     install: '安装 CLI 和 zentao skill',
     update: '更新 CLI 和 zentao skill',
     upgrade: 'update 的别名',
@@ -851,6 +958,27 @@ function getBuiltinCommandHelp(commandName: string): string | undefined {
       '',
       '说明：',
       '  输出当前 CLI 版本号。',
+      '',
+    ].join('\n'),
+    changelog: [
+      'zentao changelog',
+      '',
+      '用法：',
+      '  zentao changelog',
+      '  zentao changelog --limit 5',
+      '  zentao changelog --limit all',
+      '  zentao changelog --version 0.1.23',
+      '  zentao changelog --since 0.1.20',
+      '  zentao changelog --raw',
+      '',
+      '说明：',
+      '  查看 CLI 更新日志。默认展示最近 5 个版本；使用 --raw 输出完整 Markdown。',
+      '',
+      '参数：',
+      '  --limit <number|all> （可选）：展示的版本数量，默认 5；all 表示全部。',
+      '  --version <string> （可选）：只展示指定版本的更新内容。',
+      '  --since <string> （可选）：展示从指定版本到当前最新的所有更新。',
+      '  --raw （可选）：输出完整 CHANGELOG.md 原文。',
       '',
     ].join('\n'),
     install: [

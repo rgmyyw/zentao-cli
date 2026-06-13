@@ -89,7 +89,7 @@ describe('ZentaoHttpClient', () => {
     await expect(http.request('GET', '/tasks', { params: { page: 1 }, headers: { A: 'B' } })).resolves.toEqual({ ok: true });
 
     expect(http.username).toBe('me');
-    expect(axiosMock.create).toHaveBeenCalledWith({ baseURL: 'https://zentao.example.com/zentao/api.php/v1', timeout: 30_000 });
+    expect(axiosMock.create).toHaveBeenCalledWith(expect.objectContaining({ baseURL: 'https://zentao.example.com/zentao/api.php/v1', timeout: 30_000 }));
     expect(client.request).toHaveBeenCalledWith({ method: 'GET', url: '/tasks', params: { page: 1 }, headers: { A: 'B', Token: 'token' } });
   });
 

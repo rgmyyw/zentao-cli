@@ -1,3 +1,5 @@
+import http from 'node:http';
+import https from 'node:https';
 import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios';
 import { ZentaoAuth } from './auth.js';
 import type { ZentaoConfig } from '../types/common.js';
@@ -11,17 +13,28 @@ export interface HttpError extends Error {
 export class ZentaoHttpClient {
   private readonly client: AxiosInstance;
   private readonly auth: ZentaoAuth;
+  private requestCount = 0;
 
   constructor(private readonly config: ZentaoConfig) {
     this.client = axios.create({
       baseURL: config.apiBaseUrl || `${config.url}/zentao/api.php/${config.apiVersion}`,
       timeout: 30_000,
+      httpAgent: new http.Agent({ keepAlive: true }),
+      httpsAgent: new https.Agent({ keepAlive: true }),
     });
     this.auth = new ZentaoAuth(this.client, config);
   }
 
   get username(): string {
     return this.config.username;
+  }
+
+  getRequestCount(): number {
+    return this.requestCount;
+  }
+
+  resetRequestCount(): void {
+    this.requestCount = 0;
   }
 
   async getToken(): Promise<string> {
@@ -56,6 +69,7 @@ export class ZentaoHttpClient {
   private async downloadLegacyWithRetry(pathOrUrl: string, retried: boolean): Promise<{ data: Buffer; contentType?: string; fileName?: string }> {
     const token = await this.auth.getToken();
     const url = this.resolveLegacyUrl(pathOrUrl);
+    this.requestCount += 1;
 
     try {
       const response = await axios.request<ArrayBuffer>({
@@ -89,6 +103,7 @@ export class ZentaoHttpClient {
   private async legacyRequestWithRetry<T = unknown>(method: string, path: string, options: AxiosRequestConfig, retried: boolean): Promise<T> {
     const token = await this.auth.getToken();
     const baseURL = this.getLegacyBaseURL();
+    this.requestCount += 1;
 
     try {
       const response = await axios.request({
@@ -121,6 +136,7 @@ export class ZentaoHttpClient {
 
   private async requestWithRetry<T = unknown>(method: string, url: string, options: AxiosRequestConfig, retried: boolean): Promise<T> {
     const token = await this.auth.getToken();
+    this.requestCount += 1;
 
     try {
       const response = await this.client.request({

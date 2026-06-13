@@ -5,6 +5,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { ZentaoApi } from './api/index.js';
 import { loadConfig, maskConfig, normalizeConfig, saveConfig } from './core/config.js';
+import { writeUpdateCacheAfterInstall } from './update-probe.js';
 import type { ZentaoConfig } from './types/common.js';
 
 const PACKAGE_NAME = '@cloudglab/zentao-cli';
@@ -71,7 +72,12 @@ export async function runUninstallCommand(args: string[] = []): Promise<void> {
 
 function printSuccessGuide(action: '安装' | '更新', status: string): void {
   process.stdout.write(`\n${action}完成，${status}\n\n${renderBanner()}\n\n`);
-  process.stdout.write(`快速开始：
+  process.stdout.write(`写操作说明：
+  写操作默认已开启。
+  写命令需要加 --confirm 才会真正执行。
+  如需禁用写操作，设置 ZENTAO_DISABLE_WRITE=true。
+
+快速开始：
   zentao help                    查看帮助
   zentao list                    查看可用命令
   zentao whoami                  校验当前账号
@@ -79,11 +85,8 @@ function printSuccessGuide(action: '安装' | '更新', status: string): void {
   zentao getMyBugs --limit 10    查看我的 Bug
 
 常用配置：
-  zentao update                  更新 CLI 和 Skill
-  zentao install --skip-config-check 仅安装，跳过配置校验
-  ZENTAO_DISABLE_WRITE=true      禁用真实写操作
-
-写操作提示：真实写入仍需显式传 confirm=true。
+  zentao update                       更新 CLI 和 Skill
+  zentao install --skip-config-check  仅安装，跳过配置校验
 `);
 }
 
@@ -280,11 +283,31 @@ function parseBooleanValue(value: string, optionName: string): boolean {
 async function installPackageAndSkill(action: '安装' | '更新', options: InstallOptions): Promise<void> {
   if (!options.skillOnly) {
     await cleanupGlobalPackageResidues();
-    await runStep(`${action} zentao CLI`, 'npm', ['install', '-g', `${PACKAGE_NAME}@latest`]);
+    await installGlobalCli(action);
   }
   if (!options.cliOnly) {
     await installSkill(action, options);
   }
+  await writeUpdateCacheAfterInstall();
+}
+
+async function installGlobalCli(action: '安装' | '更新'): Promise<void> {
+  const args = ['install', '-g', `${PACKAGE_NAME}@latest`];
+  try {
+    await runStep(`${action} zentao CLI`, 'npm', args);
+  } catch (error) {
+    if (!isNpmDirectoryNotEmptyError(error)) {
+      throw error;
+    }
+    process.stdout.write('\n检测到 npm 全局安装目录残留，正在清理后重试...\n');
+    await cleanupGlobalPackageResidues();
+    await runStep(`${action} zentao CLI`, 'npm', args);
+  }
+}
+
+function isNpmDirectoryNotEmptyError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('ENOTEMPTY') || message.toLowerCase().includes('directory not empty');
 }
 
 async function installSkill(action: '安装' | '更新', options: InstallOptions): Promise<void> {
@@ -435,8 +458,7 @@ function runCommandOutput(command: string, args: string[]): Promise<string> {
 async function ensureValidZentaoConfig(): Promise<void> {
   const { config: existing, error: loadError } = tryLoadConfig();
   if (existing && await validateConfig(existing)) {
-    process.stdout.write(`\n检测到已有禅道配置，校验通过：${JSON.stringify(maskConfig(existing))}\n`);
-    printWriteGuardNotice();
+    process.stdout.write(`\n禅道配置校验通过：${JSON.stringify(maskConfig(existing))}\n`);
     printEnvOverrideNotice();
     return;
   }
@@ -456,12 +478,7 @@ async function ensureValidZentaoConfig(): Promise<void> {
   await validateConfigOrThrow(config);
   saveConfig(config);
   process.stdout.write(`已保存禅道配置：${JSON.stringify(maskConfig(config))}\n`);
-  printWriteGuardNotice();
   printEnvOverrideNotice();
-}
-
-function printWriteGuardNotice(): void {
-  process.stdout.write('写操作默认支持；真实写入仍需在命令参数中传 confirm=true。如需禁用写操作，请设置 ZENTAO_DISABLE_WRITE=true。\n');
 }
 
 function printEnvOverrideNotice(): void {

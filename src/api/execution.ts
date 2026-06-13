@@ -1,6 +1,6 @@
 import type { ZentaoHttpClient } from '../core/http.js';
 import { toClientPaginatedListResult, toServerListResult, type ListResult } from '../core/list-result.js';
-import { normalizePagination, normalizeTotalPages, type PaginationInput } from '../core/pagination.js';
+import { fetchRemainingPagesConcurrently, normalizePagination, type PaginationInput } from '../core/pagination.js';
 import type { ZentaoBug, ZentaoExecution, ZentaoListResponse, ZentaoTask } from '../types/zentao.js';
 import { toFormUrlEncoded } from '../utils/form.js';
 import { bugMatchesKeyword, bugMatchesModuleAlias, normalizeBugFilterText } from './bug-filter.js';
@@ -101,14 +101,15 @@ export class ExecutionApi {
     const firstPage = await this.fetchExecutionBugsPage(executionId, params, 1, pageSize);
     const firstResult = toServerListResult<ZentaoBug>(firstPage, ['bugs']);
     const total = firstResult.total;
-    const allBugs = [...firstResult.items];
-    const totalPages = normalizeTotalPages(total, pageSize, allBugs.length);
-
-    for (let page = 2; page <= totalPages; page += 1) {
-      const response = await this.fetchExecutionBugsPage(executionId, params, page, pageSize);
-      const result = toServerListResult<ZentaoBug>(response, ['bugs']);
-      allBugs.push(...result.items);
-    }
+    const allBugs = await fetchRemainingPagesConcurrently(
+      { items: firstResult.items, total },
+      async (page) => {
+        const response = await this.fetchExecutionBugsPage(executionId, params, page, pageSize);
+        const result = toServerListResult<ZentaoBug>(response, ['bugs']);
+        return result.items;
+      },
+      { limit: pageSize },
+    );
 
     let filtered = allBugs;
 
@@ -299,15 +300,14 @@ export class ExecutionApi {
   private async getAllExecutionBugs(executionId: number): Promise<ZentaoBug[]> {
     const limit = 100;
     const firstPage = await this.getExecutionBugs(executionId, { page: 1, limit }) as { items?: ZentaoBug[]; total?: number };
-    const bugs = [...(firstPage.items ?? [])];
-    const totalPages = normalizeTotalPages(firstPage.total, limit, bugs.length);
-
-    for (let page = 2; page <= totalPages; page += 1) {
-      const response = await this.getExecutionBugs(executionId, { page, limit }) as { items?: ZentaoBug[] };
-      bugs.push(...(response.items ?? []));
-    }
-
-    return bugs;
+    return fetchRemainingPagesConcurrently(
+      { items: firstPage.items ?? [], total: firstPage.total },
+      async (page) => {
+        const response = await this.getExecutionBugs(executionId, { page, limit }) as { items?: ZentaoBug[] };
+        return response.items ?? [];
+      },
+      { limit },
+    );
   }
 
   private async getAllExecutionTasks(executionId: number): Promise<ZentaoTask[]> {
@@ -315,17 +315,16 @@ export class ExecutionApi {
     const firstPage = await this.http.request<ZentaoListResponse<ZentaoTask> & { tasks?: ZentaoTask[] }>('GET', `/executions/${executionId}/tasks`, {
       params: { page: 1, limit },
     });
-    const tasks = [...(firstPage.tasks ?? [])];
-    const totalPages = normalizeTotalPages(firstPage.total, limit, tasks.length);
-
-    for (let page = 2; page <= totalPages; page += 1) {
-      const response = await this.http.request<ZentaoListResponse<ZentaoTask> & { tasks?: ZentaoTask[] }>('GET', `/executions/${executionId}/tasks`, {
-        params: { page, limit },
-      });
-      tasks.push(...(response.tasks ?? []));
-    }
-
-    return tasks;
+    return fetchRemainingPagesConcurrently(
+      { items: firstPage.tasks ?? [], total: firstPage.total },
+      async (page) => {
+        const response = await this.http.request<ZentaoListResponse<ZentaoTask> & { tasks?: ZentaoTask[] }>('GET', `/executions/${executionId}/tasks`, {
+          params: { page, limit },
+        });
+        return response.tasks ?? [];
+      },
+      { limit },
+    );
   }
 
   private buildParticipantBugStats(bugs: ZentaoBug[], total: number, devNotResolvedToday: ZentaoBug[], userNames: Map<string, string>): ParticipantBugStats[] {
