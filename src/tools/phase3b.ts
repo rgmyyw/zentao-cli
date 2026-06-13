@@ -4,18 +4,7 @@ import type { CreateBuildInput } from '../api/build.js';
 import type { CreateTestTaskInput, UpdateTestTaskInput } from '../api/testtask.js';
 import { getApi } from '../core/api-provider.js';
 import { previewOrAssertWriteAllowed } from '../core/write-guard.js';
-import { jsonResult } from './shared.js';
-
-const optionalTrimmedText = z.preprocess(
-  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
-  z.string().trim().optional(),
-);
-
-async function runPreviewed(action: string, confirm: boolean | undefined, payload: unknown, runner: () => Promise<unknown>) {
-  const preview = previewOrAssertWriteAllowed({ action, confirm, payload });
-  if (preview) return jsonResult(preview);
-  return jsonResult(await runner());
-}
+import { optionalTrimmedText, runWithPreview } from './shared.js';
 
 export function registerExecutionWriteTools(server: CliRegistry): void {
   server.tool('updateExecution', {
@@ -36,40 +25,40 @@ export function registerExecutionWriteTools(server: CliRegistry): void {
     acl: optionalTrimmedText.describe('访问控制：private | open'),
     whitelist: z.array(z.string().trim().min(1)).optional().describe('白名单账号数组'),
     confirm: z.boolean().optional().default(false),
-  }, async ({ executionId, confirm, ...update }) => runPreviewed('updateExecution', confirm, { executionId, update }, () => getApi().execution.updateExecution(executionId, update)));
+  }, async ({ executionId, confirm, ...update }) => runWithPreview('updateExecution', confirm, { executionId, update }, previewOrAssertWriteAllowed, () => getApi().execution.updateExecution(executionId, update)));
 
   server.tool('startExecution', {
     executionId: z.number().int().positive(),
     realBegan: optionalTrimmedText.describe('格式 YYYY-MM-DD'),
     comment: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
-  }, async ({ executionId, confirm, ...payload }) => runPreviewed('startExecution', confirm, { executionId, payload }, () => getApi().execution.startExecution(executionId, payload)));
+  }, async ({ executionId, confirm, ...payload }) => runWithPreview('startExecution', confirm, { executionId, payload }, previewOrAssertWriteAllowed, () => getApi().execution.startExecution(executionId, payload)));
 
   server.tool('closeExecution', {
     executionId: z.number().int().positive(),
     realEnd: optionalTrimmedText.describe('格式 YYYY-MM-DD'),
     comment: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
-  }, async ({ executionId, confirm, ...payload }) => runPreviewed('closeExecution', confirm, { executionId, payload }, () => getApi().execution.closeExecution(executionId, payload)));
+  }, async ({ executionId, confirm, ...payload }) => runWithPreview('closeExecution', confirm, { executionId, payload }, previewOrAssertWriteAllowed, () => getApi().execution.closeExecution(executionId, payload)));
 
   server.tool('suspendExecution', {
     executionId: z.number().int().positive(),
     comment: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
-  }, async ({ executionId, confirm, ...payload }) => runPreviewed('suspendExecution', confirm, { executionId, payload }, () => getApi().execution.suspendExecution(executionId, payload)));
+  }, async ({ executionId, confirm, ...payload }) => runWithPreview('suspendExecution', confirm, { executionId, payload }, previewOrAssertWriteAllowed, () => getApi().execution.suspendExecution(executionId, payload)));
 
   server.tool('activateExecution', {
     executionId: z.number().int().positive(),
     comment: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
-  }, async ({ executionId, confirm, ...payload }) => runPreviewed('activateExecution', confirm, { executionId, payload }, () => getApi().execution.activateExecution(executionId, payload)));
+  }, async ({ executionId, confirm, ...payload }) => runWithPreview('activateExecution', confirm, { executionId, payload }, previewOrAssertWriteAllowed, () => getApi().execution.activateExecution(executionId, payload)));
 
   server.tool('putoffExecution', {
     executionId: z.number().int().positive(),
     days: z.number().int().positive(),
     comment: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
-  }, async ({ executionId, confirm, ...payload }) => runPreviewed('putoffExecution', confirm, { executionId, payload }, () => getApi().execution.putoffExecution(executionId, payload as { days: number; comment?: string })));
+  }, async ({ executionId, confirm, ...payload }) => runWithPreview('putoffExecution', confirm, { executionId, payload }, previewOrAssertWriteAllowed, () => getApi().execution.putoffExecution(executionId, payload as { days: number; comment?: string })));
 }
 
 export function registerBuildWriteTools(server: CliRegistry): void {
@@ -85,7 +74,7 @@ export function registerBuildWriteTools(server: CliRegistry): void {
     scmPath: optionalTrimmedText,
     filePath: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
-  }, async ({ confirm, ...payload }) => runPreviewed('createBuild', confirm, payload, () => getApi().build.createBuild(payload as CreateBuildInput)));
+  }, async ({ confirm, ...payload }) => runWithPreview('createBuild', confirm, payload, previewOrAssertWriteAllowed, () => getApi().build.createBuild(payload as CreateBuildInput)));
 
   server.tool('updateBuild', {
     buildId: z.number().int().positive(),
@@ -98,7 +87,7 @@ export function registerBuildWriteTools(server: CliRegistry): void {
     scmPath: optionalTrimmedText,
     filePath: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
-  }, async ({ buildId, confirm, ...update }) => runPreviewed('updateBuild', confirm, { buildId, update }, () => getApi().build.updateBuild(buildId, update)));
+  }, async ({ buildId, confirm, ...update }) => runWithPreview('updateBuild', confirm, { buildId, update }, previewOrAssertWriteAllowed, () => getApi().build.updateBuild(buildId, update)));
 }
 
 const testCaseStepSchema = z.object({
@@ -124,7 +113,7 @@ export function registerTestCaseWriteTools(server: CliRegistry): void {
     project: z.number().int().positive().optional().describe('禅道 18.5 REST v1 创建产品用例不绑定项目，传入会被忽略'),
     execution: z.number().int().positive().optional().describe('禅道 18.5 REST v1 创建产品用例不绑定执行，传入会被忽略'),
     confirm: z.boolean().optional().default(false),
-  }, async ({ productId, confirm, ...payload }) => runPreviewed('createTestCase', confirm, { productId, ...payload }, () => getApi().testcase.createTestCase(productId, payload)));
+  }, async ({ productId, confirm, ...payload }) => runWithPreview('createTestCase', confirm, { productId, ...payload }, previewOrAssertWriteAllowed, () => getApi().testcase.createTestCase(productId, payload)));
 
   server.tool('updateTestCase', {
     testCaseId: z.number().int().positive(),
@@ -142,7 +131,7 @@ export function registerTestCaseWriteTools(server: CliRegistry): void {
     project: z.number().int().positive().optional().describe('禅道 18.5 REST v1 更新用例不接收该字段，传入会被忽略'),
     execution: z.number().int().positive().optional().describe('禅道 18.5 REST v1 更新用例不接收该字段，传入会被忽略'),
     confirm: z.boolean().optional().default(false),
-  }, async ({ testCaseId, confirm, ...update }) => runPreviewed('updateTestCase', confirm, { testCaseId, update }, () => getApi().testcase.updateTestCase(testCaseId, update)));
+  }, async ({ testCaseId, confirm, ...update }) => runWithPreview('updateTestCase', confirm, { testCaseId, update }, previewOrAssertWriteAllowed, () => getApi().testcase.updateTestCase(testCaseId, update)));
 }
 
 export function registerTestTaskWriteTools(server: CliRegistry): void {
@@ -160,7 +149,7 @@ export function registerTestTaskWriteTools(server: CliRegistry): void {
     pri: z.number().int().optional(),
     desc: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
-  }, async ({ confirm, ...payload }) => runPreviewed('createTestTask', confirm, payload, () => getApi().testtask.createTestTask(payload as CreateTestTaskInput)));
+  }, async ({ confirm, ...payload }) => runWithPreview('createTestTask', confirm, payload, previewOrAssertWriteAllowed, () => getApi().testtask.createTestTask(payload as CreateTestTaskInput)));
 
   server.tool('updateTestTask', {
     testTaskId: z.number().int().positive(),
@@ -177,5 +166,5 @@ export function registerTestTaskWriteTools(server: CliRegistry): void {
     end: optionalTrimmedText.describe('格式 YYYY-MM-DD'),
     desc: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
-  }, async ({ testTaskId, confirm, ...update }) => runPreviewed('updateTestTask', confirm, { testTaskId, update }, () => getApi().testtask.updateTestTask(testTaskId, update as UpdateTestTaskInput)));
+  }, async ({ testTaskId, confirm, ...update }) => runWithPreview('updateTestTask', confirm, { testTaskId, update }, previewOrAssertWriteAllowed, () => getApi().testtask.updateTestTask(testTaskId, update as UpdateTestTaskInput)));
 }

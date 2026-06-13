@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { isRecord } from './core/value.js';
 import { CLI_VERSION } from './version.js';
 
 const PACKAGE_NAME = '@cloudglab/zentao-cli';
@@ -129,8 +130,4 @@ function parseVersion(version: string): number[] {
     .split(/[.-]/)
     .map((part) => Number.parseInt(part, 10))
     .map((part) => (Number.isFinite(part) ? part : 0));
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

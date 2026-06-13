@@ -1,6 +1,7 @@
 import type { ZentaoHttpClient } from '../core/http.js';
 import { toServerListResult } from '../core/list-result.js';
 import { normalizePagination, type PaginationInput } from '../core/pagination.js';
+import { requireNonBlank } from '../core/validation.js';
 import { toFormUrlEncoded } from '../utils/form.js';
 
 export interface TestTaskListInput extends PaginationInput {
@@ -84,7 +85,7 @@ export class TestTaskApi {
       if (typeof value !== 'string') continue;
 
       if (requiredFields.includes(field as 'name' | 'begin' | 'end')) {
-        normalized[field] = this.requireNonBlank(value, `${field} 不能为空`);
+        normalized[field] = requireNonBlank(value, `${field} 不能为空`);
         continue;
       }
 
@@ -95,7 +96,7 @@ export class TestTaskApi {
 
     const build = normalized.build;
     if (typeof build === 'string') {
-      normalized.build = this.requireNonBlank(build, 'build 不能为空');
+      normalized.build = requireNonBlank(build, 'build 不能为空');
     }
 
     if (Array.isArray(normalized.type)) {
@@ -112,10 +113,4 @@ export class TestTaskApi {
     return trimmed === '' ? undefined : trimmed;
   }
 
-  private requireNonBlank(value: unknown, message: string): string {
-    if (typeof value !== 'string') throw new Error(message);
-    const trimmed = value.trim();
-    if (trimmed === '') throw new Error(message);
-    return trimmed;
-  }
 }

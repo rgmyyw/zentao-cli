@@ -1,4 +1,6 @@
-import type { HttpError, ZentaoHttpClient } from '../core/http.js';
+import type { ZentaoHttpClient } from '../core/http.js';
+import { isHttpStatusError } from '../core/http-error.js';
+import { requireNonBlank } from '../core/validation.js';
 
 export type CommentObjectType = 'task' | 'bug' | 'story' | 'product' | 'project' | 'execution' | string;
 
@@ -86,21 +88,4 @@ export class CommentApi {
         throw new Error(`不支持从详情回退获取评论: ${objectType}`);
     }
   }
-}
-
-function isHttpStatusError(error: unknown, statusCode: number): error is HttpError {
-  return error instanceof Error && 'statusCode' in error && (error as HttpError).statusCode === statusCode;
-}
-
-function requireNonBlank(value: unknown, message: string): string {
-  if (typeof value !== 'string') {
-    throw new Error(message);
-  }
-
-  const normalized = value.trim();
-  if (!normalized) {
-    throw new Error(message);
-  }
-
-  return normalized;
 }

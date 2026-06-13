@@ -1,4 +1,5 @@
 import type { ZentaoHttpClient } from '../core/http.js';
+import { requireNonBlank } from '../core/validation.js';
 import { extractItems } from '../core/list-result.js';
 
 export class TodoApi {
@@ -37,7 +38,7 @@ export class TodoApi {
     const normalized: Record<string, unknown> = { ...input };
 
     if (Object.prototype.hasOwnProperty.call(normalized, 'name')) {
-      normalized.name = this.requireNonBlank(normalized.name, 'name 不能为空');
+      normalized.name = requireNonBlank(normalized.name as string | undefined, 'name 不能为空');
     } else if (requireName) {
       throw new Error('name 不能为空');
     }
@@ -51,16 +52,4 @@ export class TodoApi {
     return normalized;
   }
 
-  private requireNonBlank(value: unknown, message: string): string {
-    if (typeof value !== 'string') {
-      throw new Error(message);
-    }
-
-    const normalized = value.trim();
-    if (!normalized) {
-      throw new Error(message);
-    }
-
-    return normalized;
-  }
 }

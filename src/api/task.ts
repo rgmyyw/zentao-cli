@@ -1,6 +1,8 @@
-import type { HttpError, ZentaoHttpClient } from '../core/http.js';
+import type { ZentaoHttpClient } from '../core/http.js';
+import { isHttpStatusError } from '../core/http-error.js';
 import { extractItems, toClientPaginatedListResult, toServerListResult } from '../core/list-result.js';
-import { fetchRemainingPagesConcurrently, normalizePagination, type PaginationInput } from '../core/pagination.js';
+import { fetchAllPages, normalizePagination, type PaginationInput } from '../core/pagination.js';
+import { requireNonBlank } from '../core/validation.js';
 import type { ZentaoTask } from '../types/zentao.js';
 import { toFormUrlEncoded } from '../utils/form.js';
 
@@ -89,31 +91,24 @@ export class TaskApi {
   }
 
   private async getAllMyTasksByPages(total: number): Promise<ZentaoTask[]> {
-    const limit = 100;
+    const pageSize = 100;
+    type TasksResponse = { tasks?: ZentaoTask[] } | ZentaoTask[];
 
-    const firstResponse = await this.http.request<{ tasks?: ZentaoTask[] } | ZentaoTask[]>('GET', '/tasks', {
-      params: {
-        assignedTo: this.http.username,
-        page: 1,
-        limit,
-      },
+    const fetchTasksPage = async (page: number): Promise<{ items: ZentaoTask[]; total?: unknown }> => {
+      const response = await this.http.request<TasksResponse>('GET', '/tasks', {
+        params: {
+          assignedTo: this.http.username,
+          page,
+          limit: pageSize,
+        },
+      });
+      return { items: extractItems<ZentaoTask>(response, ['tasks']), total };
+    };
+
+    return fetchAllPages<ZentaoTask>({
+      pageSize,
+      fetchPage: fetchTasksPage,
     });
-    const firstPageItems = extractItems<ZentaoTask>(firstResponse, ['tasks']);
-
-    return fetchRemainingPagesConcurrently(
-      { items: firstPageItems, total },
-      async (page) => {
-        const response = await this.http.request<{ tasks?: ZentaoTask[] } | ZentaoTask[]>('GET', '/tasks', {
-          params: {
-            assignedTo: this.http.username,
-            page,
-            limit,
-          },
-        });
-        return extractItems<ZentaoTask>(response, ['tasks']);
-      },
-      { limit },
-    );
   }
 
   async updateTask(taskId: number, update: Record<string, unknown>): Promise<unknown> {
@@ -153,7 +148,7 @@ export class TaskApi {
 
   async assignTask(taskId: number, data: Record<string, unknown>): Promise<unknown> {
     const normalizedData = this.normalizeTaskInput(data);
-    normalizedData.assignedTo = this.requireNonBlank(normalizedData.assignedTo, 'assignedTo 不能为空');
+    normalizedData.assignedTo = requireNonBlank(normalizedData.assignedTo as string | undefined, 'assignedTo 不能为空');
     return this.http.request('POST', `/tasks/${taskId}/assignto`, { data: normalizedData });
   }
 
@@ -163,8 +158,8 @@ export class TaskApi {
 
   async finishTask(taskId: number, update: Record<string, unknown> = {}): Promise<unknown> {
     const normalizedUpdate = this.normalizeTaskInput(update);
-    normalizedUpdate.realStarted = this.requireNonBlank(normalizedUpdate.realStarted, 'realStarted 不能为空');
-    normalizedUpdate.finishedDate = this.requireNonBlank(normalizedUpdate.finishedDate, 'finishedDate 不能为空');
+    normalizedUpdate.realStarted = requireNonBlank(normalizedUpdate.realStarted as string | undefined, 'realStarted 不能为空');
+    normalizedUpdate.finishedDate = requireNonBlank(normalizedUpdate.finishedDate as string | undefined, 'finishedDate 不能为空');
     return this.http.request('POST', `/tasks/${taskId}/finish`, {
       data: normalizedUpdate,
     });
@@ -178,7 +173,7 @@ export class TaskApi {
   }
 
   private normalizeRecordEstimateInput(input: RecordTaskEstimateInput): RecordTaskEstimateInput {
-    const date = this.requireNonBlank(input.date, 'date 不能为空');
+    const date = requireNonBlank(input.date, 'date 不能为空');
     const work = this.normalizeOptionalString(input.work);
 
     if (typeof input.consumed !== 'number' || Number.isNaN(input.consumed) || input.consumed <= 0) {
@@ -223,7 +218,7 @@ export class TaskApi {
       if (!(field in normalized)) continue;
       const value = normalized[field];
       if (requiredFields.includes(field as 'name' | 'assignedTo' | 'estStarted' | 'deadline')) {
-        normalized[field] = this.requireNonBlank(value, `${field} 不能为空`);
+        normalized[field] = requireNonBlank(value as string | undefined, `${field} 不能为空`);
         continue;
       }
       const normalizedValue = this.normalizeOptionalString(value);
@@ -243,14 +238,4 @@ export class TaskApi {
     return normalized === '' ? undefined : normalized;
   }
 
-  private requireNonBlank(value: unknown, message: string): string {
-    if (typeof value !== 'string') throw new Error(message);
-    const normalized = value.trim();
-    if (normalized === '') throw new Error(message);
-    return normalized;
-  }
-}
-
-function isHttpStatusError(error: unknown, statusCode: number): error is HttpError {
-  return error instanceof Error && 'statusCode' in error && (error as HttpError).statusCode === statusCode;
 }

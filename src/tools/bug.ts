@@ -2,18 +2,7 @@ import { z } from 'zod';
 import type { CliRegistry } from '../core/cli-registry.js';
 import { getApi } from '../core/api-provider.js';
 import { previewOrAssertWriteAllowed } from '../core/write-guard.js';
-import { jsonResult } from './shared.js';
-
-const optionalTrimmedText = z.preprocess(
-  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
-  z.string().trim().optional(),
-);
-
-const runActioned = async (action: string, confirm: boolean, params: Record<string, unknown>, fn: () => Promise<unknown>) => {
-  const preview = previewOrAssertWriteAllowed({ action, confirm, payload: params });
-  if (preview) return jsonResult(preview);
-  return jsonResult(await fn());
-};
+import { jsonResult, optionalTrimmedText, runWithPreview } from './shared.js';
 
 export function registerBugTools(server: CliRegistry): void {
   server.tool(
@@ -65,7 +54,7 @@ export function registerBugTools(server: CliRegistry): void {
       confirm: z.boolean().optional().default(false),
     },
     async ({ bugId, confirm, ...resolution }) => {
-      return runActioned('resolveBug', confirm, { bugId, resolution }, () => getApi().bug.resolveBug(bugId, resolution));
+      return runWithPreview('resolveBug', confirm, { bugId, resolution }, previewOrAssertWriteAllowed, () => getApi().bug.resolveBug(bugId, resolution));
     },
   );
 
@@ -89,7 +78,7 @@ export function registerBugTools(server: CliRegistry): void {
       mailto: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
-    async ({ confirm, ...data }) => runActioned('createBug', confirm, data, () => getApi().bug.createBug(data)),
+    async ({ confirm, ...data }) => runWithPreview('createBug', confirm, data, previewOrAssertWriteAllowed, () => getApi().bug.createBug(data)),
   );
 
   server.tool(
@@ -116,7 +105,7 @@ export function registerBugTools(server: CliRegistry): void {
       mailto: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
-    async ({ bugId, confirm, ...update }) => runActioned('updateBug', confirm, { bugId, update }, () => getApi().bug.updateBug(bugId, update)),
+    async ({ bugId, confirm, ...update }) => runWithPreview('updateBug', confirm, { bugId, update }, previewOrAssertWriteAllowed, () => getApi().bug.updateBug(bugId, update)),
   );
 
   server.tool(
@@ -128,7 +117,7 @@ export function registerBugTools(server: CliRegistry): void {
       mailto: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
-    async ({ bugId, confirm, ...data }) => runActioned('assignBug', confirm, { bugId, data }, () => getApi().bug.assignBug(bugId, data)),
+    async ({ bugId, confirm, ...data }) => runWithPreview('assignBug', confirm, { bugId, data }, previewOrAssertWriteAllowed, () => getApi().bug.assignBug(bugId, data)),
   );
 
   server.tool(
@@ -138,7 +127,7 @@ export function registerBugTools(server: CliRegistry): void {
       comment: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
-    async ({ bugId, confirm, ...data }) => runActioned('okBug', confirm, { bugId, data }, () => getApi().bug.okBug(bugId, data)),
+    async ({ bugId, confirm, ...data }) => runWithPreview('okBug', confirm, { bugId, data }, previewOrAssertWriteAllowed, () => getApi().bug.okBug(bugId, data)),
   );
 
   server.tool(
@@ -151,7 +140,7 @@ export function registerBugTools(server: CliRegistry): void {
       comment: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
-    async ({ bugId, confirm, ...data }) => runActioned('confirmBug', confirm, { bugId, data }, () => getApi().bug.confirmBug(bugId, data)),
+    async ({ bugId, confirm, ...data }) => runWithPreview('confirmBug', confirm, { bugId, data }, previewOrAssertWriteAllowed, () => getApi().bug.confirmBug(bugId, data)),
   );
 
   server.tool(
@@ -161,7 +150,7 @@ export function registerBugTools(server: CliRegistry): void {
       comment: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
-    async ({ bugId, confirm, ...data }) => runActioned('closeBug', confirm, { bugId, data }, () => getApi().bug.closeBug(bugId, data)),
+    async ({ bugId, confirm, ...data }) => runWithPreview('closeBug', confirm, { bugId, data }, previewOrAssertWriteAllowed, () => getApi().bug.closeBug(bugId, data)),
   );
 
   server.tool(
@@ -172,7 +161,7 @@ export function registerBugTools(server: CliRegistry): void {
       comment: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
-    async ({ bugId, confirm, ...data }) => runActioned('activateBug', confirm, { bugId, data }, () => getApi().bug.activateBug(bugId, data)),
+    async ({ bugId, confirm, ...data }) => runWithPreview('activateBug', confirm, { bugId, data }, previewOrAssertWriteAllowed, () => getApi().bug.activateBug(bugId, data)),
   );
 
   server.tool(
@@ -181,6 +170,6 @@ export function registerBugTools(server: CliRegistry): void {
       bugId: z.number().int().positive(),
       confirm: z.boolean().optional().default(false),
     },
-    async ({ bugId, confirm }) => runActioned('deleteBug', confirm, { bugId }, () => getApi().bug.deleteBug(bugId)),
+    async ({ bugId, confirm }) => runWithPreview('deleteBug', confirm, { bugId }, previewOrAssertWriteAllowed, () => getApi().bug.deleteBug(bugId)),
   );
 }

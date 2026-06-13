@@ -159,57 +159,54 @@ describe('runCli', () => {
     expect(write).toHaveBeenCalledWith(`${JSON.stringify({ id: 84362 }, null, 2)}\n`);
   });
 
-  it('maps legacy page shortcuts in help command', async () => {
+  it.each([
+    {
+      name: 'maps legacy page shortcuts in help command',
+      args: ['help', 'execution-bug-2130.html'],
+      expectations: ['zentao help getExecutionBugs', '--executionId <number>'],
+    },
+    {
+      name: 'prints legacy shortcut target help when help command also includes help flag',
+      args: ['help', 'execution-bug-2130.html', '--help'],
+      expectations: ['zentao help getExecutionBugs', '--executionId <number>'],
+    },
+  ])('$name', async ({ args, expectations }) => {
     const getExecutionBugs = vi.fn();
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     setApi({ execution: { getExecutionBugs } } as never);
 
-    await runCli(['help', 'execution-bug-2130.html']);
+    await runCli(args);
 
     expect(getExecutionBugs).not.toHaveBeenCalled();
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao help getExecutionBugs'));
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('--executionId <number>'));
+    for (const expectation of expectations) {
+      expect(write).toHaveBeenCalledWith(expect.stringContaining(expectation));
+    }
   });
 
-  it('prints legacy shortcut target help when help command also includes help flag', async () => {
-    const getExecutionBugs = vi.fn();
-    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    setApi({ execution: { getExecutionBugs } } as never);
-
-    await runCli(['help', 'execution-bug-2130.html', '--help']);
-
-    expect(getExecutionBugs).not.toHaveBeenCalled();
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao help getExecutionBugs'));
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('--executionId <number>'));
-  });
-
-  it('prints builtin command help through help command', async () => {
-    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-
-    await runCli(['help', 'update']);
-
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao update'));
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('--skip-config-check'));
-  });
-
-  it('prints version help through help command aliases', async () => {
+  it.each([
+    {
+      name: 'prints builtin command help through help command',
+      args: ['help', 'update'],
+      expectations: ['zentao update', '--skip-config-check'],
+    },
+    {
+      name: 'prints version help through help command aliases',
+      args: ['help', '--version'],
+      expectations: ['zentao version', 'zentao --version'],
+    },
+    {
+      name: 'prints builtin command help through direct help flag',
+      args: ['update', '--help'],
+      expectations: ['zentao upgrade', '--cli-only', '--cli-only true|false'],
+    },
+  ])('$name', async ({ args, expectations }) => {
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
-    await runCli(['help', '--version']);
-    await runCli(['help', '-v']);
+    await runCli(args);
 
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao version'));
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao --version'));
-  });
-
-  it('prints builtin command help through direct help flag', async () => {
-    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-
-    await runCli(['update', '--help']);
-
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao upgrade'));
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('--cli-only'));
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('--cli-only true|false'));
+    for (const expectation of expectations) {
+      expect(write).toHaveBeenCalledWith(expect.stringContaining(expectation));
+    }
   });
 
   it('includes upgrade in raw builtin command listings', async () => {
@@ -244,14 +241,16 @@ describe('runCli', () => {
     expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao list --raw'));
   });
 
-  it('prints top-level help with inline role, key=value, and legacy shortcut examples', async () => {
+  it('prints focused top-level help emphasizing list and common commands', async () => {
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
     await runCli(['--help']);
 
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao [--role=full|dev|pm|qa] <command> [--key=value ...]'));
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao --role=qa getMyBugs --limit=50'));
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao execution-bug-2130.html'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao CLI'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao [--role=full|dev|pm|qa] <command> [options]'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao list'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('查看全部可用命令（推荐）'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('常用命令：'));
     expect(write).toHaveBeenCalledWith(expect.stringContaining('Node.js >= 16'));
   });
 

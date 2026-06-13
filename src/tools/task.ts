@@ -2,25 +2,9 @@ import { z } from 'zod';
 import type { CliRegistry } from '../core/cli-registry.js';
 import { getApi } from '../core/api-provider.js';
 import { previewOrAssertWriteAllowed } from '../core/write-guard.js';
-import { jsonResult } from './shared.js';
-
-const optionalTrimmedText = z.preprocess(
-  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
-  z.string().trim().optional(),
-);
+import { jsonResult, optionalTrimmedText, runWithPreview } from './shared.js';
 
 export function registerTaskTools(server: CliRegistry): void {
-  const runActioned = async (
-    action: string,
-    confirm: boolean,
-    params: Record<string, unknown>,
-    fn: () => Promise<unknown>,
-  ) => {
-    const preview = previewOrAssertWriteAllowed({ action, confirm, payload: params });
-    if (preview) return jsonResult(preview);
-    return jsonResult(await fn());
-  };
-
   server.tool(
     'getMyTasks',
     {
@@ -49,7 +33,7 @@ export function registerTaskTools(server: CliRegistry): void {
       work: optionalTrimmedText.describe('本次工作内容。对应 task-recordEstimate 页面里的 work 字段。'),
       confirm: z.boolean().optional().default(false),
     },
-    async ({ confirm, ...input }) => runActioned('recordTaskEstimate', confirm, input, () => getApi().task.recordEstimate(input.taskId, input)),
+    async ({ confirm, ...input }) => runWithPreview('recordTaskEstimate', confirm, input, previewOrAssertWriteAllowed, () => getApi().task.recordEstimate(input.taskId, input)),
   );
 
   server.tool(
@@ -75,9 +59,7 @@ export function registerTaskTools(server: CliRegistry): void {
     },
     async ({ taskId, confirm, ...update }) => {
       const payload = { taskId, update };
-      const preview = previewOrAssertWriteAllowed({ action: 'updateTask', confirm, payload });
-      if (preview) return jsonResult(preview);
-      return jsonResult(await getApi().task.updateTask(taskId, update));
+      return runWithPreview('updateTask', confirm, payload, previewOrAssertWriteAllowed, () => getApi().task.updateTask(taskId, update));
     },
   );
 
@@ -94,9 +76,7 @@ export function registerTaskTools(server: CliRegistry): void {
     },
     async ({ taskId, confirm, ...update }) => {
       const payload = { taskId, update };
-      const preview = previewOrAssertWriteAllowed({ action: 'finishTask', confirm, payload });
-      if (preview) return jsonResult(preview);
-      return jsonResult(await getApi().task.finishTask(taskId, update));
+      return runWithPreview('finishTask', confirm, payload, previewOrAssertWriteAllowed, () => getApi().task.finishTask(taskId, update));
     },
   );
 
@@ -110,7 +90,7 @@ export function registerTaskTools(server: CliRegistry): void {
       comment: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
-    async ({ confirm, ...input }) => runActioned('startTask', confirm, input, () => getApi().task.startTask(input.taskId, input)),
+    async ({ confirm, ...input }) => runWithPreview('startTask', confirm, input, previewOrAssertWriteAllowed, () => getApi().task.startTask(input.taskId, input)),
   );
 
   server.tool(
@@ -120,7 +100,7 @@ export function registerTaskTools(server: CliRegistry): void {
       comment: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
-    async ({ confirm, ...input }) => runActioned('pauseTask', confirm, input, () => getApi().task.pauseTask(input.taskId, input)),
+    async ({ confirm, ...input }) => runWithPreview('pauseTask', confirm, input, previewOrAssertWriteAllowed, () => getApi().task.pauseTask(input.taskId, input)),
   );
 
   server.tool(
@@ -132,7 +112,7 @@ export function registerTaskTools(server: CliRegistry): void {
       comment: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
-    async ({ confirm, ...input }) => runActioned('restartTask', confirm, input, () => getApi().task.restartTask(input.taskId, input)),
+    async ({ confirm, ...input }) => runWithPreview('restartTask', confirm, input, previewOrAssertWriteAllowed, () => getApi().task.restartTask(input.taskId, input)),
   );
 
   server.tool(
@@ -142,7 +122,7 @@ export function registerTaskTools(server: CliRegistry): void {
       comment: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
-    async ({ confirm, ...input }) => runActioned('closeTask', confirm, input, () => getApi().task.closeTask(input.taskId, input)),
+    async ({ confirm, ...input }) => runWithPreview('closeTask', confirm, input, previewOrAssertWriteAllowed, () => getApi().task.closeTask(input.taskId, input)),
   );
 
   server.tool(
@@ -154,7 +134,7 @@ export function registerTaskTools(server: CliRegistry): void {
       comment: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
-    async ({ confirm, ...input }) => runActioned('activateTask', confirm, input, () => getApi().task.activateTask(input.taskId, input)),
+    async ({ confirm, ...input }) => runWithPreview('activateTask', confirm, input, previewOrAssertWriteAllowed, () => getApi().task.activateTask(input.taskId, input)),
   );
 
   server.tool(
@@ -166,7 +146,7 @@ export function registerTaskTools(server: CliRegistry): void {
       left: z.number().optional(),
       confirm: z.boolean().optional().default(false),
     },
-    async ({ confirm, ...input }) => runActioned('assignTask', confirm, input, () => getApi().task.assignTask(input.taskId, input)),
+    async ({ confirm, ...input }) => runWithPreview('assignTask', confirm, input, previewOrAssertWriteAllowed, () => getApi().task.assignTask(input.taskId, input)),
   );
 
   server.tool(
@@ -175,6 +155,6 @@ export function registerTaskTools(server: CliRegistry): void {
       taskId: z.number().int().positive(),
       confirm: z.boolean().optional().default(false),
     },
-    async ({ taskId, confirm }) => runActioned('deleteTask', confirm, { taskId }, () => getApi().task.deleteTask(taskId)),
+    async ({ taskId, confirm }) => runWithPreview('deleteTask', confirm, { taskId }, previewOrAssertWriteAllowed, () => getApi().task.deleteTask(taskId)),
   );
 }

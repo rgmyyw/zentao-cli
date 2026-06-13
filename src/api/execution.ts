@@ -1,7 +1,8 @@
 import type { ZentaoHttpClient } from '../core/http.js';
 import { toClientPaginatedListResult, toServerListResult, type ListResult } from '../core/list-result.js';
-import { fetchRemainingPagesConcurrently, normalizePagination, type PaginationInput } from '../core/pagination.js';
+import { fetchAllPages, normalizePagination, type PaginationInput } from '../core/pagination.js';
 import type { ZentaoBug, ZentaoExecution, ZentaoListResponse, ZentaoTask } from '../types/zentao.js';
+import { addDays, formatDate, isOnOrBefore, makeCalendarDate, normalizeOptionalText, parseCalendarDate, toDateOnly } from '../utils/date.js';
 import { toFormUrlEncoded } from '../utils/form.js';
 import { bugMatchesKeyword, bugMatchesModuleAlias, normalizeBugFilterText } from './bug-filter.js';
 
@@ -98,18 +99,13 @@ export class ExecutionApi {
 
   private async getExecutionBugsWithClientFilter(executionId: number, params: ExecutionBugListParams): Promise<ListResult<ZentaoBug>> {
     const pageSize = 100;
-    const firstPage = await this.fetchExecutionBugsPage(executionId, params, 1, pageSize);
-    const firstResult = toServerListResult<ZentaoBug>(firstPage, ['bugs']);
-    const total = firstResult.total;
-    const allBugs = await fetchRemainingPagesConcurrently(
-      { items: firstResult.items, total },
-      async (page) => {
+    const allBugs = await fetchAllPages<ZentaoBug>({
+      pageSize,
+      fetchPage: async (page) => {
         const response = await this.fetchExecutionBugsPage(executionId, params, page, pageSize);
-        const result = toServerListResult<ZentaoBug>(response, ['bugs']);
-        return result.items;
+        return toServerListResult<ZentaoBug>(response, ['bugs']);
       },
-      { limit: pageSize },
-    );
+    });
 
     let filtered = allBugs;
 
@@ -163,8 +159,8 @@ export class ExecutionApi {
     const closed = bugs.filter(bug => this.toString(bug.status) === 'closed');
     const resolved = bugs.filter(bug => this.toString(bug.status) === 'resolved');
     const unresolved = bugs.filter(bug => !['closed', 'resolved'].includes(this.toString(bug.status)));
-    const testerNotClosed = resolved.filter(bug => this.isOnOrBefore(this.toDateOnly(bug.resolvedDate), this.formatDate(this.addDays(this.parseDate(date), -1))));
-    const devNotResolvedToday = unresolved.filter(bug => this.isOnOrBefore(this.toDateOnly(bug.openedDate), date));
+    const testerNotClosed = resolved.filter(bug => isOnOrBefore(toDateOnly(bug.resolvedDate), formatDate(addDays(parseCalendarDate(date) ?? new Date(), -1))));
+    const devNotResolvedToday = unresolved.filter(bug => isOnOrBefore(toDateOnly(bug.openedDate), date));
     const userNames = await this.resolveUserNames(bugs.map(bug => this.getBugOwner(bug)));
     const participants = this.buildParticipantBugStats(bugs, total, devNotResolvedToday, userNames);
     const highReopenParticipants = participants.filter(item => item.reopened > 0).map(item => item.displayName);
@@ -193,7 +189,7 @@ export class ExecutionApi {
         delayed: this.buildBugDetails(delayed, userNames),
         testerNotClosed: this.buildBugDetails(testerNotClosed, userNames),
         devNotResolvedToday: this.buildBugDetails(devNotResolvedToday, userNames),
-        taskFinishedToday: this.buildTaskDetails(tasks.filter(task => this.toDateOnly(task.finishedDate) === date)),
+        taskFinishedToday: this.buildTaskDetails(tasks.filter(task => toDateOnly(task.finishedDate) === date)),
         taskOverdueUnfinished: this.buildTaskDetails(tasks.filter(task => this.isOverdueUnfinishedTask(task, date))),
         taskFromBug: this.buildTaskDetails(tasks.filter(task => Number(task.fromBug ?? 0) > 0)),
       },
@@ -298,33 +294,27 @@ export class ExecutionApi {
   }
 
   private async getAllExecutionBugs(executionId: number): Promise<ZentaoBug[]> {
-    const limit = 100;
-    const firstPage = await this.getExecutionBugs(executionId, { page: 1, limit }) as { items?: ZentaoBug[]; total?: number };
-    return fetchRemainingPagesConcurrently(
-      { items: firstPage.items ?? [], total: firstPage.total },
-      async (page) => {
-        const response = await this.getExecutionBugs(executionId, { page, limit }) as { items?: ZentaoBug[] };
-        return response.items ?? [];
+    const pageSize = 100;
+    return fetchAllPages<ZentaoBug>({
+      pageSize,
+      fetchPage: async (page) => {
+        const response = await this.getExecutionBugs(executionId, { page, limit: pageSize }) as { items?: ZentaoBug[]; total?: number };
+        return { items: response.items ?? [], total: response.total };
       },
-      { limit },
-    );
+    });
   }
 
   private async getAllExecutionTasks(executionId: number): Promise<ZentaoTask[]> {
-    const limit = 100;
-    const firstPage = await this.http.request<ZentaoListResponse<ZentaoTask> & { tasks?: ZentaoTask[] }>('GET', `/executions/${executionId}/tasks`, {
-      params: { page: 1, limit },
-    });
-    return fetchRemainingPagesConcurrently(
-      { items: firstPage.tasks ?? [], total: firstPage.total },
-      async (page) => {
+    const pageSize = 100;
+    return fetchAllPages<ZentaoTask>({
+      pageSize,
+      fetchPage: async (page) => {
         const response = await this.http.request<ZentaoListResponse<ZentaoTask> & { tasks?: ZentaoTask[] }>('GET', `/executions/${executionId}/tasks`, {
-          params: { page, limit },
+          params: { page, limit: pageSize },
         });
-        return response.tasks ?? [];
+        return { items: response.tasks ?? [], total: response.total };
       },
-      { limit },
-    );
+    });
   }
 
   private buildParticipantBugStats(bugs: ZentaoBug[], total: number, devNotResolvedToday: ZentaoBug[], userNames: Map<string, string>): ParticipantBugStats[] {
@@ -401,7 +391,7 @@ export class ExecutionApi {
     const doing = tasks.filter(task => this.toString(task.status) === 'doing');
     const wait = tasks.filter(task => this.toString(task.status) === 'wait');
     const canceled = tasks.filter(task => ['cancel', 'cancelled'].includes(this.toString(task.status)));
-    const finishedToday = tasks.filter(task => this.toDateOnly(task.finishedDate) === date);
+    const finishedToday = tasks.filter(task => toDateOnly(task.finishedDate) === date);
     const overdueUnfinished = tasks.filter(task => this.isOverdueUnfinishedTask(task, date));
     const fromBug = tasks.filter(task => Number(task.fromBug ?? 0) > 0);
     const consumed = tasks.reduce((sum, task) => sum + Number(task.consumed ?? 0), 0);
@@ -436,7 +426,7 @@ export class ExecutionApi {
         done: items.filter(task => ['done', 'closed'].includes(this.toString(task.status))).length,
         doing: items.filter(task => this.toString(task.status) === 'doing').length,
         wait: items.filter(task => this.toString(task.status) === 'wait').length,
-        finishedToday: items.filter(task => this.toDateOnly(task.finishedDate) === date).length,
+        finishedToday: items.filter(task => toDateOnly(task.finishedDate) === date).length,
         overdueUnfinished: items.filter(task => this.isOverdueUnfinishedTask(task, date)).length,
       }))
       .sort((a, b) => b.total - a.total || a.owner.localeCompare(b.owner));
@@ -448,8 +438,8 @@ export class ExecutionApi {
       name: this.toString(task.name),
       status: this.toString(task.status),
       owner: this.getTaskOwner(task),
-      deadline: this.toDateOnly(task.deadline),
-      finishedDate: this.toDateOnly(task.finishedDate),
+      deadline: toDateOnly(task.deadline),
+      finishedDate: toDateOnly(task.finishedDate),
       consumed: Number(task.consumed ?? 0),
       estimate: Number(task.estimate ?? 0),
       fromBug: Number(task.fromBug ?? 0),
@@ -462,7 +452,7 @@ export class ExecutionApi {
 
   private isOverdueUnfinishedTask(task: ZentaoTask, date: string): boolean {
     const status = this.toString(task.status);
-    const deadline = this.toDateOnly(task.deadline);
+    const deadline = toDateOnly(task.deadline);
     return !!deadline && deadline <= date && !['done', 'closed', 'cancel', 'cancelled'].includes(status);
   }
 
@@ -478,10 +468,10 @@ export class ExecutionApi {
         pri: this.toString(bug.pri),
         owner,
         ownerName: userNames.get(owner) ?? owner,
-        openedDate: this.toDateOnly(bug.openedDate),
-        resolvedDate: this.toDateOnly(bug.resolvedDate),
+        openedDate: toDateOnly(bug.openedDate),
+        resolvedDate: toDateOnly(bug.resolvedDate),
         activatedCount: Number(bug.activatedCount ?? 0),
-        activatedDate: this.toDateOnly(bug.activatedDate),
+        activatedDate: toDateOnly(bug.activatedDate),
         resolution: this.toString(bug.resolution),
       };
     });
@@ -572,48 +562,15 @@ export class ExecutionApi {
   }
 
   private resolveStatsDate(value?: string): string {
-    const text = value?.trim();
+    const text = normalizeOptionalText(value);
     const lowerText = text?.toLowerCase();
-    if (!text || ['today', '今天', '今日'].includes(lowerText ?? text)) return this.formatDate(new Date());
-    if (['yesterday', '昨天', '昨日'].includes(lowerText ?? text)) return this.formatDate(this.addDays(new Date(), -1));
+    if (!text || ['today', '今天', '今日'].includes(lowerText ?? text)) return formatDate(new Date());
+    if (['yesterday', '昨天', '昨日'].includes(lowerText ?? text)) return formatDate(addDays(new Date(), -1));
     const parsed = text.match(/^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})日?$/);
     if (!parsed) throw new Error(`无法解析统计日期: ${value}`);
-    const date = this.makeDate(Number(parsed[1]), Number(parsed[2]), Number(parsed[3]));
+    const date = makeCalendarDate(Number(parsed[1]), Number(parsed[2]), Number(parsed[3]));
     if (!date) throw new Error(`无法解析统计日期: ${value}`);
-    return this.formatDate(date);
-  }
-
-  private makeDate(year: number, month: number, day: number): Date | undefined {
-    const date = new Date(year, month - 1, day);
-    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return undefined;
-    return date;
-  }
-
-  private parseDate(value: string): Date {
-    const [year, month, day] = value.split('-').map(Number);
-    return new Date(year, month - 1, day);
-  }
-
-  private toDateOnly(value: unknown): string | undefined {
-    const text = this.toString(value);
-    return text ? text.slice(0, 10) : undefined;
-  }
-
-  private isOnOrBefore(date: string | undefined, target: string): boolean {
-    return !!date && date <= target;
-  }
-
-  private addDays(date: Date, days: number): Date {
-    const next = new Date(date);
-    next.setDate(next.getDate() + days);
-    return next;
-  }
-
-  private formatDate(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return formatDate(date);
   }
 
   private toString(value: unknown): string {

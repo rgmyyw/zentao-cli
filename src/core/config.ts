@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { isRecord } from './value.js';
+import { requireNonBlank } from './validation.js';
 import type { ZentaoConfig } from '../types/common.js';
 
 const CONFIG_DIR = path.join(homedir(), '.zentao');
@@ -101,16 +103,6 @@ function readConfigFile(): Partial<ZentaoConfig> {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`禅道配置文件损坏，请检查 ${CONFIG_FILE}：${message}`);
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function requireNonBlank(value: string | undefined, message: string): string {
-  const normalized = value?.trim();
-  if (!normalized) throw new Error(message);
-  return normalized;
 }
 
 function normalizeOptionalEnvValue(value: string | undefined): string | undefined {

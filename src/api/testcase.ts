@@ -1,6 +1,7 @@
 import type { ZentaoHttpClient } from '../core/http.js';
 import { toClientPaginatedListResult } from '../core/list-result.js';
 import { normalizePagination, type PaginationInput } from '../core/pagination.js';
+import { requireNonBlank } from '../core/validation.js';
 
 export interface TestCaseListInput extends PaginationInput {
   productId: number;
@@ -89,7 +90,7 @@ export class TestCaseApi {
       if (typeof value !== 'string') continue;
 
       if (requiredFields.includes(field as 'title' | 'type')) {
-        normalized[field] = this.requireNonBlank(value, `${field} 不能为空`);
+        normalized[field] = requireNonBlank(value as string | undefined | null, `${field} 不能为空`);
         continue;
       }
 
@@ -112,8 +113,8 @@ export class TestCaseApi {
 
     const record = step as Record<string, unknown>;
     const normalized: TestCaseStepInput = {
-      desc: this.requireNonBlank(record.desc, 'steps.desc 不能为空'),
-      expect: this.requireNonBlank(record.expect, 'steps.expect 不能为空'),
+      desc: requireNonBlank(record.desc as string | undefined | null, 'steps.desc 不能为空'),
+      expect: requireNonBlank(record.expect as string | undefined | null, 'steps.expect 不能为空'),
     };
 
     const type = record.type;
@@ -132,13 +133,6 @@ export class TestCaseApi {
 
     const trimmed = value.trim();
     return trimmed === '' ? undefined : trimmed;
-  }
-
-  private requireNonBlank(value: unknown, message: string): string {
-    if (typeof value !== 'string') throw new Error(message);
-    const trimmed = value.trim();
-    if (trimmed === '') throw new Error(message);
-    return trimmed;
   }
 
   private normalizeTestCaseListInput(input: TestCaseListInput): TestCaseListInput {

@@ -3,12 +3,7 @@ import type { CliRegistry } from '../core/cli-registry.js';
 import { ZentaoApi } from '../api/index.js';
 import { loadConfig, maskConfig, normalizeConfig, saveConfig } from '../core/config.js';
 import { setApi } from '../core/api-provider.js';
-import { jsonResult } from './shared.js';
-
-const optionalTrimmedText = z.preprocess(
-  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
-  z.string().trim().optional(),
-);
+import { jsonResult, optionalTrimmedText } from './shared.js';
 
 export function registerInitTools(server: CliRegistry): void {
   server.tool(

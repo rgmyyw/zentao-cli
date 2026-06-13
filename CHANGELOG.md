@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.25 - 2026-06-14
+
+### 变更
+
+- 重构 CLI 输出层：将 `src/cli.ts` 中的帮助、命令列表、`whoami` 格式化、`changelog` 渲染等显示逻辑抽离到新的 `src/core/cli-output.ts`，`cli.ts` 从 1033 行精简到 359 行，内置命令帮助集中维护。
+- 统一通用工具函数：
+  - 新增 `src/utils/date.ts`，集中管理日期解析（`YYYY-MM-DD` / 中文年月日 / 月日）、格式化、范围判断和加减运算。
+  - 新增 `src/core/value.ts`，提供 `firstString` 和 `isRecord` 通用空值/类型判断。
+  - 新增 `src/core/validation.ts`，提供 `requireNonBlank` 必填字符串校验。
+  - 新增 `src/core/http-error.ts`，提供按 HTTP 状态码判断错误类型的工具。
+- 抽象分页拉取：在 `src/core/pagination.ts` 新增 `fetchAllPages`，封装“先拉首页、再并发拉剩余页”的通用模式，简化 `statistics.ts` 等模块的全量读取代码。
+- 多处 API 和工具层去重：`bug.ts`、`build.ts`、`comment.ts`、`execution.ts`、`relation.ts`、`search.ts`、`statistics.ts`、`story.ts`、`task.ts`、`testcase.ts`、`testtask.ts`、`todo.ts` 等模块复用新的日期、分页和校验工具，减少重复样板。
+- 写操作参数统一使用 `optionalTrimmedText` schema：空白字符串会被视为 `undefined`，避免误传空值到禅道。
+
+### 修复
+
+- 修复 `src/api/resource-analysis.ts` 中仍通过 `normalizeOptionalPath` 中转调用日期工具的问题，改为直接使用 `normalizeOptionalText`。
+- 修复内置命令 help 在某些别名场景下输出不一致的问题，`help --version` / `help -v` 现在统一走 `getBuiltinCommandHelp`。
+
+### 测试
+
+- 更新 `tests/cli.test.ts`：将重复的 help 场景测试合并为 `it.each` 参数化用例，并补充 `zentao --help` 聚焦常用命令的新断言。
+
 ## 0.1.24 - 2026-06-13
 
 ### Added

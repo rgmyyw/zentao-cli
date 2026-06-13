@@ -295,6 +295,8 @@ zentao changelog --since 0.1.20
 zentao changelog --raw
 ```
 
+> 提示：`zentao help <command>` 现在对 `install`、`update`、`uninstall`、`changelog` 等内置命令也会输出完整参数说明；`zentao --help` 会按当前 role 推荐常用命令，并优先引导使用 `zentao list` 查看全部可用命令。
+
 ## 常用命令示例
 
 ```bash

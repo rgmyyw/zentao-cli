@@ -2,8 +2,9 @@ import type { BugApi } from './bug.js';
 import type { TaskApi } from './task.js';
 import type { ListResult } from '../core/list-result.js';
 import type { ZentaoHttpClient } from '../core/http.js';
-import { fetchRemainingPagesConcurrently } from '../core/pagination.js';
+import { fetchAllPages } from '../core/pagination.js';
 import type { ZentaoBug, ZentaoTask } from '../types/zentao.js';
+import { addDays, formatDate, isInDateRange, normalizeOptionalText, parseCalendarDate, requireNonBlank, startOfDay } from '../utils/date.js';
 
 function countBy<T>(items: T[], getter: (item: T) => string | number | undefined): Record<string, number> {
   return items.reduce<Record<string, number>>((acc, item) => {
@@ -46,13 +47,13 @@ export class StatisticsApi {
   }
 
   async getMyWeeklyActivity(input: ActivityQueryInput): Promise<unknown> {
-    const account = this.requireNonBlank(input.account, 'account 不能为空');
+    const account = requireNonBlank(input.account, 'account 不能为空');
     const range = this.resolveActivityRange(input);
     const response = await this.getUserDynamic(account, range.legacyPeriod, range.anchorTimestamp);
     const actions = this.extractActions(response);
     const normalizedActions = actions
       .map(action => this.normalizeAction(action))
-      .filter(action => this.isInDateRange(action.date, range.startDate, range.endDate));
+      .filter(action => isInDateRange(action.date, range.startDate, range.endDate));
     const bugActions = normalizedActions.filter(action => action.objectType === 'bug');
     const taskActions = normalizedActions.filter(action => action.objectType === 'task');
     const comments = normalizedActions.filter(action => action.action === 'commented' || action.comment);
@@ -105,29 +106,15 @@ export class StatisticsApi {
   }
 
   private async getAllMyBugs(productId?: number): Promise<ZentaoBug[]> {
-    const limit = 100;
-    const firstPage = await this.bugApi.getMyBugs({ productId, page: 1, limit }) as ListResult<ZentaoBug>;
-    return fetchRemainingPagesConcurrently(
-      { items: firstPage.items, total: firstPage.total },
-      async (page) => {
-        const response = await this.bugApi.getMyBugs({ productId, page, limit }) as ListResult<ZentaoBug>;
-        return response.items;
-      },
-      { limit },
-    );
+    return fetchAllPages<ZentaoBug>({
+      fetchPage: (page) => this.bugApi.getMyBugs({ productId, page, limit: 100 }) as Promise<ListResult<ZentaoBug>>,
+    });
   }
 
   private async getAllMyTasks(): Promise<ZentaoTask[]> {
-    const limit = 100;
-    const firstPage = await this.taskApi.getMyTasks({ status: 'all', page: 1, limit }) as ListResult<ZentaoTask>;
-    return fetchRemainingPagesConcurrently(
-      { items: firstPage.items, total: firstPage.total },
-      async (page) => {
-        const response = await this.taskApi.getMyTasks({ status: 'all', page, limit }) as ListResult<ZentaoTask>;
-        return response.items;
-      },
-      { limit },
-    );
+    return fetchAllPages<ZentaoTask>({
+      fetchPage: (page) => this.taskApi.getMyTasks({ status: 'all', page, limit: 100 }) as Promise<ListResult<ZentaoTask>>,
+    });
   }
 
   private pickTasks(tasks: ZentaoTask[]): Array<Pick<ZentaoTask, 'id' | 'name' | 'status'>> {
@@ -152,16 +139,16 @@ export class StatisticsApi {
   }
 
   private resolveActivityRange(input: ActivityQueryInput): ActivityDateRange {
-    const startDateText = this.normalizeOptionalText(input.startDate);
-    const endDateText = this.normalizeOptionalText(input.endDate);
+    const startDateText = normalizeOptionalText(input.startDate);
+    const endDateText = normalizeOptionalText(input.endDate);
 
     if (startDateText || endDateText) {
-      const start = startDateText ? this.parseDate(startDateText) : undefined;
-      const end = endDateText ? this.parseDate(endDateText) : undefined;
+      const start = startDateText ? parseCalendarDate(startDateText) : undefined;
+      const end = endDateText ? parseCalendarDate(endDateText) : undefined;
       if (!start && startDateText) throw new Error(`无法解析开始日期: ${input.startDate}`);
       if (!end && endDateText) throw new Error(`无法解析结束日期: ${input.endDate}`);
-      const startDate = this.formatDate(start ?? end ?? new Date());
-      const endDate = this.formatDate(end ?? start ?? new Date());
+      const startDate = formatDate(start ?? end ?? new Date());
+      const endDate = formatDate(end ?? start ?? new Date());
       return this.withLegacyAnchor(this.normalizeDateRange({ label: `${startDate}..${endDate}`, startDate, endDate, legacyPeriod: 'all', source: 'explicit-date' }));
     }
 
@@ -182,7 +169,7 @@ export class StatisticsApi {
     if (['last', 'lastweek', 'last week', '上周', '上一周'].includes(normalized)) return this.rangeForWeek('last');
     if (['this', 'thisweek', 'this week', '本周', '这周', '这一周'].includes(normalized)) return this.rangeForWeek('this');
     if (['today', '今天', '今日'].includes(normalized)) return this.rangeForPeriodDay('今天', new Date(), 'today');
-    if (['yesterday', '昨天', '昨日'].includes(normalized)) return this.rangeForPeriodDay('昨天', this.addDays(new Date(), -1), 'yesterday');
+    if (['yesterday', '昨天', '昨日'].includes(normalized)) return this.rangeForPeriodDay('昨天', addDays(new Date(), -1), 'yesterday');
 
     const recentDays = normalized.match(/(?:最近|近|last|past)\s*(\d+)\s*(?:天|days?|日)?/);
     if (recentDays) {
@@ -192,18 +179,18 @@ export class StatisticsApi {
     }
 
     const daysAgo = normalized.match(/(\d+)\s*天前/);
-    if (daysAgo) return this.rangeForPeriodDay(text, this.addDays(new Date(), -Number(daysAgo[1])), 'all');
+    if (daysAgo) return this.rangeForPeriodDay(text, addDays(new Date(), -Number(daysAgo[1])), 'all');
 
     const rangeParts = text.split(/\s*(?:\.\.|~|至|到|—)\s*/).filter(Boolean);
     if (rangeParts.length === 2) {
-      const start = this.parseDate(rangeParts[0]);
-      const end = this.parseDate(rangeParts[1]);
+      const start = parseCalendarDate(rangeParts[0]);
+      const end = parseCalendarDate(rangeParts[1]);
       if (start && end) {
-        return this.withLegacyAnchor(this.normalizeDateRange({ label: text, startDate: this.formatDate(start), endDate: this.formatDate(end), legacyPeriod: 'all', source: 'natural-range' }));
+        return this.withLegacyAnchor(this.normalizeDateRange({ label: text, startDate: formatDate(start), endDate: formatDate(end), legacyPeriod: 'all', source: 'natural-range' }));
       }
     }
 
-    const singleDate = this.parseDate(text);
+    const singleDate = parseCalendarDate(text);
     if (singleDate) return this.rangeForPeriodDay(text, singleDate, 'all');
 
     throw new Error(`无法解析日期描述: ${text}。可用示例：上周、本周、今天、昨天、最近3天、3天前、2026-05-28、2026-05-25到2026-05-29。`);
@@ -212,97 +199,45 @@ export class StatisticsApi {
   private rangeForWeek(week: 'last' | 'this'): ActivityDateRange {
     const today = new Date();
     const day = today.getDay() || 7;
-    const thisMonday = this.startOfDay(this.addDays(today, 1 - day));
-    const start = week === 'this' ? thisMonday : this.addDays(thisMonday, -7);
-    const end = week === 'this' ? this.addDays(start, 6) : this.addDays(thisMonday, -1);
+    const thisMonday = startOfDay(addDays(today, 1 - day));
+    const start = week === 'this' ? thisMonday : addDays(thisMonday, -7);
+    const end = week === 'this' ? addDays(start, 6) : addDays(thisMonday, -1);
     return {
       label: week === 'last' ? '上周' : '本周',
-      startDate: this.formatDate(start),
-      endDate: this.formatDate(end),
+      startDate: formatDate(start),
+      endDate: formatDate(end),
       legacyPeriod: week === 'last' ? 'lastWeek' : 'thisWeek',
       source: 'week',
     };
   }
 
   private rangeForRecentDays(days: number, label: string): ActivityDateRange {
-    const end = this.startOfDay(new Date());
-    const start = this.addDays(end, 1 - days);
+    const end = startOfDay(new Date());
+    const start = addDays(end, 1 - days);
     return {
       label,
-      startDate: this.formatDate(start),
-      endDate: this.formatDate(end),
+      startDate: formatDate(start),
+      endDate: formatDate(end),
       legacyPeriod: days === 1 ? 'today' : days === 2 ? 'twodaysago' : days === 3 ? 'latest3days' : 'all',
       source: 'recent-days',
     };
   }
 
   private rangeForPeriodDay(label: string, date: Date, legacyPeriod: string): ActivityDateRange {
-    const day = this.formatDate(date);
+    const day = formatDate(date);
     const range = { label, startDate: day, endDate: day, legacyPeriod, source: 'single-day' as const };
     return legacyPeriod === 'all' ? this.withLegacyAnchor(range) : range;
   }
 
   private withLegacyAnchor(range: ActivityDateRange): ActivityDateRange {
-    const end = this.parseDate(range.endDate);
+    const end = parseCalendarDate(range.endDate);
     if (!end) return range;
-    return { ...range, anchorTimestamp: Math.floor(this.addDays(end, 1).getTime() / 1000) };
+    return { ...range, anchorTimestamp: Math.floor(addDays(end, 1).getTime() / 1000) };
   }
 
   private normalizeDateRange(range: ActivityDateRange): ActivityDateRange {
     if (range.startDate <= range.endDate) return range;
     return { ...range, startDate: range.endDate, endDate: range.startDate };
-  }
-
-  private parseDate(value: string): Date | undefined {
-    const trimmed = value.trim();
-    const full = trimmed.match(/^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})日?$/);
-    if (full) return this.makeDate(Number(full[1]), Number(full[2]), Number(full[3]));
-
-    const monthDay = trimmed.match(/^(\d{1,2})[-/.月](\d{1,2})日?$/);
-    if (monthDay) return this.makeDate(new Date().getFullYear(), Number(monthDay[1]), Number(monthDay[2]));
-
-    return undefined;
-  }
-
-  private makeDate(year: number, month: number, day: number): Date | undefined {
-    const date = new Date(year, month - 1, day);
-    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return undefined;
-    return this.startOfDay(date);
-  }
-
-  private normalizeOptionalText(value?: string): string | undefined {
-    const text = value?.trim();
-    return text ? text : undefined;
-  }
-
-  private requireNonBlank(value: string, message: string): string {
-    const text = value.trim();
-    if (!text) throw new Error(message);
-    return text;
-  }
-
-  private isInDateRange(date: string, startDate: string, endDate: string): boolean {
-    if (!date) return false;
-    return date >= startDate && date <= endDate;
-  }
-
-  private addDays(date: Date, days: number): Date {
-    const next = new Date(date);
-    next.setDate(next.getDate() + days);
-    return next;
-  }
-
-  private startOfDay(date: Date): Date {
-    const next = new Date(date);
-    next.setHours(0, 0, 0, 0);
-    return next;
-  }
-
-  private formatDate(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
   }
 
   private findUserId(value: unknown): string | undefined {

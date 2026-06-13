@@ -1,6 +1,7 @@
 import type { ZentaoHttpClient } from '../core/http.js';
 import { toServerListResult } from '../core/list-result.js';
 import { normalizePagination, type PaginationInput } from '../core/pagination.js';
+import { requireNonBlank } from '../core/validation.js';
 import type { ZentaoStory } from '../types/zentao.js';
 
 export interface StoryListInput extends PaginationInput {
@@ -73,7 +74,7 @@ export class StoryApi {
       if (!Object.prototype.hasOwnProperty.call(normalized, field)) {
         throw new Error(`${field} 不能为空`);
       }
-      normalized[field] = this.requireNonBlank(normalized[field], `${field} 不能为空`);
+      normalized[field] = requireNonBlank(normalized[field] as string | undefined | null, `${field} 不能为空`);
     }
 
     for (const key of ['title', 'assignedTo', 'comment', 'reviewer', 'reviewedBy', 'spec', 'verify', 'type', 'source', 'sourceNote', 'category', 'keywords', 'stage', 'mailto', 'closedReason', 'reviewedDate'] as const) {
@@ -106,16 +107,4 @@ export class StoryApi {
     return normalized;
   }
 
-  private requireNonBlank(value: unknown, message: string): string {
-    if (typeof value !== 'string') {
-      throw new Error(message);
-    }
-
-    const normalized = value.trim();
-    if (!normalized) {
-      throw new Error(message);
-    }
-
-    return normalized;
-  }
 }

@@ -1,5 +1,6 @@
 import type { ZentaoHttpClient } from '../core/http.js';
 import { toServerListResult } from '../core/list-result.js';
+import { requireNonBlank } from '../core/validation.js';
 
 export interface CreateBuildInput {
   project: number;
@@ -54,7 +55,7 @@ export class BuildApi {
       if (typeof value !== 'string') continue;
 
       if (requiredFields.includes(field as 'name' | 'builder')) {
-        normalized[field] = this.requireNonBlank(value, `${field} 不能为空`);
+        normalized[field] = requireNonBlank(value, `${field} 不能为空`);
         continue;
       }
 
@@ -71,10 +72,4 @@ export class BuildApi {
     return trimmed === '' ? undefined : trimmed;
   }
 
-  private requireNonBlank(value: unknown, message: string): string {
-    if (typeof value !== 'string') throw new Error(message);
-    const trimmed = value.trim();
-    if (trimmed === '') throw new Error(message);
-    return trimmed;
-  }
 }

@@ -57,3 +57,26 @@ export async function fetchRemainingPagesConcurrently<T>(
 
   return allItems;
 }
+
+export interface FetchAllPagesOptions<T> {
+  /** 单页拉取回调，需要返回 items + 可选 total；page 一定是 ≥ 1 的整数。 */
+  fetchPage: (page: number) => Promise<{ items: T[]; total?: unknown }>;
+  /** 每页大小；默认 100（与原代码中显式传入的 100 保持一致）。 */
+  pageSize?: number;
+  /** 并发拉取剩余页的最大并发度；默认 3。 */
+  concurrency?: number;
+}
+
+/**
+ * 拉取全量分页结果：先调 fetchPage(1) 拿到首页 + total，再并发拉剩余页。
+ * 用于替代"first page + fetchRemainingPagesConcurrently + 固定 limit=100"的样板代码。
+ */
+export async function fetchAllPages<T>(options: FetchAllPagesOptions<T>): Promise<T[]> {
+  const pageSize = options.pageSize ?? 100;
+  const firstPage = await options.fetchPage(1);
+  return fetchRemainingPagesConcurrently(
+    { items: firstPage.items, total: firstPage.total },
+    async (page) => (await options.fetchPage(page)).items,
+    { limit: pageSize, concurrency: options.concurrency },
+  );
+}

@@ -1,6 +1,7 @@
 import type { ZentaoHttpClient } from '../core/http.js';
 import { toClientPaginatedListResult, toServerListResult, type ListResult } from '../core/list-result.js';
-import { fetchRemainingPagesConcurrently, normalizePagination, type PaginationInput } from '../core/pagination.js';
+import { fetchAllPages, normalizePagination, type PaginationInput } from '../core/pagination.js';
+import { requireNonBlank } from '../core/validation.js';
 import type { ZentaoBug, ZentaoListResponse } from '../types/zentao.js';
 import { toFormUrlEncoded } from '../utils/form.js';
 import { bugMatchesKeyword, bugMatchesModuleAlias, normalizeBugFilterText } from './bug-filter.js';
@@ -99,18 +100,13 @@ export class BugApi {
 
   private async getProductBugsWithClientFilter(params: BugListParams): Promise<ListResult<ZentaoBug>> {
     const pageSize = 100;
-    const firstPage = await this.fetchProductBugsPage(params, 1, pageSize);
-    const firstResult = toServerListResult<ZentaoBug>(firstPage, ['bugs']);
-    const total = firstResult.total;
-    const allBugs = await fetchRemainingPagesConcurrently(
-      { items: firstResult.items, total },
-      async (page) => {
+    const allBugs = await fetchAllPages<ZentaoBug>({
+      pageSize,
+      fetchPage: async (page) => {
         const response = await this.fetchProductBugsPage(params, page, pageSize);
-        const result = toServerListResult<ZentaoBug>(response, ['bugs']);
-        return result.items;
+        return toServerListResult<ZentaoBug>(response, ['bugs']);
       },
-      { limit: pageSize },
-    );
+    });
 
     let filtered = allBugs;
 
@@ -213,16 +209,9 @@ export class BugApi {
   }
 
   private async getAllMyBugsInProduct(params: Omit<BugListParams, 'status' | 'page' | 'limit'>): Promise<ZentaoBug[]> {
-    const limit = 100;
-    const firstPage = await this.getProductBugs({ ...params, status: 'assigntome', page: 1, limit }) as ListResult<ZentaoBug>;
-    return fetchRemainingPagesConcurrently(
-      { items: firstPage.items, total: firstPage.total },
-      async (page) => {
-        const response = await this.getProductBugs({ ...params, status: 'assigntome', page, limit }) as ListResult<ZentaoBug>;
-        return response.items;
-      },
-      { limit },
-    );
+    return fetchAllPages<ZentaoBug>({
+      fetchPage: (page) => this.getProductBugs({ ...params, status: 'assigntome', page, limit: 100 }) as Promise<ListResult<ZentaoBug>>,
+    });
   }
 
   private sortBugs(bugs: ZentaoBug[], order?: string): ZentaoBug[] {
@@ -248,7 +237,7 @@ export class BugApi {
       if (!Object.prototype.hasOwnProperty.call(normalized, field)) {
         throw new Error(`${field} 不能为空`);
       }
-      normalized[field] = this.requireNonBlank(normalized[field], `${field} 不能为空`);
+      normalized[field] = requireNonBlank(normalized[field] as string | undefined | null, `${field} 不能为空`);
     }
 
     for (const key of ['title', 'assignedTo', 'comment', 'resolvedBuild', 'resolvedDate', 'openedBuild', 'type', 'steps', 'keywords', 'mailto', 'status', 'resolution', 'project', 'execution', 'plan'] as const) {
@@ -305,19 +294,6 @@ export class BugApi {
       openedBuild,
       assignedTo,
     };
-  }
-
-  private requireNonBlank(value: unknown, message: string): string {
-    if (typeof value !== 'string') {
-      throw new Error(message);
-    }
-
-    const normalized = value.trim();
-    if (!normalized) {
-      throw new Error(message);
-    }
-
-    return normalized;
   }
 
   private normalizeBugQueryParams<T extends PaginationInput & {

@@ -1,6 +1,7 @@
 import type { ProductApi } from './product.js';
 import type { StoryApi } from './story.js';
-import { fetchRemainingPagesConcurrently } from '../core/pagination.js';
+import { fetchAllPages } from '../core/pagination.js';
+import { requireNonBlank } from '../core/validation.js';
 
 export interface SearchStoriesInput {
   keyword: string;
@@ -49,7 +50,7 @@ export class SearchApi {
   ) {}
 
   async searchStories(input: SearchStoriesInput): Promise<unknown> {
-    const keyword = this.requireNonBlank(input.keyword, 'keyword 不能为空');
+    const keyword = requireNonBlank(input.keyword, 'keyword 不能为空');
     const { productId, limit = 20, deepSearch = false } = input;
     const storiesResult = await this.getAllStories(productId);
     const stories = storiesResult.items;
@@ -105,8 +106,8 @@ export class SearchApi {
   }
 
   async searchStoriesByProductName(productName: string, keyword: string, input: Omit<SearchStoriesInput, 'keyword' | 'productId'> = {}): Promise<unknown> {
-    const normalizedProductName = this.requireNonBlank(productName, 'productName 不能为空');
-    const normalizedKeyword = this.requireNonBlank(keyword, 'keyword 不能为空');
+    const normalizedProductName = requireNonBlank(productName, 'productName 不能为空');
+    const normalizedKeyword = requireNonBlank(keyword, 'keyword 不能为空');
     const productsResult = await this.productApi.getProducts() as { items: Array<Record<string, unknown>> };
     const matchedProducts = productsResult.items.filter(product => String(product.name ?? '').toLowerCase().includes(normalizedProductName.toLowerCase()));
 
@@ -149,12 +150,6 @@ export class SearchApi {
     };
   }
 
-  private requireNonBlank(value: string, message: string): string {
-    const normalized = value.trim();
-    if (normalized === '') throw new Error(message);
-    return normalized;
-  }
-
   private async getAllStories(productId?: number): Promise<{
     partial: boolean;
     failedProducts: number;
@@ -189,14 +184,9 @@ export class SearchApi {
   }
 
   private async getAllStoriesByProduct(productId: number): Promise<Array<Record<string, unknown>>> {
-    const firstPage = await this.storyApi.getProductStories({ productId, page: 1, limit: 100 }) as { total: number; items: Array<Record<string, unknown>> };
-    return fetchRemainingPagesConcurrently(
-      { items: firstPage.items, total: firstPage.total },
-      async (page) => {
-        const result = await this.storyApi.getProductStories({ productId, page, limit: 100 }) as { items: Array<Record<string, unknown>> };
-        return result.items;
-      },
-      { limit: 100 },
-    );
+    type StoryList = { total: number; items: Array<Record<string, unknown>> };
+    return fetchAllPages<Record<string, unknown>>({
+      fetchPage: (page) => this.storyApi.getProductStories({ productId, page, limit: 100 }) as Promise<StoryList>,
+    });
   }
 }

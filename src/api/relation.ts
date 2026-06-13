@@ -1,7 +1,7 @@
 import type { BugApi } from './bug.js';
 import type { StoryApi } from './story.js';
 import type { ListResult } from '../core/list-result.js';
-import { fetchRemainingPagesConcurrently } from '../core/pagination.js';
+import { fetchAllPages } from '../core/pagination.js';
 import type { ZentaoBug, ZentaoStory } from '../types/zentao.js';
 
 function toNumber(value: unknown): number | null {
@@ -67,15 +67,8 @@ export class RelationApi {
   }
 
   private async getAllProductBugs(productId: number): Promise<ZentaoBug[]> {
-    const limit = 100;
-    const firstPage = await this.bugApi.getProductBugs({ productId, status: 'all', page: 1, limit }) as ListResult<ZentaoBug>;
-    return fetchRemainingPagesConcurrently(
-      { items: firstPage.items, total: firstPage.total },
-      async (page) => {
-        const response = await this.bugApi.getProductBugs({ productId, status: 'all', page, limit }) as ListResult<ZentaoBug>;
-        return response.items;
-      },
-      { limit },
-    );
+    return fetchAllPages<ZentaoBug>({
+      fetchPage: (page) => this.bugApi.getProductBugs({ productId, status: 'all', page, limit: 100 }) as Promise<ListResult<ZentaoBug>>,
+    });
   }
 }

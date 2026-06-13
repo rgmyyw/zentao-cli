@@ -2,9 +2,11 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { firstString } from '../core/value.js';
 import type { ZentaoHttpClient } from '../core/http.js';
 import type { BugApi } from './bug.js';
 import type { TaskApi } from './task.js';
+import { normalizeOptionalText } from '../utils/date.js';
 
 export type ResourceObjectType = 'bug' | 'task';
 
@@ -34,7 +36,7 @@ export class ResourceAnalysisApi {
   async analyzeObjectResources(input: AnalyzeObjectResourcesInput): Promise<unknown> {
     const detail = await this.getObjectDetail(input.objectType, input.objectID);
     const candidates = dedupeCandidates(findResourceCandidates(detail));
-    const outDir = normalizeOptionalPath(input.outDir) ?? path.join(tmpdir(), 'zentao-cli-resources', `${input.objectType}-${input.objectID}`);
+    const outDir = normalizeOptionalText(input.outDir) ?? path.join(tmpdir(), 'zentao-cli-resources', `${input.objectType}-${input.objectID}`);
     const maxInlineBytes = input.maxInlineBytes ?? 200 * 1024;
     const shouldDownload = input.download !== false;
 
@@ -207,20 +209,10 @@ function buildSummary(resources: Array<Record<string, unknown>>): Record<string,
   }, {});
 }
 
-function firstString(...values: unknown[]): string | undefined {
-  return values.find((value): value is string => typeof value === 'string' && value.length > 0);
-}
-
 function firstNumber(...values: unknown[]): number | undefined {
   return values.find((value): value is number => typeof value === 'number' && Number.isFinite(value));
 }
 
 function safeFileName(name: string): string {
   return name.replace(/[\\/:*?"<>|]/g, '_').slice(0, 180) || 'resource';
-}
-
-function normalizeOptionalPath(value?: string): string | undefined {
-  if (typeof value !== 'string') return value;
-  const trimmed = value.trim();
-  return trimmed === '' ? undefined : trimmed;
 }

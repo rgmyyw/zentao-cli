@@ -2,18 +2,7 @@ import { z } from 'zod';
 import type { CliRegistry } from '../core/cli-registry.js';
 import { getApi } from '../core/api-provider.js';
 import { previewOrAssertWriteAllowed } from '../core/write-guard.js';
-import { jsonResult } from './shared.js';
-
-const optionalTrimmedText = z.preprocess(
-  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
-  z.string().trim().optional(),
-);
-
-async function runPreviewed(action: string, confirm: boolean | undefined, payload: unknown, runner: () => Promise<unknown>) {
-  const preview = previewOrAssertWriteAllowed({ action, confirm, payload });
-  if (preview) return jsonResult(preview);
-  return jsonResult(await runner());
-}
+import { optionalTrimmedText, runWithPreview } from './shared.js';
 
 export function registerStoryWriteTools(server: CliRegistry): void {
   server.tool('updateStory', {
@@ -35,7 +24,7 @@ export function registerStoryWriteTools(server: CliRegistry): void {
     stage: optionalTrimmedText,
     notifyEmail: z.array(z.string().trim().min(1)).optional(),
     confirm: z.boolean().optional().default(false),
-  }, async ({ storyId, confirm, ...update }) => runPreviewed('updateStory', confirm, { storyId, update }, () => getApi().story.updateStory(storyId, update)));
+  }, async ({ storyId, confirm, ...update }) => runWithPreview('updateStory', confirm, { storyId, update }, previewOrAssertWriteAllowed, () => getApi().story.updateStory(storyId, update)));
 
   server.tool('changeStory', {
     storyId: z.number().int().positive(),
@@ -50,7 +39,7 @@ export function registerStoryWriteTools(server: CliRegistry): void {
     tasks: z.array(z.number().int().positive()).optional(),
     reviewedBy: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
-  }, async ({ storyId, confirm, ...update }) => runPreviewed('changeStory', confirm, { storyId, update }, () => getApi().story.changeStory(storyId, update)));
+  }, async ({ storyId, confirm, ...update }) => runWithPreview('changeStory', confirm, { storyId, update }, previewOrAssertWriteAllowed, () => getApi().story.changeStory(storyId, update)));
 
   server.tool('createStory', {
     product: z.number().int().positive(),
@@ -68,7 +57,7 @@ export function registerStoryWriteTools(server: CliRegistry): void {
     sourceNote: optionalTrimmedText,
     reviewer: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
-  }, async ({ confirm, ...input }) => runPreviewed('createStory', confirm, input, () => getApi().story.createStory(input as Record<string, unknown> & { product: number })));
+  }, async ({ confirm, ...input }) => runWithPreview('createStory', confirm, input, previewOrAssertWriteAllowed, () => getApi().story.createStory(input as Record<string, unknown> & { product: number })));
 
   server.tool('closeStory', {
     storyId: z.number().int().positive(),
@@ -76,20 +65,20 @@ export function registerStoryWriteTools(server: CliRegistry): void {
     duplicateStory: z.number().int().positive().optional(),
     comment: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
-  }, async ({ storyId, confirm, ...input }) => runPreviewed('closeStory', confirm, { storyId, ...input }, () => getApi().story.closeStory(storyId, input)));
+  }, async ({ storyId, confirm, ...input }) => runWithPreview('closeStory', confirm, { storyId, ...input }, previewOrAssertWriteAllowed, () => getApi().story.closeStory(storyId, input)));
 
   server.tool('assignStory', {
     storyId: z.number().int().positive(),
     assignedTo: z.string().trim().min(1),
     comment: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
-  }, async ({ storyId, confirm, ...input }) => runPreviewed('assignStory', confirm, { storyId, ...input }, () => getApi().story.assignStory(storyId, input)));
+  }, async ({ storyId, confirm, ...input }) => runWithPreview('assignStory', confirm, { storyId, ...input }, previewOrAssertWriteAllowed, () => getApi().story.assignStory(storyId, input)));
 
   server.tool('activateStory', {
     storyId: z.number().int().positive(),
     comment: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
-  }, async ({ storyId, confirm, ...input }) => runPreviewed('activateStory', confirm, { storyId, ...input }, () => getApi().story.activateStory(storyId, input)));
+  }, async ({ storyId, confirm, ...input }) => runWithPreview('activateStory', confirm, { storyId, ...input }, previewOrAssertWriteAllowed, () => getApi().story.activateStory(storyId, input)));
 
   server.tool('reviewStory', {
     storyId: z.number().int().positive(),
@@ -100,7 +89,7 @@ export function registerStoryWriteTools(server: CliRegistry): void {
     estimate: z.number().optional(),
     comment: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
-  }, async ({ storyId, confirm, ...input }) => runPreviewed('reviewStory', confirm, { storyId, ...input }, () => getApi().story.reviewStory(storyId, input)));
+  }, async ({ storyId, confirm, ...input }) => runWithPreview('reviewStory', confirm, { storyId, ...input }, previewOrAssertWriteAllowed, () => getApi().story.reviewStory(storyId, input)));
 }
 
 export function registerTaskDerivedTools(server: CliRegistry): void {
@@ -132,7 +121,7 @@ export function registerTaskDerivedTools(server: CliRegistry): void {
       desc: normalizedDesc ?? `基于需求 #${storyId}: ${story.title}`,
       pri,
     };
-    return runPreviewed('createTaskFromStory', confirm, payload, () => getApi().task.createTask(payload));
+    return runWithPreview('createTaskFromStory', confirm, payload, previewOrAssertWriteAllowed, () => getApi().task.createTask(payload));
   });
 
   server.tool('createTaskFromBug', {
@@ -164,7 +153,7 @@ export function registerTaskDerivedTools(server: CliRegistry): void {
       desc: normalizedDesc ?? `修复Bug #${bugId}: ${bug.title}\n\n复现步骤:\n${String(bug.steps ?? '无')}`,
       pri,
     };
-    return runPreviewed('createTaskFromBug', confirm, payload, () => getApi().task.createTask(payload));
+    return runWithPreview('createTaskFromBug', confirm, payload, previewOrAssertWriteAllowed, () => getApi().task.createTask(payload));
   });
 }
 
@@ -181,23 +170,23 @@ export function registerPlanRelationTools(server: CliRegistry): void {
     planId: z.number().int().positive(),
     storyIds: z.array(z.number().int().positive()).min(1).max(20),
     confirm: z.boolean().optional().default(false),
-  }, async ({ planId, storyIds, confirm }) => runPreviewed('linkStoriesToPlan', confirm, { planId, storyIds }, () => getApi().plan.linkStoriesToPlan(planId, storyIds)));
+  }, async ({ planId, storyIds, confirm }) => runWithPreview('linkStoriesToPlan', confirm, { planId, storyIds }, previewOrAssertWriteAllowed, () => getApi().plan.linkStoriesToPlan(planId, storyIds)));
 
   server.tool('unlinkStoriesFromPlan', {
     planId: z.number().int().positive(),
     storyIds: z.array(z.number().int().positive()).min(1).max(20),
     confirm: z.boolean().optional().default(false),
-  }, async ({ planId, storyIds, confirm }) => runPreviewed('unlinkStoriesFromPlan', confirm, { planId, storyIds }, () => getApi().plan.unlinkStoriesFromPlan(planId, storyIds)));
+  }, async ({ planId, storyIds, confirm }) => runWithPreview('unlinkStoriesFromPlan', confirm, { planId, storyIds }, previewOrAssertWriteAllowed, () => getApi().plan.unlinkStoriesFromPlan(planId, storyIds)));
 
   server.tool('linkBugsToPlan', {
     planId: z.number().int().positive(),
     bugIds: z.array(z.number().int().positive()).min(1).max(20),
     confirm: z.boolean().optional().default(false),
-  }, async ({ planId, bugIds, confirm }) => runPreviewed('linkBugsToPlan', confirm, { planId, bugIds }, () => getApi().plan.linkBugsToPlan(planId, bugIds)));
+  }, async ({ planId, bugIds, confirm }) => runWithPreview('linkBugsToPlan', confirm, { planId, bugIds }, previewOrAssertWriteAllowed, () => getApi().plan.linkBugsToPlan(planId, bugIds)));
 
   server.tool('unlinkBugsFromPlan', {
     planId: z.number().int().positive(),
     bugIds: z.array(z.number().int().positive()).min(1).max(20),
     confirm: z.boolean().optional().default(false),
-  }, async ({ planId, bugIds, confirm }) => runPreviewed('unlinkBugsFromPlan', confirm, { planId, bugIds }, () => getApi().plan.unlinkBugsFromPlan(planId, bugIds)));
+  }, async ({ planId, bugIds, confirm }) => runWithPreview('unlinkBugsFromPlan', confirm, { planId, bugIds }, previewOrAssertWriteAllowed, () => getApi().plan.unlinkBugsFromPlan(planId, bugIds)));
 }
