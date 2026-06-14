@@ -5,7 +5,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const commandCalls: Array<{ command: string; args: string[] }> = [];
 const rmCalls: string[] = [];
 
-function mockSpawn(stdoutByCommand = new Map<string, string>()) {
+function mockSpawn(
+  stdoutByCommand = new Map<string, string>(),
+  failOnceByCommand = new Map<string, string>(),
+) {
+  const failedOnce = new Set<string>();
   vi.doMock('node:child_process', () => ({
     spawn: vi.fn((command: string, args: string[]) => {
       commandCalls.push({ command, args });
@@ -15,6 +19,13 @@ function mockSpawn(stdoutByCommand = new Map<string, string>()) {
 
       queueMicrotask(() => {
         const key = `${command} ${args.join(' ')}`;
+        const failMessage = failOnceByCommand.get(key);
+        if (failMessage && !failedOnce.has(key)) {
+          failedOnce.add(key);
+          child.stderr.emit('data', Buffer.from(failMessage));
+          child.emit('close', 1);
+          return;
+        }
         const stdout = stdoutByCommand.get(key);
         if (stdout) {
           child.stdout.emit('data', Buffer.from(stdout));
@@ -27,13 +38,23 @@ function mockSpawn(stdoutByCommand = new Map<string, string>()) {
   }));
 }
 
-function mockInstallDependencies() {
+function mockInstallDependencies(options: { npxCacheEntries?: string[]; cloudglabEntries?: string[] } = {}) {
+  const npxCacheEntries = options.npxCacheEntries ?? [];
   vi.doMock('node:fs/promises', () => ({
     access: vi.fn(async () => undefined),
     mkdir: vi.fn(async () => undefined),
     mkdtemp: vi.fn(async () => '/tmp/zentao-cli-skill-abc'),
     readFile: vi.fn(async () => { throw new Error('missing'); }),
-    readdir: vi.fn(async () => []),
+    readdir: vi.fn(async (target: string) => {
+      if (target === path.join('/home/me', '.npm', '_npx')) {
+        return npxCacheEntries;
+      }
+      const hash = npxCacheEntries[0];
+      if (hash && target === path.join('/home/me', '.npm', '_npx', hash, 'node_modules', '@cloudglab')) {
+        return options.cloudglabEntries ?? [];
+      }
+      return [];
+    }),
     rm: vi.fn(async (target: string) => {
       rmCalls.push(target);
     }),
@@ -277,6 +298,38 @@ describe('install command', () => {
     await runInstallCommand([]);
 
     expect(write).not.toHaveBeenCalledWith(expect.stringContaining('当前 shell 存在 ZENTAO_* 环境变量'));
+  });
+
+  it('retries npx skill add when npx cache ENOTEMPTY error occurs', async () => {
+    const expectedSkillPath = path.join('/usr/local/lib/node_modules', '@cloudglab/zentao-cli', 'skills', 'zentao-cli');
+    mockSpawn(
+      new Map([['npm root -g', '/usr/local/lib/node_modules\n']]),
+      new Map([[`npx -y skills add ${expectedSkillPath} --yes`, 'npm error code ENOTEMPTY\n']]),
+    );
+    mockInstallDependencies({ npxCacheEntries: ['83f3ca18e531c9ec'], cloudglabEntries: ['zentao-cli', '.zentao-cli-TQ1BDOEL'] });
+    const { runUpdateCommand } = await import('../src/install.js');
+
+    await runUpdateCommand(['--skip-config-check']);
+
+    expect(commandCalls.filter((c) => c.command === 'npx')).toHaveLength(2);
+    expect(commandCalls).toEqual([
+      { command: 'npm', args: ['root', '-g'] },
+      { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
+      { command: 'npm', args: ['root', '-g'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', expectedSkillPath, '--yes'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', expectedSkillPath, '--yes'] },
+    ]);
+    expect(rmCalls).toContain(path.join('/home/me', '.npm', '_npx', '83f3ca18e531c9ec'));
+  });
+
+  it('cleans npx cache residues before installing skill', async () => {
+    mockSpawn(new Map([['npm root -g', '/usr/local/lib/node_modules\n']]));
+    mockInstallDependencies({ npxCacheEntries: ['83f3ca18e531c9ec'], cloudglabEntries: ['zentao-cli'] });
+    const { runInstallCommand } = await import('../src/install.js');
+
+    await runInstallCommand(['--skip-config-check']);
+
+    expect(rmCalls).toContain(path.join('/home/me', '.npm', '_npx', '83f3ca18e531c9ec'));
   });
 
   it('surfaces malformed config errors in non-interactive environments', async () => {

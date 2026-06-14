@@ -310,9 +310,26 @@ function isNpmDirectoryNotEmptyError(error: unknown): boolean {
   return message.includes('ENOTEMPTY') || message.toLowerCase().includes('directory not empty');
 }
 
+async function runNpxStepWithRetry(
+  title: string,
+  args: string[],
+  _action: '安装' | '更新' | '卸载',
+): Promise<void> {
+  try {
+    await runStep(title, 'npx', args);
+  } catch (error) {
+    if (!isNpmDirectoryNotEmptyError(error)) {
+      throw error;
+    }
+    process.stdout.write(`\n检测到 npx 缓存目录残留，正在清理后重试 ${title}...\n`);
+    await cleanupNpxResidues();
+    await runStep(title, 'npx', args);
+  }
+}
+
 async function installSkill(action: '安装' | '更新', options: InstallOptions): Promise<void> {
   if (options.skillLocalPath) {
-    await runStep(`${action} zentao skill`, 'npx', createSkillAddArgs(path.resolve(options.skillLocalPath)));
+    await runNpxStepWithRetry(`${action} zentao skill`, createSkillAddArgs(path.resolve(options.skillLocalPath)), action);
     return;
   }
 
@@ -322,7 +339,7 @@ async function installSkill(action: '安装' | '更新', options: InstallOptions
   }
 
   if (options.skillSource === 'git') {
-    await runStep(`${action} zentao skill`, 'npx', createSkillAddArgs(GIT_SKILL_SOURCE));
+    await runNpxStepWithRetry(`${action} zentao skill`, createSkillAddArgs(GIT_SKILL_SOURCE), action);
     return;
   }
 
@@ -337,7 +354,7 @@ async function installSkillFromInstalledPackage(action: '安装' | '更新'): Pr
     throw new Error(`未找到已安装包内的 zentao skill：${skillPath}。可重试 --skill-source npm 或 --skill-source git。`);
   }
 
-  await runStep(`${action} zentao skill`, 'npx', createSkillAddArgs(skillPath));
+  await runNpxStepWithRetry(`${action} zentao skill`, createSkillAddArgs(skillPath), action);
 }
 
 async function getInstalledPackageSkillPath(): Promise<string> {
@@ -359,15 +376,15 @@ async function installSkillFromNpmPackage(action: '安装' | '更新'): Promise<
 
     const tarballPath = path.join(tempDir, tarballName);
     await runStep('解压 zentao npm 包', 'tar', ['-xzf', tarballPath, '-C', tempDir]);
-    await runStep(`${action} zentao skill`, 'npx', createSkillAddArgs(path.join(tempDir, 'package')));
+    await runNpxStepWithRetry(`${action} zentao skill`, createSkillAddArgs(path.join(tempDir, 'package')), action);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
 }
 
 async function uninstallSkill(): Promise<void> {
-  await runStep('卸载项目级 zentao skill', 'npx', createSkillRemoveArgs(false));
-  await runStep('卸载全局级 zentao skill', 'npx', createSkillRemoveArgs(true));
+  await runNpxStepWithRetry('卸载项目级 zentao skill', createSkillRemoveArgs(false), '卸载');
+  await runNpxStepWithRetry('卸载全局级 zentao skill', createSkillRemoveArgs(true), '卸载');
 }
 
 async function uninstallPackage(): Promise<void> {
@@ -377,19 +394,49 @@ async function uninstallPackage(): Promise<void> {
 
 async function cleanupGlobalPackageResidues(): Promise<void> {
   const globalNodeModules = (await runCommandOutput('npm', ['root', '-g'])).trim();
-  if (!globalNodeModules) return;
+  if (globalNodeModules) {
+    await rm(path.join(globalNodeModules, PACKAGE_NAME), { recursive: true, force: true });
+    const scopeDir = path.join(globalNodeModules, '@cloudglab');
+    let entries: string[] = [];
+    try {
+      entries = await readdir(scopeDir);
+    } catch {
+      // scope 目录不存在时忽略
+    }
+    await Promise.all(entries
+      .filter((entry) => entry.startsWith('.zentao-cli-'))
+      .map((entry) => rm(path.join(scopeDir, entry), { recursive: true, force: true })));
+  }
 
-  await rm(path.join(globalNodeModules, PACKAGE_NAME), { recursive: true, force: true });
-  const scopeDir = path.join(globalNodeModules, '@cloudglab');
+  await cleanupNpxResidues();
+}
+
+async function cleanupNpxResidues(): Promise<void> {
+  const npxCacheDir = path.join(os.homedir(), '.npm', '_npx');
   let entries: string[] = [];
   try {
-    entries = await readdir(scopeDir);
+    entries = await readdir(npxCacheDir);
   } catch {
     return;
   }
-  await Promise.all(entries
-    .filter((entry) => entry.startsWith('.zentao-cli-'))
-    .map((entry) => rm(path.join(scopeDir, entry), { recursive: true, force: true })));
+
+  await Promise.all(entries.map(async (entry) => {
+    const hashDir = path.join(npxCacheDir, entry);
+    const cloudglabDir = path.join(hashDir, 'node_modules', '@cloudglab');
+    let cloudglabEntries: string[] = [];
+    try {
+      cloudglabEntries = await readdir(cloudglabDir);
+    } catch {
+      return;
+    }
+
+    const hasZentaoCli = cloudglabEntries.some(
+      (e) => e === 'zentao-cli' || e.startsWith('.zentao-cli-'),
+    );
+    if (hasZentaoCli) {
+      await rm(hashDir, { recursive: true, force: true });
+    }
+  }));
 }
 
 async function removeConfigFile(): Promise<void> {

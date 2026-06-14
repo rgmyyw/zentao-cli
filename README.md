@@ -70,11 +70,12 @@ zentao update --skip-config-check
 npx -y @cloudglab/zentao-cli@latest update
 ```
 
-如果 npm 全局目录存在上次失败留下的残留目录，安装 / 更新会自动清理并重试一次；若仍失败，可按提示执行手动清理：
+如果 npm 全局目录或 npx 缓存目录存在上次失败留下的残留目录，安装 / 更新会自动清理并重试一次；若仍失败，可按提示执行手动清理：
 
 ```bash
 npm uninstall -g @cloudglab/zentao-cli
 rm -rf "$(npm root -g)/@cloudglab/zentao-cli" "$(npm root -g)/@cloudglab/.zentao-cli-"*
+rm -rf ~/.npm/_npx/
 npm install -g @cloudglab/zentao-cli@latest
 ```
 

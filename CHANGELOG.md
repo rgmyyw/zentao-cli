@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.26 - 2026-06-14
+
+### 修复
+
+- `zentao install` / `zentao update` / `zentao uninstall` 内部调用 `npx skills add/remove` 遇到 `ENOTEMPTY` 缓存残留时，自动清理 `~/.npm/_npx/` 下对应的 hash 目录并重试一次，避免安装/卸载 skill 因中断残留而失败。
+- `cleanupGlobalPackageResidues` 预防性清理扩展到 npx 缓存目录，每次安装 skill 前主动扫描并删除 `~/.npm/_npx/*/node_modules/@cloudglab/` 和 `.zentao-cli-*` 残留。
+
 ## 0.1.25 - 2026-06-14
 
 ### 变更

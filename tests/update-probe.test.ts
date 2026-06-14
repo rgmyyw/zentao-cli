@@ -33,7 +33,7 @@ describe('runDailyUpdateProbe', () => {
     vi.doMock('node:os', () => ({ homedir: () => '/tmp/home' }));
     vi.doMock('node:fs/promises', () => ({
       mkdir: vi.fn(async () => undefined),
-      readFile: vi.fn(async () => JSON.stringify({ lastCheckedDate: '2026-01-01', latestVersion: '0.1.26', currentVersion: '0.1.24' })),
+      readFile: vi.fn(async () => JSON.stringify({ lastCheckedDate: '2026-01-01', latestVersion: '0.1.27', currentVersion: '0.1.24' })),
       writeFile: vi.fn(async () => undefined),
     }));
 
@@ -42,7 +42,7 @@ describe('runDailyUpdateProbe', () => {
 
     await runDailyUpdateProbe('getMyTasks');
 
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('检测到 zentao CLI 新版本 0.1.26（当前 0.1.25）。'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('检测到 zentao CLI 新版本 0.1.27（当前 0.1.26）。'));
     expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao update --skip-config-check'));
   });
 
