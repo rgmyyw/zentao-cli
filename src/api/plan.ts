@@ -1,5 +1,6 @@
 import type { ZentaoHttpClient } from '../core/http.js';
 import { toServerListResult } from '../core/list-result.js';
+import { toFormUrlEncoded } from '../utils/form.js';
 
 export interface ProductPlanListInput {
   productId: number;
@@ -7,6 +8,15 @@ export interface ProductPlanListInput {
   status?: string;
   query?: string;
   order?: string;
+}
+
+export interface ClosePlanInput {
+  closedReason: string;
+  comment?: string;
+}
+
+export interface PlanActionInput {
+  comment?: string;
 }
 
 export class PlanApi {
@@ -62,5 +72,51 @@ export class PlanApi {
 
   async unlinkBugsFromPlan(planId: number, bugIds: number[]): Promise<unknown> {
     return this.http.request('POST', `/productplans/${planId}/unlinkbugs`, { data: { bugs: bugIds } });
+  }
+
+  async startPlan(planId: number, input: PlanActionInput = {}): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/productplan-start-${planId}-yes.json${this.buildCommentQuery(input.comment)}`);
+  }
+
+  async finishPlan(planId: number, input: PlanActionInput = {}): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/productplan-finish-${planId}-yes.json${this.buildCommentQuery(input.comment)}`);
+  }
+
+  async activatePlan(planId: number, input: PlanActionInput = {}): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/productplan-activate-${planId}-yes.json${this.buildCommentQuery(input.comment)}`);
+  }
+
+  async closePlan(planId: number, input: ClosePlanInput): Promise<unknown> {
+    const normalized = this.normalizeClosePlanInput(input);
+    return this.http.legacyRequest('POST', `/productplan-close-${planId}.json`, {
+      data: toFormUrlEncoded(normalized as unknown as Record<string, unknown>).toString(),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  private normalizeClosePlanInput(input: ClosePlanInput): ClosePlanInput {
+    return {
+      closedReason: this.normalizeRequiredString(input.closedReason, 'closedReason'),
+      comment: this.normalizeOptionalString(input.comment),
+    };
+  }
+
+  private normalizeRequiredString(value: string, fieldName: string): string {
+    if (typeof value !== 'string') {
+      throw new Error(`${fieldName} 不能为空`);
+    }
+
+    const normalized = value.trim();
+    if (!normalized) {
+      throw new Error(`${fieldName} 不能为空`);
+    }
+
+    return normalized;
+  }
+
+  private buildCommentQuery(comment?: string): string {
+    const normalizedComment = this.normalizeOptionalString(comment);
+    if (!normalizedComment) return '';
+    return `?${toFormUrlEncoded({ comment: normalizedComment }).toString()}`;
   }
 }

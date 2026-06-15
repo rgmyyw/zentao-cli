@@ -144,6 +144,15 @@ export function registerBugTools(server: CliRegistry): void {
   );
 
   server.tool(
+    'confirmBugStoryChange',
+    {
+      bugId: z.number().int().positive().describe('Bug ID。对齐禅道 18.5 bug/confirmStoryChange 页面按钮'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ bugId, confirm }) => runWithPreview('confirmBugStoryChange', confirm, { bugId }, previewOrAssertWriteAllowed, () => getApi().bug.confirmStoryChange(bugId)),
+  );
+
+  server.tool(
     'closeBug',
     {
       bugId: z.number().int().positive(),
@@ -171,5 +180,91 @@ export function registerBugTools(server: CliRegistry): void {
       confirm: z.boolean().optional().default(false),
     },
     async ({ bugId, confirm }) => runWithPreview('deleteBug', confirm, { bugId }, previewOrAssertWriteAllowed, () => getApi().bug.deleteBug(bugId)),
+  );
+
+  server.tool(
+    'batchChangeBugBranch',
+    {
+      bugIds: z.array(z.number().int().positive()).min(1).describe('要切换分支的 Bug ID 列表，对应 18.5 bug/batchChangeBranch 页面 bugIDList[] 字段'),
+      branchId: z.number().int().nonnegative().describe('目标分支 ID；传 0 表示切换到主干'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ bugIds, branchId, confirm }) => runWithPreview('batchChangeBugBranch', confirm, { bugIds, branchId }, previewOrAssertWriteAllowed, () => getApi().bug.batchChangeBugBranch({ bugIds, branchId })),
+  );
+
+  server.tool(
+    'batchChangeBugModule',
+    {
+      bugIds: z.array(z.number().int().positive()).min(1).describe('要切换模块的 Bug ID 列表，对应 18.5 bug/batchChangeModule 页面 bugIDList[] 字段'),
+      moduleId: z.number().int().nonnegative().describe('目标模块 ID；传 0 表示移到根模块'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ bugIds, moduleId, confirm }) => runWithPreview('batchChangeBugModule', confirm, { bugIds, moduleId }, previewOrAssertWriteAllowed, () => getApi().bug.batchChangeBugModule({ bugIds, moduleId })),
+  );
+
+  server.tool(
+    'batchChangeBugPlan',
+    {
+      bugIds: z.array(z.number().int().positive()).min(1).describe('要切换计划的 Bug ID 列表，对应 18.5 bug/batchChangePlan 页面 bugIDList[] 字段'),
+      planId: z.number().int().nonnegative().describe('目标计划 ID；传 0 表示移除计划'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ bugIds, planId, confirm }) => runWithPreview('batchChangeBugPlan', confirm, { bugIds, planId }, previewOrAssertWriteAllowed, () => getApi().bug.batchChangeBugPlan({ bugIds, planId })),
+  );
+
+  server.tool(
+    'batchAssignBugs',
+    {
+      bugIds: z.array(z.number().int().positive()).min(1).describe('要指派的 Bug ID 列表，对应 18.5 bug/batchAssignTo 页面 bugIDList[] 字段'),
+      objectId: z.number().int().positive().describe('所属对象 ID（项目/执行/产品/模块）'),
+      type: optionalTrimmedText.default('execution').describe('所属对象类型 execution|project|product，默认 execution'),
+      assignedTo: z.string().trim().min(1),
+      comment: optionalTrimmedText,
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ bugIds, objectId, type, assignedTo, comment, confirm }) => runWithPreview('batchAssignBugs', confirm, { bugIds, objectId, type, assignedTo, comment }, previewOrAssertWriteAllowed, () => getApi().bug.batchAssignBugs({ bugIds, objectId, type, assignedTo, comment })),
+  );
+
+  server.tool(
+    'batchConfirmBugs',
+    {
+      bugIds: z.array(z.number().int().positive()).min(1).describe('要确认的 Bug ID 列表，对应 18.5 bug/batchConfirm 页面 bugIDList[] 字段'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ bugIds, confirm }) => runWithPreview('batchConfirmBugs', confirm, { bugIds }, previewOrAssertWriteAllowed, () => getApi().bug.batchConfirmBugs({ bugIds })),
+  );
+
+  server.tool(
+    'batchResolveBugs',
+    {
+      bugIds: z.array(z.number().int().positive()).min(1).describe('要解决的 Bug ID 列表，对应 18.5 bug/batchResolve 页面 bugIDList[] 字段'),
+      resolution: z.string().trim().min(1).describe('解决方案，固定枚举 fixed/bydesign/duplicate/external/notrepro/postponed/willnotfix/tostory'),
+      resolvedBuild: optionalTrimmedText.describe('解决版本；resolution=fixed 时通常必填'),
+      comment: optionalTrimmedText,
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ bugIds, resolution, resolvedBuild, comment, confirm }) => runWithPreview('batchResolveBugs', confirm, { bugIds, resolution, resolvedBuild, comment }, previewOrAssertWriteAllowed, () => getApi().bug.batchResolveBugs({ bugIds, resolution, resolvedBuild, comment })),
+  );
+
+  server.tool(
+    'batchCloseBugs',
+    {
+      bugIds: z.array(z.number().int().positive()).min(1).describe('要关闭的 Bug ID 列表，对应 18.5 bug/batchClose 页面 bugIDList[] / unlinkBugs[] 字段'),
+      releaseId: optionalTrimmedText.describe('可选。所属发布 ID；非空时使用 unlinkBugs[] 解绑并关闭'),
+      viewType: optionalTrimmedText,
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ bugIds, releaseId, viewType, confirm }) => runWithPreview('batchCloseBugs', confirm, { bugIds, releaseId, viewType }, previewOrAssertWriteAllowed, () => getApi().bug.batchCloseBugs({ bugIds, releaseId, viewType })),
+  );
+
+  server.tool(
+    'batchActivateBugs',
+    {
+      productId: z.number().int().positive().describe('所属产品 ID。18.5 bug/batchActivate 页面要求先传 productID 渲染 statusList 表单'),
+      branch: z.number().int().nonnegative().optional().default(0).describe('可选。产品分支 ID，默认 0'),
+      bugIds: z.array(z.number().int().positive()).min(1).describe('要激活的 Bug ID 列表'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ productId, branch, bugIds, confirm }) => runWithPreview('batchActivateBugs', confirm, { productId, branch, bugIds }, previewOrAssertWriteAllowed, () => getApi().bug.batchActivateBugs({ productId, branch, bugIds })),
   );
 }

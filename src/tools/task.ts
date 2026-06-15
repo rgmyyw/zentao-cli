@@ -37,6 +37,37 @@ export function registerTaskTools(server: CliRegistry): void {
   );
 
   server.tool(
+    'editTaskEstimate',
+    {
+      estimateId: z.number().int().positive().describe('工时记录 ID，对应 18.5 task/editEstimate 页面里的 estimateID/effortID'),
+      date: z.string().trim().min(1).describe('工时日期，推荐 YYYY-MM-DD。'),
+      consumed: z.number().positive().describe('消耗工时，必须大于 0。'),
+      left: z.number().nonnegative().describe('编辑后剩余工时，可为 0。'),
+      work: optionalTrimmedText.describe('工作内容。对应 task-editEstimate 页面里的 work 字段。'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ estimateId, confirm, ...input }) => runWithPreview('editTaskEstimate', confirm, { estimateId, ...input }, previewOrAssertWriteAllowed, () => getApi().task.editEstimate(estimateId, input)),
+  );
+
+  server.tool(
+    'deleteTaskEstimate',
+    {
+      estimateId: z.number().int().positive().describe('工时记录 ID，对应 18.5 task/deleteEstimate 页面里的 estimateID/effortID'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ estimateId, confirm }) => runWithPreview('deleteTaskEstimate', confirm, { estimateId }, previewOrAssertWriteAllowed, () => getApi().task.deleteEstimate(estimateId)),
+  );
+
+  server.tool(
+    'confirmTaskStoryChange',
+    {
+      taskId: z.number().int().positive(),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ taskId, confirm }) => runWithPreview('confirmTaskStoryChange', confirm, { taskId }, previewOrAssertWriteAllowed, () => getApi().task.confirmStoryChange(taskId)),
+  );
+
+  server.tool(
     'updateTask',
     {
       taskId: z.number().int().positive(),
@@ -126,6 +157,16 @@ export function registerTaskTools(server: CliRegistry): void {
   );
 
   server.tool(
+    'cancelTask',
+    {
+      taskId: z.number().int().positive(),
+      comment: optionalTrimmedText.describe('取消备注。对应 18.5 task/cancel 页面里的 comment 字段。'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ taskId, confirm, comment }) => runWithPreview('cancelTask', confirm, { taskId, comment }, previewOrAssertWriteAllowed, () => getApi().task.cancelTask(taskId, { comment })),
+  );
+
+  server.tool(
     'activateTask',
     {
       taskId: z.number().int().positive(),
@@ -156,5 +197,82 @@ export function registerTaskTools(server: CliRegistry): void {
       confirm: z.boolean().optional().default(false),
     },
     async ({ taskId, confirm }) => runWithPreview('deleteTask', confirm, { taskId }, previewOrAssertWriteAllowed, () => getApi().task.deleteTask(taskId)),
+  );
+
+  server.tool(
+    'batchFinishTasks',
+    {
+      taskIds: z.array(z.number().int().positive()).min(1).describe('要批量完成的任务 ID 列表，对应 18.5 task/batchFinish 页面 taskIDList[] 字段'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ taskIds, confirm }) => runWithPreview('batchFinishTasks', confirm, { taskIds }, previewOrAssertWriteAllowed, () => getApi().task.batchFinishTasks({ taskIds })),
+  );
+
+  server.tool(
+    'batchCancelTasks',
+    {
+      taskIds: z.array(z.number().int().positive()).min(1).describe('要批量取消的任务 ID 列表，对应 18.5 task/batchCancel 页面 taskIDList[] 字段'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ taskIds, confirm }) => runWithPreview('batchCancelTasks', confirm, { taskIds }, previewOrAssertWriteAllowed, () => getApi().task.batchCancelTasks({ taskIds })),
+  );
+
+  server.tool(
+    'batchCloseTasks',
+    {
+      taskIds: z.array(z.number().int().positive()).min(1).describe('要批量关闭的任务 ID 列表，对应 18.5 task/batchClose 页面 taskIDList[] 字段'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ taskIds, confirm }) => runWithPreview('batchCloseTasks', confirm, { taskIds }, previewOrAssertWriteAllowed, () => getApi().task.batchCloseTasks({ taskIds })),
+  );
+
+  server.tool(
+    'batchChangeTaskBranch',
+    {
+      taskIds: z.array(z.number().int().positive()).min(1).describe('要批量切换分支的任务 ID 列表，对应 18.5 task/batchChangeBranch 页面 taskIDList[] 字段'),
+      branchId: z.number().int().positive().describe('目标分支 ID'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ taskIds, branchId, confirm }) => runWithPreview('batchChangeTaskBranch', confirm, { taskIds, branchId }, previewOrAssertWriteAllowed, () => getApi().task.batchChangeTaskBranch({ taskIds, branchId })),
+  );
+
+  server.tool(
+    'batchChangeTaskModule',
+    {
+      taskIds: z.array(z.number().int().positive()).min(1).describe('要批量切换模块的任务 ID 列表，对应 18.5 task/batchChangeModule 页面 taskIDList[] 字段'),
+      moduleId: z.number().int().nonnegative().describe('目标模块 ID。传 0 表示根模块'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ taskIds, moduleId, confirm }) => runWithPreview('batchChangeTaskModule', confirm, { taskIds, moduleId }, previewOrAssertWriteAllowed, () => getApi().task.batchChangeTaskModule({ taskIds, moduleId })),
+  );
+
+  server.tool(
+    'batchChangeTaskPlan',
+    {
+      taskIds: z.array(z.number().int().positive()).min(1).describe('要批量切换计划的任务 ID 列表，对应 18.5 task/batchChangePlan 页面 taskIDList[] 字段'),
+      planId: z.number().int().positive().describe('目标计划 ID'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ taskIds, planId, confirm }) => runWithPreview('batchChangeTaskPlan', confirm, { taskIds, planId }, previewOrAssertWriteAllowed, () => getApi().task.batchChangeTaskPlan({ taskIds, planId })),
+  );
+
+  server.tool(
+    'batchAssignTasksTo',
+    {
+      taskIds: z.array(z.number().int().positive()).min(1).describe('要批量指派的任务 ID 列表，对应 18.5 task/batchAssignTo 页面 taskIDList[] 字段'),
+      assignedTo: z.string().trim().min(1).describe('指派人禅道账号'),
+      comment: optionalTrimmedText.describe('指派备注'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ taskIds, assignedTo, comment, confirm }) => runWithPreview('batchAssignTasksTo', confirm, { taskIds, assignedTo, comment }, previewOrAssertWriteAllowed, () => getApi().task.batchAssignTasksTo({ taskIds, assignedTo, comment })),
+  );
+
+  server.tool(
+    'batchActivateTasks',
+    {
+      taskIds: z.array(z.number().int().positive()).min(1).describe('要批量激活的任务 ID 列表，对应 18.5 task/batchActivate 页面 taskIDList[] 字段'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ taskIds, confirm }) => runWithPreview('batchActivateTasks', confirm, { taskIds }, previewOrAssertWriteAllowed, () => getApi().task.batchActivateTasks({ taskIds })),
   );
 }

@@ -573,6 +573,14 @@ export class ExecutionApi {
     return formatDate(date);
   }
 
+  async confirmStoryChange(executionId: number): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/execution-confirmStoryChange-${executionId}.json`);
+  }
+
+  async computeBurn(executionId: number): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/execution-computeBurn-${executionId}.json`);
+  }
+
   private toString(value: unknown): string {
     if (typeof value === 'string') return value;
     if (typeof value === 'number') return String(value);

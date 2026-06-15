@@ -90,6 +90,100 @@ export function registerStoryWriteTools(server: CliRegistry): void {
     comment: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
   }, async ({ storyId, confirm, ...input }) => runWithPreview('reviewStory', confirm, { storyId, ...input }, previewOrAssertWriteAllowed, () => getApi().story.reviewStory(storyId, input)));
+
+  server.tool('linkStoriesToStory', {
+    storyId: z.number().int().positive(),
+    storyIds: z.array(z.number().int().positive()).min(1).describe('要关联到当前需求的需求 ID 列表，对应 18.5 页面 stories[] 字段'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ storyId, storyIds, confirm }) => runWithPreview('linkStoriesToStory', confirm, { storyId, storyIds }, previewOrAssertWriteAllowed, () => getApi().story.linkStoriesToStory(storyId, { storyIds })));
+
+  server.tool('unlinkStoryFromStory', {
+    storyId: z.number().int().positive(),
+    linkedStoryId: z.number().int().positive(),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ storyId, linkedStoryId, confirm }) => runWithPreview('unlinkStoryFromStory', confirm, { storyId, linkedStoryId }, previewOrAssertWriteAllowed, () => getApi().story.unlinkStoryFromStory(storyId, linkedStoryId)));
+
+  server.tool('recallStory', {
+    storyId: z.number().int().positive().describe('需求 ID。对齐 18.5 story/recall 页面按钮，仅在状态为 reviewing/changing 时可撤回'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ storyId, confirm }) => runWithPreview('recallStory', confirm, { storyId }, previewOrAssertWriteAllowed, () => getApi().story.recallStory(storyId)));
+
+  server.tool('submitStoryReview', {
+    storyId: z.number().int().positive().describe('需求 ID。对齐 18.5 story/submitReview 提交评审按钮'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ storyId, confirm }) => runWithPreview('submitStoryReview', confirm, { storyId }, previewOrAssertWriteAllowed, () => getApi().story.submitStoryReview(storyId)));
+
+  server.tool('processStoryChange', {
+    storyId: z.number().int().positive().describe('需求 ID。对齐 18.5 story/processStoryChange 确认变更按钮'),
+    result: z.enum(['yes', 'no']).optional().default('yes').describe('确认/忽略需求变更，默认 yes 表示确认变更'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ storyId, result, confirm }) => runWithPreview('processStoryChange', confirm, { storyId, result }, previewOrAssertWriteAllowed, () => getApi().story.processStoryChange(storyId, result)));
+
+  server.tool('batchReviewStories', {
+    storyIds: z.array(z.number().int().positive()).min(1).describe('要批量评审的需求 ID 列表，对应 18.5 story/batchReview 页面 storyIdList[] 字段'),
+    result: z.enum(['pass', 'reject', 'clarify', 'revert']),
+    reason: optionalTrimmedText,
+    confirm: z.boolean().optional().default(false),
+  }, async ({ storyIds, result, reason, confirm }) => runWithPreview('batchReviewStories', confirm, { storyIds, result, reason }, previewOrAssertWriteAllowed, () => getApi().story.batchReviewStories({ storyIds, result, reason })));
+
+  server.tool('batchCloseStories', {
+    productId: z.number().int().positive().describe('产品 ID。对齐 18.5 story/batchClose 页面 productID 参数'),
+    storyIds: z.array(z.number().int().positive()).min(1).describe('要批量关闭的需求 ID 列表，对应 18.5 页面 storyIdList[id] 字段'),
+    executionId: z.number().int().positive().optional().describe('执行 ID，可选，对应 18.5 页面 executionID 参数'),
+    closedReasons: z.array(z.string().trim().min(1)).optional().describe('每个需求对应的关闭原因，数组下标与 storyIds 对齐'),
+    comments: z.array(z.string().trim().min(1)).optional().describe('每个需求对应的关闭备注，数组下标与 storyIds 对齐'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ productId, storyIds, executionId, closedReasons, comments, confirm }) => {
+    const closedReasonMap: Record<number, string> = {};
+    if (closedReasons) {
+      for (let i = 0; i < closedReasons.length; i += 1) {
+        if (closedReasons[i]) closedReasonMap[storyIds[i]] = closedReasons[i];
+      }
+    }
+    const commentMap: Record<number, string> = {};
+    if (comments) {
+      for (let i = 0; i < comments.length; i += 1) {
+        if (comments[i]) commentMap[storyIds[i]] = comments[i];
+      }
+    }
+    return runWithPreview('batchCloseStories', confirm, { productId, storyIds, executionId, closedReasons: closedReasonMap, comments: commentMap }, previewOrAssertWriteAllowed, () => getApi().story.batchCloseStories({ productId, storyIds, executionId, closedReasons: closedReasonMap, comments: commentMap }));
+  });
+
+  server.tool('batchChangeStoryModule', {
+    storyIds: z.array(z.number().int().positive()).min(1).describe('要批量修改所属模块的需求 ID 列表，对应 18.5 story/batchChangeModule 页面 storyIdList[] 字段'),
+    moduleId: z.number().int().nonnegative().describe('目标模块 ID。对齐 18.5 story/batchChangeModule 页面 moduleID 参数；传 0 表示根模块'),
+    storyType: z.enum(['story', 'requirement']).optional().default('story').describe('需求类型，禅道 18.5 区分 story 和 requirement'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ storyIds, moduleId, storyType, confirm }) => runWithPreview('batchChangeStoryModule', confirm, { storyIds, moduleId, storyType }, previewOrAssertWriteAllowed, () => getApi().story.batchChangeStoryModule({ storyIds, moduleId, storyType })));
+
+  server.tool('batchChangeStoryPlan', {
+    storyIds: z.array(z.number().int().positive()).min(1).describe('要批量修改所属计划的需求 ID 列表，对应 18.5 story/batchChangePlan 页面 storyIdList[] 字段'),
+    planId: z.number().int().nonnegative().describe('目标计划 ID。0 表示移出计划'),
+    oldPlanId: z.number().int().nonnegative().optional().describe('原计划 ID，0 表示任意计划'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ storyIds, planId, oldPlanId, confirm }) => runWithPreview('batchChangeStoryPlan', confirm, { storyIds, planId, oldPlanId }, previewOrAssertWriteAllowed, () => getApi().story.batchChangeStoryPlan({ storyIds, planId, oldPlanId })));
+
+  server.tool('batchChangeStoryBranch', {
+    storyIds: z.array(z.number().int().positive()).min(1).describe('要批量修改所属分支的需求 ID 列表，对应 18.5 story/batchChangeBranch 页面 storyIdList[] 字段'),
+    branchId: z.number().int().nonnegative().describe('目标分支 ID；0 表示主分支'),
+    confirmBranch: z.enum(['yes', 'no']).optional().default('yes').describe('是否确认覆盖计划分支不一致的需求；yes 跳过二次确认，no 在冲突时中止'),
+    storyType: z.enum(['story', 'requirement']).optional().default('story').describe('需求类型，禅道 18.5 区分 story 和 requirement'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ storyIds, branchId, confirmBranch, storyType, confirm }) => runWithPreview('batchChangeStoryBranch', confirm, { storyIds, branchId, confirmBranch, storyType }, previewOrAssertWriteAllowed, () => getApi().story.batchChangeStoryBranch({ storyIds, branchId, confirm: confirmBranch, storyType })));
+
+  server.tool('batchChangeStoryStage', {
+    storyIds: z.array(z.number().int().positive()).min(1).describe('要批量修改阶段的需求 ID 列表，对应 18.5 story/batchChangeStage 页面 storyIdList[] 字段'),
+    stage: z.string().trim().min(1).describe('目标阶段，如 wait/planned/projected/developing/developped/verified/closed'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ storyIds, stage, confirm }) => runWithPreview('batchChangeStoryStage', confirm, { storyIds, stage }, previewOrAssertWriteAllowed, () => getApi().story.batchChangeStoryStage({ storyIds, stage })));
+
+  server.tool('batchAssignStoriesTo', {
+    storyIds: z.array(z.number().int().positive()).min(1).describe('要批量指派的需求 ID 列表，对应 18.5 story/batchAssignTo 页面 storyIdList[] 字段'),
+    assignedTo: z.string().trim().min(1).describe('指派人禅道账号。对齐 18.5 story/batchAssignTo 页面 assignedTo 字段'),
+    comment: optionalTrimmedText,
+    storyType: z.enum(['story', 'requirement']).optional().default('story').describe('需求类型，禅道 18.5 区分 story 和 requirement'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ storyIds, assignedTo, comment, storyType, confirm }) => runWithPreview('batchAssignStoriesTo', confirm, { storyIds, assignedTo, comment, storyType }, previewOrAssertWriteAllowed, () => getApi().story.batchAssignStoriesTo({ storyIds, assignedTo, comment, storyType })));
 }
 
 export function registerTaskDerivedTools(server: CliRegistry): void {
@@ -126,6 +220,7 @@ export function registerTaskDerivedTools(server: CliRegistry): void {
 
   server.tool('createTaskFromBug', {
     bugId: z.number().int().positive(),
+    project: z.number().int().positive().describe('所属项目 ID。按禅道页面转任务链路，需与 execution 一起显式提供'),
     execution: z.number().int().positive(),
     taskName: optionalTrimmedText,
     type: optionalTrimmedText.default('devel'),
@@ -136,24 +231,26 @@ export function registerTaskDerivedTools(server: CliRegistry): void {
     desc: optionalTrimmedText,
     pri: z.number().optional().describe('优先级 1-4'),
     confirm: z.boolean().optional().default(false),
-  }, async ({ bugId, execution, taskName, type, assignedTo, estimate, estStarted, deadline, desc, pri, confirm }) => {
+  }, async ({ bugId, project, execution, taskName, type, assignedTo, estimate, estStarted, deadline, desc, pri, confirm }) => {
     const bug = await getApi().bug.getBugDetail(bugId);
     const normalizedTaskName = normalizeOptionalText(taskName);
     const normalizedType = normalizeOptionalText(type) ?? 'devel';
     const normalizedDesc = normalizeOptionalText(desc);
+
     const payload = {
+      bugId,
       execution,
+      project,
       name: normalizedTaskName ?? `修复Bug #${bugId}: ${bug.title}`,
       type: normalizedType,
       assignedTo,
       estimate,
       estStarted,
       deadline,
-      fromBug: bugId,
       desc: normalizedDesc ?? `修复Bug #${bugId}: ${bug.title}\n\n复现步骤:\n${String(bug.steps ?? '无')}`,
       pri,
     };
-    return runWithPreview('createTaskFromBug', confirm, payload, previewOrAssertWriteAllowed, () => getApi().task.createTask(payload));
+    return runWithPreview('createTaskFromBug', confirm, payload, previewOrAssertWriteAllowed, () => getApi().task.convertBugToTask(payload));
   });
 }
 

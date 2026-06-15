@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import type { CliRegistry } from '../core/cli-registry.js';
 import type { CreateBuildInput } from '../api/build.js';
-import type { CreateTestTaskInput, UpdateTestTaskInput } from '../api/testtask.js';
+import type { CloseTestTaskInput, CreateTestTaskInput, TestTaskActionInput, UpdateTestTaskInput } from '../api/testtask.js';
+import type { ConfirmTestCaseLibcaseChangeInput, ConfirmTestCaseStoryChangeInput } from '../api/testcase.js';
 import { getApi } from '../core/api-provider.js';
 import { previewOrAssertWriteAllowed } from '../core/write-guard.js';
 import { optionalTrimmedText, runWithPreview } from './shared.js';
@@ -88,6 +89,42 @@ export function registerBuildWriteTools(server: CliRegistry): void {
     filePath: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
   }, async ({ buildId, confirm, ...update }) => runWithPreview('updateBuild', confirm, { buildId, update }, previewOrAssertWriteAllowed, () => getApi().build.updateBuild(buildId, update)));
+
+  server.tool('linkStoriesToBuild', {
+    buildId: z.number().int().positive(),
+    storyIds: z.array(z.number().int().positive()).min(1).describe('要关联到构建的需求 ID 列表，对应 18.5 build/linkStory 页面 stories[] 字段'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ buildId, storyIds, confirm }) => runWithPreview('linkStoriesToBuild', confirm, { buildId, storyIds }, previewOrAssertWriteAllowed, () => getApi().build.linkStoriesToBuild(buildId, { storyIds })));
+
+  server.tool('unlinkStoryFromBuild', {
+    buildId: z.number().int().positive(),
+    storyId: z.number().int().positive(),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ buildId, storyId, confirm }) => runWithPreview('unlinkStoryFromBuild', confirm, { buildId, storyId }, previewOrAssertWriteAllowed, () => getApi().build.unlinkStoryFromBuild(buildId, storyId)));
+
+  server.tool('batchUnlinkStoriesFromBuild', {
+    buildId: z.number().int().positive(),
+    storyIds: z.array(z.number().int().positive()).min(1).describe('要从构建批量移除的需求 ID 列表，对应 18.5 build/batchUnlinkStory 页面 unlinkStories[] 字段'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ buildId, storyIds, confirm }) => runWithPreview('batchUnlinkStoriesFromBuild', confirm, { buildId, storyIds }, previewOrAssertWriteAllowed, () => getApi().build.batchUnlinkStoriesFromBuild(buildId, { storyIds })));
+
+  server.tool('linkBugsToBuild', {
+    buildId: z.number().int().positive(),
+    bugIds: z.array(z.number().int().positive()).min(1).describe('要关联到构建的 Bug ID 列表，对应 18.5 build/linkBug 页面 bugs[] 字段'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ buildId, bugIds, confirm }) => runWithPreview('linkBugsToBuild', confirm, { buildId, bugIds }, previewOrAssertWriteAllowed, () => getApi().build.linkBugsToBuild(buildId, { bugIds })));
+
+  server.tool('unlinkBugFromBuild', {
+    buildId: z.number().int().positive(),
+    bugId: z.number().int().positive(),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ buildId, bugId, confirm }) => runWithPreview('unlinkBugFromBuild', confirm, { buildId, bugId }, previewOrAssertWriteAllowed, () => getApi().build.unlinkBugFromBuild(buildId, bugId)));
+
+  server.tool('batchUnlinkBugsFromBuild', {
+    buildId: z.number().int().positive(),
+    bugIds: z.array(z.number().int().positive()).min(1).describe('要从构建批量移除的 Bug ID 列表，对应 18.5 build/batchUnlinkBug 页面 unlinkBugs[] 字段'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ buildId, bugIds, confirm }) => runWithPreview('batchUnlinkBugsFromBuild', confirm, { buildId, bugIds }, previewOrAssertWriteAllowed, () => getApi().build.batchUnlinkBugsFromBuild(buildId, { bugIds })));
 }
 
 const testCaseStepSchema = z.object({
@@ -132,6 +169,28 @@ export function registerTestCaseWriteTools(server: CliRegistry): void {
     execution: z.number().int().positive().optional().describe('禅道 18.5 REST v1 更新用例不接收该字段，传入会被忽略'),
     confirm: z.boolean().optional().default(false),
   }, async ({ testCaseId, confirm, ...update }) => runWithPreview('updateTestCase', confirm, { testCaseId, update }, previewOrAssertWriteAllowed, () => getApi().testcase.updateTestCase(testCaseId, update)));
+
+  server.tool('confirmTestCaseStoryChange', {
+    caseId: z.number().int().positive(),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ caseId, confirm }) => runWithPreview('confirmTestCaseStoryChange', confirm, { caseId }, previewOrAssertWriteAllowed, () => getApi().testcase.confirmStoryChange(caseId as ConfirmTestCaseStoryChangeInput['caseId'])));
+
+  server.tool('confirmTestCaseLibcaseChange', {
+    caseId: z.number().int().positive(),
+    libcaseId: z.number().int().positive(),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ caseId, libcaseId, confirm }) => runWithPreview('confirmTestCaseLibcaseChange', confirm, { caseId, libcaseId }, previewOrAssertWriteAllowed, () => getApi().testcase.confirmLibcaseChange({ caseId, libcaseId } as ConfirmTestCaseLibcaseChangeInput)));
+
+  server.tool('ignoreTestCaseLibcaseChange', {
+    caseId: z.number().int().positive(),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ caseId, confirm }) => runWithPreview('ignoreTestCaseLibcaseChange', confirm, { caseId }, previewOrAssertWriteAllowed, () => getApi().testcase.ignoreLibcaseChange(caseId)));
+
+  server.tool('batchConfirmTestCaseStoryChange', {
+    productId: z.number().int().positive(),
+    caseIds: z.array(z.number().int().positive()).min(1).describe('要批量确认需求变更的测试用例 ID 列表，对应 18.5 testcase/batchConfirmStoryChange 页面 caseIDList[] 字段'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ productId, caseIds, confirm }) => runWithPreview('batchConfirmTestCaseStoryChange', confirm, { productId, caseIds }, previewOrAssertWriteAllowed, () => getApi().testcase.batchConfirmStoryChange(productId, { caseIds })));
 }
 
 export function registerTestTaskWriteTools(server: CliRegistry): void {
@@ -167,4 +226,35 @@ export function registerTestTaskWriteTools(server: CliRegistry): void {
     desc: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
   }, async ({ testTaskId, confirm, ...update }) => runWithPreview('updateTestTask', confirm, { testTaskId, update }, previewOrAssertWriteAllowed, () => getApi().testtask.updateTestTask(testTaskId, update as UpdateTestTaskInput)));
+
+  server.tool('startTestTask', {
+    testTaskId: z.number().int().positive(),
+    comment: optionalTrimmedText.describe('开始备注。对应 18.5 testtask/start 页面 comment 字段'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ testTaskId, confirm, ...payload }) => runWithPreview('startTestTask', confirm, { testTaskId, payload }, previewOrAssertWriteAllowed, () => getApi().testtask.startTestTask(testTaskId, payload as TestTaskActionInput)));
+
+  server.tool('activateTestTask', {
+    testTaskId: z.number().int().positive(),
+    comment: optionalTrimmedText.describe('激活备注。对应 18.5 testtask/activate 页面 comment 字段'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ testTaskId, confirm, ...payload }) => runWithPreview('activateTestTask', confirm, { testTaskId, payload }, previewOrAssertWriteAllowed, () => getApi().testtask.activateTestTask(testTaskId, payload as TestTaskActionInput)));
+
+  server.tool('blockTestTask', {
+    testTaskId: z.number().int().positive(),
+    comment: optionalTrimmedText.describe('阻塞备注。对应 18.5 testtask/block 页面 comment 字段'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ testTaskId, confirm, ...payload }) => runWithPreview('blockTestTask', confirm, { testTaskId, payload }, previewOrAssertWriteAllowed, () => getApi().testtask.blockTestTask(testTaskId, payload as TestTaskActionInput)));
+
+  server.tool('closeTestTask', {
+    testTaskId: z.number().int().positive(),
+    realFinishedDate: optionalTrimmedText.describe('实际完成时间。对应 18.5 testtask/close 页面 realFinishedDate 字段'),
+    mailto: z.array(z.string().trim().min(1)).optional().describe('抄送账号数组。对应 18.5 testtask/close 页面 mailto[] 字段'),
+    comment: optionalTrimmedText.describe('关闭备注。对应 18.5 testtask/close 页面 comment 字段'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ testTaskId, confirm, ...payload }) => runWithPreview('closeTestTask', confirm, { testTaskId, payload }, previewOrAssertWriteAllowed, () => getApi().testtask.closeTestTask(testTaskId, payload as CloseTestTaskInput)));
+
+  server.tool('deleteTestTask', {
+    testTaskId: z.number().int().positive(),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ testTaskId, confirm }) => runWithPreview('deleteTestTask', confirm, { testTaskId }, previewOrAssertWriteAllowed, () => getApi().testtask.deleteTestTask(testTaskId)));
 }

@@ -33,9 +33,11 @@ export const groupLoaders: Record<ToolGroup, GroupLoader> = {
   search: async () => (await import('../tools/search.js')).registerSearchTools,
   'story-write': async () => (await import('../tools/phase3a.js')).registerStoryWriteTools,
   'task-derived': async () => (await import('../tools/phase3a.js')).registerTaskDerivedTools,
+  'plan-write': async () => (await import('../tools/plan.js')).registerPlanTools,
   'plan-relation': async () => (await import('../tools/phase3a.js')).registerPlanRelationTools,
   'execution-write': async () => (await import('../tools/phase3b.js')).registerExecutionWriteTools,
   'build-write': async () => (await import('../tools/phase3b.js')).registerBuildWriteTools,
+  'release-write': async () => (await import('../tools/release.js')).registerReleaseWriteTools,
   'testcase-write': async () => (await import('../tools/phase3b.js')).registerTestCaseWriteTools,
   'testtask-write': async () => (await import('../tools/phase3b.js')).registerTestTaskWriteTools,
 };

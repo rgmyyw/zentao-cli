@@ -1,6 +1,7 @@
 import type { ZentaoHttpClient } from '../core/http.js';
 import { toClientPaginatedListResult } from '../core/list-result.js';
 import { normalizePagination, type PaginationInput } from '../core/pagination.js';
+import { toFormUrlEncoded } from '../utils/form.js';
 import { requireNonBlank } from '../core/validation.js';
 
 export interface TestCaseListInput extends PaginationInput {
@@ -48,6 +49,19 @@ export interface UpdateTestCaseInput {
   execution?: number;
 }
 
+export interface ConfirmTestCaseStoryChangeInput {
+  caseId: number;
+}
+
+export interface ConfirmTestCaseLibcaseChangeInput {
+  caseId: number;
+  libcaseId: number;
+}
+
+export interface BatchConfirmTestCaseStoryChangeInput {
+  caseIds: number[];
+}
+
 export class TestCaseApi {
   constructor(private readonly http: ZentaoHttpClient) {}
 
@@ -79,6 +93,26 @@ export class TestCaseApi {
     const normalizedUpdate = this.normalizeTestCaseInput(update, []);
     return this.http.request('PUT', `/testcases/${testCaseId}`, {
       data: normalizedUpdate,
+    });
+  }
+
+  async confirmStoryChange(caseId: number): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/testcase-confirmStoryChange-${caseId}.json`);
+  }
+
+  async confirmLibcaseChange(input: ConfirmTestCaseLibcaseChangeInput): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/testcase-confirmLibcaseChange-${input.caseId}-${input.libcaseId}.json`);
+  }
+
+  async ignoreLibcaseChange(caseId: number): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/testcase-ignoreLibcaseChange-${caseId}.json`);
+  }
+
+  async batchConfirmStoryChange(productId: number, input: BatchConfirmTestCaseStoryChangeInput): Promise<unknown> {
+    const caseIds = this.normalizeIdArray(input.caseIds, 'caseIds');
+    return this.http.legacyRequest('POST', `/testcase-batchConfirmStoryChange-${productId}.json`, {
+      data: toFormUrlEncoded({ caseIDList: caseIds }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   }
 
@@ -140,5 +174,13 @@ export class TestCaseApi {
       ...input,
       status: this.normalizeOptionalString(input.status),
     };
+  }
+
+  private normalizeIdArray(values: number[], fieldName: string): number[] {
+    if (!Array.isArray(values) || values.length === 0) {
+      throw new Error(`${fieldName} 至少需要 1 项`);
+    }
+
+    return values;
   }
 }

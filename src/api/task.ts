@@ -17,6 +17,26 @@ export interface RecordTaskEstimateInput {
   work?: string;
 }
 
+export type EditTaskEstimateInput = RecordTaskEstimateInput;
+
+export interface ConvertBugToTaskInput {
+  bugId: number;
+  execution: number;
+  project: number;
+  name: string;
+  assignedTo: string;
+  estStarted: string;
+  deadline: string;
+  type?: string;
+  estimate?: number;
+  desc?: string;
+  pri?: number;
+}
+
+export interface CancelTaskInput {
+  comment?: string;
+}
+
 export class TaskApi {
   constructor(private readonly http: ZentaoHttpClient) {}
 
@@ -90,6 +110,22 @@ export class TaskApi {
     }
   }
 
+  async editEstimate(estimateId: number, input: EditTaskEstimateInput): Promise<unknown> {
+    const normalized = this.normalizeRecordEstimateInput(input);
+    return this.http.legacyRequest('POST', `/task-editEstimate-${estimateId}.json`, {
+      data: toFormUrlEncoded(normalized as unknown as Record<string, unknown>),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async deleteEstimate(estimateId: number): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/task-deleteEstimate-${estimateId}-yes.json`);
+  }
+
+  async confirmStoryChange(taskId: number): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/task-confirmStoryChange-${taskId}.json`);
+  }
+
   private async getAllMyTasksByPages(total: number): Promise<ZentaoTask[]> {
     const pageSize = 100;
     type TasksResponse = { tasks?: ZentaoTask[] } | ZentaoTask[];
@@ -142,6 +178,14 @@ export class TaskApi {
     return this.http.request('POST', `/tasks/${taskId}/close`, { data: this.normalizeTaskInput(data) });
   }
 
+  async cancelTask(taskId: number, input: CancelTaskInput = {}): Promise<unknown> {
+    const comment = this.normalizeOptionalString(input.comment);
+    return this.http.legacyRequest('POST', `/task-cancel-${taskId}.json`, {
+      data: toFormUrlEncoded({ status: 'cancel', comment: comment ?? '' }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
   async activateTask(taskId: number, data: Record<string, unknown> = {}): Promise<unknown> {
     return this.http.request('POST', `/tasks/${taskId}/activate`, { data: this.normalizeTaskInput(data) });
   }
@@ -165,10 +209,111 @@ export class TaskApi {
     });
   }
 
+  async batchFinishTasks(input: { taskIds: number[] }): Promise<unknown> {
+    const taskIds = normalizeTaskIdList(input.taskIds, 'taskIds');
+    return this.http.legacyRequest('POST', '/task-batchFinish.json', {
+      data: toFormUrlEncoded({ taskIDList: taskIds } as unknown as Record<string, unknown>),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async batchCancelTasks(input: { taskIds: number[] }): Promise<unknown> {
+    const taskIds = normalizeTaskIdList(input.taskIds, 'taskIds');
+    return this.http.legacyRequest('POST', '/task-batchCancel.json', {
+      data: toFormUrlEncoded({ taskIDList: taskIds } as unknown as Record<string, unknown>),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async batchCloseTasks(input: { taskIds: number[] }): Promise<unknown> {
+    const taskIds = normalizeTaskIdList(input.taskIds, 'taskIds');
+    return this.http.legacyRequest('POST', '/task-batchClose.json', {
+      data: toFormUrlEncoded({ taskIDList: taskIds } as unknown as Record<string, unknown>),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async batchChangeTaskBranch(input: { taskIds: number[]; branchId: number }): Promise<unknown> {
+    const taskIds = normalizeTaskIdList(input.taskIds, 'taskIds');
+    return this.http.legacyRequest('POST', '/task-batchChangeBranch.json', {
+      data: toFormUrlEncoded({ taskIDList: taskIds, branch: input.branchId } as unknown as Record<string, unknown>),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async batchChangeTaskModule(input: { taskIds: number[]; moduleId: number }): Promise<unknown> {
+    const taskIds = normalizeTaskIdList(input.taskIds, 'taskIds');
+    return this.http.legacyRequest('POST', '/task-batchChangeModule.json', {
+      data: toFormUrlEncoded({ taskIDList: taskIds, module: input.moduleId } as unknown as Record<string, unknown>),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async batchChangeTaskPlan(input: { taskIds: number[]; planId: number }): Promise<unknown> {
+    const taskIds = normalizeTaskIdList(input.taskIds, 'taskIds');
+    return this.http.legacyRequest('POST', '/task-batchChangePlan.json', {
+      data: toFormUrlEncoded({ taskIDList: taskIds, plan: input.planId } as unknown as Record<string, unknown>),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async batchAssignTasksTo(input: { taskIds: number[]; assignedTo: string; comment?: string }): Promise<unknown> {
+    const taskIds = normalizeTaskIdList(input.taskIds, 'taskIds');
+    const assignedTo = requireNonBlank(input.assignedTo, 'assignedTo 不能为空');
+    const payload: Record<string, unknown> = { taskIDList: taskIds, assignedTo };
+    if (typeof input.comment === 'string' && input.comment.trim() !== '') {
+      payload.comment = input.comment.trim();
+    }
+    return this.http.legacyRequest('POST', '/task-batchAssignTo.json', {
+      data: toFormUrlEncoded(payload),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async batchActivateTasks(input: { taskIds: number[] }): Promise<unknown> {
+    const taskIds = normalizeTaskIdList(input.taskIds, 'taskIds');
+    return this.http.legacyRequest('POST', '/task-batchActivate.json', {
+      data: toFormUrlEncoded({ taskIDList: taskIds } as unknown as Record<string, unknown>),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
   async createTask(task: Record<string, unknown> & { execution: number }): Promise<unknown> {
     const normalizedTask = this.normalizeTaskInput(task, ['name', 'assignedTo', 'estStarted', 'deadline']);
     return this.http.request('POST', `/executions/${task.execution}/tasks`, {
       data: normalizedTask,
+    });
+  }
+
+  async convertBugToTask(input: ConvertBugToTaskInput): Promise<unknown> {
+    const normalizedTask = this.normalizeTaskInput(input as unknown as Record<string, unknown>, ['name', 'assignedTo', 'estStarted', 'deadline']);
+    const estimate = typeof normalizedTask.estimate === 'number' ? normalizedTask.estimate : undefined;
+    const formPayload: Record<string, unknown> = {
+      execution: input.execution,
+      project: input.project,
+      module: 0,
+      story: 0,
+      name: normalizedTask.name,
+      type: normalizedTask.type ?? 'devel',
+      assignedTo: [normalizedTask.assignedTo],
+      estStarted: normalizedTask.estStarted,
+      deadline: normalizedTask.deadline,
+      desc: normalizedTask.desc ?? '',
+      pri: normalizedTask.pri,
+      status: 'wait',
+      after: 'toTaskList',
+    };
+
+    if (estimate !== undefined) {
+      formPayload.estimate = estimate;
+      formPayload.left = estimate;
+    }
+
+    const path = `/task-create-${input.execution}-0-0-0-0-projectID=${input.project}-${input.bugId}.json`;
+
+    return this.http.legacyRequest('POST', path, {
+      data: toFormUrlEncoded(formPayload),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   }
 
@@ -238,4 +383,17 @@ export class TaskApi {
     return normalized === '' ? undefined : normalized;
   }
 
+}
+
+function normalizeTaskIdList(values: unknown, fieldName: string): number[] {
+  if (!Array.isArray(values) || values.length === 0) {
+    throw new Error(`${fieldName} 至少需要 1 项`);
+  }
+  return values.map((value) => {
+    const numeric = Number(value);
+    if (!Number.isInteger(numeric) || numeric <= 0) {
+      throw new Error(`${fieldName} 项必须为正整数`);
+    }
+    return numeric;
+  });
 }

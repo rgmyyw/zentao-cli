@@ -2,6 +2,60 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.27 - 2026-06-15
+
+### 新增
+
+- **任务批量操作**：新增 8 个批量任务命令，覆盖禅道 18.5 任务列表页全部批量按钮：
+  - `batchFinishTasks` / `batchCancelTasks` / `batchCloseTasks`：批量完成、取消、关闭任务
+  - `batchChangeTaskBranch` / `batchChangeTaskModule` / `batchChangeTaskPlan`：批量切换分支、模块、计划
+  - `batchAssignTasksTo`：批量指派任务
+  - `batchActivateTasks`：批量激活任务
+- **执行模块补全**：
+  - `confirmStoryChange`：确认执行需求变更
+  - `computeBurn`：重新计算燃尽图
+- **构建模块补全**：
+  - `notifyBug`：通知构建关联 Bug
+  - `assignTo`：指派构建负责人
+  - `linkStoriesToBuild` / `unlinkStoryFromBuild` / `batchUnlinkStoriesFromBuild`：构建关联/取消关联需求
+  - `linkBugsToBuild` / `unlinkBugFromBuild` / `batchUnlinkBugsFromBuild`：构建关联/取消关联 Bug
+- **计划模块补全**：
+  - `startPlan` / `finishPlan` / `activatePlan` / `closePlan`：计划开始、完成、激活、关闭
+- **发布模块补全**：
+  - `changeReleaseStatus` / `notifyRelease` / `deleteRelease`：发布状态变更、通知、删除
+  - `linkStoriesToRelease` / `unlinkStoryFromRelease` / `batchUnlinkStoriesFromRelease`：发布关联/取消关联需求
+  - `linkBugsToRelease` / `unlinkBugFromRelease` / `batchUnlinkBugsFromRelease`：发布关联/取消关联 Bug
+- **测试单模块补全**：
+  - `startTestTask` / `activateTestTask` / `blockTestTask` / `closeTestTask` / `deleteTestTask`：测试单全生命周期操作
+- **测试用例模块补全**：
+  - `confirmTestCaseStoryChange` / `confirmTestCaseLibcaseChange` / `ignoreTestCaseLibcaseChange`：确认/忽略用例关联变更
+  - `batchConfirmTestCaseStoryChange`：批量确认用例需求变更
+- **任务工具补全**：
+  - `editEstimate` / `deleteEstimate`：编辑/删除任务工时估算
+  - `confirmStoryChange`：确认任务需求变更
+  - `cancelTask`：取消任务
+- **需求批量操作**：
+  - `recallStory` / `submitStoryReview` / `processStoryChange`：需求撤回、提交评审、处理变更
+  - `batchReviewStories` / `batchCloseStories`：批量评审、关闭需求
+  - `batchChangeStoryModule` / `batchChangeStoryPlan` / `batchChangeStoryBranch` / `batchChangeStoryStage`：批量切换需求模块、计划、分支、阶段
+  - `batchAssignStoriesTo`：批量指派需求
+  - `linkStoriesToStory` / `unlinkStoryFromStory`：需求关联/取消关联子需求
+- **Bug 批量操作**：
+  - `batchChangeBugBranch` / `batchChangeBugModule` / `batchChangeBugPlan`：批量切换 Bug 分支、模块、计划
+  - `batchAssignBugs` / `batchConfirmBugs` / `batchResolveBugs` / `batchCloseBugs` / `batchActivateBugs`：批量指派、确认、解决、关闭、激活 Bug
+- **待办补全**：
+  - `startTodo` / `closeTodo` / `assignTodo`：开始、关闭、指派待办
+  - `importTodosToToday`：导入待办到今日
+  - `batchFinishTodos` / `batchCloseTodos`：批量完成、关闭待办
+- **Bug 工具补全**：
+  - `confirmStoryChange`：确认 Bug 需求变更
+
+### 测试
+
+- 新增 8 个 task batch 操作的 tool-registry parse 测试，测试总数从 246 增至 254。
+- 新增 execution、build、plan、release、testtask、testcase、todo 等模块的 API 单元测试。
+- 新增批量操作（story-batch、bug-batch、todo-batch）的 tool-registry 完整命令清单测试。
+
 ## 0.1.26 - 2026-06-14
 
 ### 修复

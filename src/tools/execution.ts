@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import type { CliRegistry } from '../core/cli-registry.js';
 import { getApi } from '../core/api-provider.js';
-import { jsonResult } from './shared.js';
+import { previewOrAssertWriteAllowed } from '../core/write-guard.js';
+import { jsonResult, runWithPreview } from './shared.js';
 
 const optionalTrimmedText = z.preprocess(
   (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
@@ -63,5 +64,23 @@ export function registerExecutionTools(server: CliRegistry): void {
       date: optionalTrimmedText.describe('统计日期，默认今天。支持 today/今天/yesterday/昨天/YYYY-MM-DD。'),
     },
     async ({ executionId, iterationName, date }) => jsonResult(await getApi().execution.getExecutionDailyBugStats(executionId, { iterationName, date })),
+  );
+
+  server.tool(
+    'confirmExecutionStoryChange',
+    {
+      executionId: z.number().int().positive().describe('执行 ID。对齐禅道 18.5 execution/confirmStoryChange 页面按钮'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ executionId, confirm }) => runWithPreview('confirmExecutionStoryChange', confirm, { executionId }, previewOrAssertWriteAllowed, () => getApi().execution.confirmStoryChange(executionId)),
+  );
+
+  server.tool(
+    'computeExecutionBurn',
+    {
+      executionId: z.number().int().positive().describe('执行 ID。对齐禅道 18.5 execution/computeBurn 页面按钮'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ executionId, confirm }) => runWithPreview('computeExecutionBurn', confirm, { executionId }, previewOrAssertWriteAllowed, () => getApi().execution.computeBurn(executionId)),
   );
 }

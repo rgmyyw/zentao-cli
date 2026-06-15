@@ -25,8 +25,10 @@ describe('roles', () => {
       'resource-analysis',
       'search',
       'story-write',
+      'plan-write',
       'plan-relation',
       'execution-write',
+      'release-write',
     ]);
   });
 });

@@ -94,7 +94,7 @@
 - `updateTask` 和 `updateStory`：禅道 18.5 Task PUT / Story PUT 的 `batchSetPost` 字段列表不包含 `comment`，无法直接通过 PUT 写备注，备注请通过 `finishTask` / `resolveBug` / `changeStory` 等状态变更操作附带。
 - `updateExecution`：禅道 18.5 REST PUT 在启用迭代代号时 `code` 字段拼接缺逗号，已改为走旧版 `execution-edit-{id}.json` 控制器。
 - `updateTestTask`：禅道 18.5 v1 没有 testtask PUT 入口，已改为走旧版 `testtask-edit-{id}.json` 控制器。
-- `createTaskFromBug` 只保证基于 Bug 预填任务内容并尝试创建任务，不保证创建后自动建立 Bug 关联。
+- `createTaskFromBug` 应走旧版 `task/create` + `bugID` 兼容模式，并按页面链路显式传 `project` 与 `execution`，保证服务端执行真正的 `toTask` 语义：同步写 `task.fromBug`、`bug.toTask` 并记录 `converttotask` 动作。
 
 ## 写操作保护
 

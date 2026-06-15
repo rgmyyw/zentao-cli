@@ -175,6 +175,10 @@ export class BugApi {
     });
   }
 
+  async confirmStoryChange(bugId: number): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/bug-confirmStoryChange-${bugId}.json`);
+  }
+
   async closeBug(bugId: number, data: Record<string, unknown> = {}): Promise<unknown> {
     return this.http.request('POST', `/bugs/${bugId}/close`, {
       data: this.normalizeBugWriteInput(data, { requiredFields: [] }),
@@ -206,6 +210,98 @@ export class BugApi {
     }
 
     return this.http.request('POST', `/bugs/${bugId}/resolve`, { data: payload });
+  }
+
+  async batchChangeBugBranch(input: { bugIds: number[]; branchId: number }): Promise<unknown> {
+    const bugIds = this.normalizeIdArray(input.bugIds, 'bugIds');
+    return this.http.legacyRequest('POST', `/bug-batchChangeBranch-${input.branchId}.json`, {
+      data: toFormUrlEncoded({ bugIDList: bugIds }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async batchChangeBugModule(input: { bugIds: number[]; moduleId: number }): Promise<unknown> {
+    const bugIds = this.normalizeIdArray(input.bugIds, 'bugIds');
+    return this.http.legacyRequest('POST', `/bug-batchChangeModule-${input.moduleId}.json`, {
+      data: toFormUrlEncoded({ bugIDList: bugIds }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async batchChangeBugPlan(input: { bugIds: number[]; planId: number }): Promise<unknown> {
+    const bugIds = this.normalizeIdArray(input.bugIds, 'bugIds');
+    return this.http.legacyRequest('POST', `/bug-batchChangePlan-${input.planId}.json`, {
+      data: toFormUrlEncoded({ bugIDList: bugIds }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async batchAssignBugs(input: { bugIds: number[]; objectId: number; type?: string; assignedTo: string; comment?: string }): Promise<unknown> {
+    const bugIds = this.normalizeIdArray(input.bugIds, 'bugIds');
+    const assignedTo = requireNonBlank(input.assignedTo, 'assignedTo 不能为空');
+    const formData: Record<string, unknown> = { bugIDList: bugIds, assignedTo };
+    if (input.comment && input.comment.trim()) formData.comment = input.comment.trim();
+    return this.http.legacyRequest(
+      'POST',
+      `/bug-batchAssignTo-${input.objectId}-${input.type ?? 'execution'}.json`,
+      {
+        data: toFormUrlEncoded(formData),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      },
+    );
+  }
+
+  async batchConfirmBugs(input: { bugIds: number[] }): Promise<unknown> {
+    const bugIds = this.normalizeIdArray(input.bugIds, 'bugIds');
+    return this.http.legacyRequest('POST', '/bug-batchConfirm.json', {
+      data: toFormUrlEncoded({ bugIDList: bugIds }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async batchResolveBugs(input: { bugIds: number[]; resolution: string; resolvedBuild?: string; comment?: string }): Promise<unknown> {
+    const bugIds = this.normalizeIdArray(input.bugIds, 'bugIds');
+    const resolution = requireNonBlank(input.resolution, 'resolution 不能为空');
+    const formData: Record<string, unknown> = { bugIDList: bugIds, resolution };
+    if (input.resolvedBuild && input.resolvedBuild.trim()) formData.resolvedBuild = input.resolvedBuild.trim();
+    if (input.comment && input.comment.trim()) formData.comment = input.comment.trim();
+    return this.http.legacyRequest(
+      'POST',
+      `/bug-batchResolve-${encodeURIComponent(resolution)}-${encodeURIComponent(input.resolvedBuild?.trim() ?? '')}.json`,
+      {
+        data: toFormUrlEncoded(formData),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      },
+    );
+  }
+
+  async batchCloseBugs(input: { bugIds: number[]; releaseId?: string; viewType?: string }): Promise<unknown> {
+    const bugIds = this.normalizeIdArray(input.bugIds, 'bugIds');
+    const formData: Record<string, unknown> = { bugIDList: bugIds };
+    return this.http.legacyRequest(
+      'POST',
+      `/bug-batchClose-${input.releaseId ?? ''}-${input.viewType ?? ''}.json`,
+      {
+        data: toFormUrlEncoded(formData),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      },
+    );
+  }
+
+  async batchActivateBugs(input: { productId: number; branch?: number; bugIds: number[] }): Promise<unknown> {
+    const bugIds = this.normalizeIdArray(input.bugIds, 'bugIds');
+    const statusListEntries = bugIds.map((id) => `statusList%5B${encodeURIComponent(String(id))}%5D=${encodeURIComponent('activate')}`);
+    const statusListData = statusListEntries.join('&');
+    const bugIdListData = bugIds.map((id) => `bugIDList%5B%5D=${encodeURIComponent(String(id))}`).join('&');
+    const formData = `${statusListData}&${bugIdListData}`;
+    return this.http.legacyRequest(
+      'POST',
+      `/bug-batchActivate-${input.productId}-${input.branch ?? 0}.json`,
+      {
+        data: formData,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      },
+    );
   }
 
   private async getAllMyBugsInProduct(params: Omit<BugListParams, 'status' | 'page' | 'limit'>): Promise<ZentaoBug[]> {
@@ -260,6 +356,19 @@ export class BugApi {
     }
 
     return normalized;
+  }
+
+  private normalizeIdArray(values: unknown, fieldName: string): number[] {
+    if (!Array.isArray(values) || values.length === 0) {
+      throw new Error(`${fieldName} 至少需要 1 项`);
+    }
+    return values.map((value) => {
+      const num = Number(value);
+      if (!Number.isInteger(num) || num <= 0) {
+        throw new Error(`${fieldName} 必须是正整数`);
+      }
+      return num;
+    });
   }
 
   private pickBugEditDefaults(bug: ZentaoBug): Record<string, unknown> {

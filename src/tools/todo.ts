@@ -40,6 +40,29 @@ export function registerTodoTools(server: CliRegistry): void {
     return runWithPreview('updateTodo', confirm, { todoId, ...update }, previewOrAssertWriteAllowed, () => getApi().todo.updateTodo(todoId, update));
   });
 
+  server.tool('startTodo', {
+    todoId: z.number().int().positive(),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ confirm, todoId }) => {
+    return runWithPreview('startTodo', confirm, { todoId }, previewOrAssertWriteAllowed, () => getApi().todo.startTodo(todoId));
+  });
+
+  server.tool('closeTodo', {
+    todoId: z.number().int().positive(),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ confirm, todoId }) => {
+    return runWithPreview('closeTodo', confirm, { todoId }, previewOrAssertWriteAllowed, () => getApi().todo.closeTodo(todoId));
+  });
+
+  server.tool('assignTodo', {
+    todoId: z.number().int().positive(),
+    assignedTo: z.string().trim().min(1).describe('分配给禅道账号。对应 18.5 todo/assignTo 页面 assignedTo 字段'),
+    comment: optionalTrimmedText.describe('分配备注。对应 18.5 todo/assignTo 页面 comment 字段'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ confirm, todoId, ...payload }) => {
+    return runWithPreview('assignTodo', confirm, { todoId, ...payload }, previewOrAssertWriteAllowed, () => getApi().todo.assignTodo(todoId, payload as { assignedTo: string; comment?: string }));
+  });
+
   server.tool('deleteTodo', {
     todoId: z.number().int().positive(),
     confirm: z.boolean().optional().default(false),
@@ -60,4 +83,20 @@ export function registerTodoTools(server: CliRegistry): void {
   }, async ({ confirm, todoId }) => {
     return runWithPreview('activateTodo', confirm, { todoId }, previewOrAssertWriteAllowed, () => getApi().todo.activateTodo(todoId));
   });
+
+  server.tool('batchFinishTodos', {
+    todoIds: z.array(z.number().int().positive()).min(1).describe('要批量结束的待办 ID 列表，对应 18.5 todo/batchFinish 页面 todoIDList[] 字段'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ todoIds, confirm }) => runWithPreview('batchFinishTodos', confirm, { todoIds }, previewOrAssertWriteAllowed, () => getApi().todo.batchFinishTodos({ todoIds })));
+
+  server.tool('batchCloseTodos', {
+    todoIds: z.array(z.number().int().positive()).min(1).describe('要批量关闭的待办 ID 列表，对应 18.5 todo/batchClose 页面 todoIDList[] 字段'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ todoIds, confirm }) => runWithPreview('batchCloseTodos', confirm, { todoIds }, previewOrAssertWriteAllowed, () => getApi().todo.batchCloseTodos({ todoIds })));
+
+  server.tool('importTodosToToday', {
+    todoIds: z.array(z.number().int().positive()).min(1).describe('要导入到今天的待办 ID 列表，对应 18.5 todo/import2Today 页面 todoIDList[] 字段'),
+    date: optionalTrimmedText.describe('目标日期，默认今天。格式 YYYY-MM-DD'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ todoIds, date, confirm }) => runWithPreview('importTodosToToday', confirm, { todoIds, date: date ?? null }, previewOrAssertWriteAllowed, () => getApi().todo.importTodosToToday({ todoIds, date })));
 }

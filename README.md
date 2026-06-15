@@ -340,6 +340,13 @@ zentao --role qa createBug --product 1 --title "页面按钮无响应" --openedB
 zentao --role qa okBug --bugId 123 --comment "回归通过" --confirm true
 zentao --role pm createStory --product 1 --title "新增导出能力" --spec "需求说明" --verify "验收标准" --confirm true
 zentao createTodo --name "跟进缺陷回归" --begin 09:00 --end 10:00 --confirm true
+
+# 批量操作示例
+zentao --role dev batchFinishTasks --taskIds 1 --taskIds 2 --confirm true
+zentao --role dev batchAssignTasksTo --taskIds 1 --taskIds 2 --assignedTo dev --comment "请处理" --confirm true
+zentao --role dev batchActivateTasks --taskIds 1 --confirm true
+zentao --role qa batchResolveBugs --bugIds 1 --bugIds 2 --confirm true
+zentao --role pm batchReviewStories --storyIds 1 --storyIds 2 --confirm true
 ```
 
 ## 写操作保护

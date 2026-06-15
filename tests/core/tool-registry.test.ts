@@ -18,9 +18,10 @@ describe('registerTools', () => {
 
     await registerTools(registry, 'full');
 
-    expect(registry.listCommands().map((command) => command.name)).toEqual([
+    expect(registry.listCommands().map((command) => command.name).sort()).toEqual([
       'activateBug',
       'activateExecution',
+      'activatePlan',
       'activateStory',
       'activateTask',
       'activateTodo',
@@ -28,14 +29,56 @@ describe('registerTools', () => {
       'analyzeBugResources',
       'analyzeTaskResources',
       'assignBug',
+      'assignBuildTo',
       'assignStory',
       'assignTask',
+      'assignTodo',
+      'batchActivateBugs',
+      'batchActivateTasks',
+      'batchAssignBugs',
+      'batchAssignStoriesTo',
+      'batchAssignTasksTo',
+      'batchCancelTasks',
+      'batchChangeBugBranch',
+      'batchChangeBugModule',
+      'batchChangeBugPlan',
+      'batchChangeStoryBranch',
+      'batchChangeStoryModule',
+      'batchChangeStoryPlan',
+      'batchChangeStoryStage',
+      'batchChangeTaskBranch',
+      'batchChangeTaskModule',
+      'batchChangeTaskPlan',
+      'batchCloseBugs',
+      'batchCloseStories',
+      'batchCloseTasks',
+      'batchCloseTodos',
+      'batchConfirmBugs',
+      'batchConfirmTestCaseStoryChange',
+      'batchFinishTasks',
+      'batchFinishTodos',
+      'batchResolveBugs',
+      'batchReviewStories',
+      'batchUnlinkBugsFromBuild',
+      'batchUnlinkBugsFromRelease',
+      'batchUnlinkStoriesFromBuild',
+      'batchUnlinkStoriesFromRelease',
+      'cancelTask',
+      'changeReleaseStatus',
       'changeStory',
       'closeBug',
       'closeExecution',
+      'closePlan',
       'closeStory',
       'closeTask',
+      'computeExecutionBurn',
       'confirmBug',
+      'confirmBugStoryChange',
+      'confirmExecutionStoryChange',
+      'confirmTaskStoryChange',
+      'confirmTestCaseStoryChange',
+      'confirmTestCaseLibcaseChange',
+      'ignoreTestCaseLibcaseChange',
       'createBug',
       'createBuild',
       'createStory',
@@ -45,8 +88,13 @@ describe('registerTools', () => {
       'createTestTask',
       'createTodo',
       'deleteBug',
+      'deleteRelease',
       'deleteTask',
+      'deleteTaskEstimate',
+      'deleteTestTask',
       'deleteTodo',
+      'editTaskEstimate',
+      'finishPlan',
       'finishTask',
       'finishTodo',
       'getBugDetail',
@@ -88,23 +136,46 @@ describe('registerTools', () => {
       'getTestTaskDetail',
       'getTestTasks',
       'getTodoDetail',
+      'importTodosToToday',
       'initZentao',
+      'linkBugsToBuild',
       'linkBugsToPlan',
+      'linkBugsToRelease',
+      'linkStoriesToBuild',
       'linkStoriesToPlan',
+      'linkStoriesToRelease',
+      'linkStoriesToStory',
+      'notifyBuildBug',
+      'notifyRelease',
       'okBug',
       'pauseTask',
+      'processStoryChange',
       'putoffExecution',
+      'recallStory',
       'recordTaskEstimate',
       'resolveBug',
       'restartTask',
       'reviewStory',
       'searchStories',
       'searchStoriesByProductName',
+      'startTestTask',
       'startExecution',
+      'startPlan',
       'startTask',
+      'startTodo',
+      'submitStoryReview',
+      'activateTestTask',
+      'blockTestTask',
+      'closeTestTask',
+      'closeTodo',
       'suspendExecution',
+      'unlinkBugFromBuild',
+      'unlinkBugFromRelease',
       'unlinkBugsFromPlan',
       'unlinkStoriesFromPlan',
+      'unlinkStoryFromBuild',
+      'unlinkStoryFromRelease',
+      'unlinkStoryFromStory',
       'updateBug',
       'updateBuild',
       'updateExecution',
@@ -115,7 +186,7 @@ describe('registerTools', () => {
       'updateTodo',
       'who-am-i',
       'whoami',
-    ]);
+    ].sort());
   });
 
   it('filters commands by role', async () => {
@@ -127,6 +198,8 @@ describe('registerTools', () => {
     expect(names).toContain('getProducts');
     expect(names).toContain('getProductStories');
     expect(names).toContain('getProductPlans');
+    expect(names).toContain('startPlan');
+    expect(names).toContain('notifyRelease');
     expect(names).not.toContain('getMyBugs');
     expect(names).not.toContain('getProductTestCases');
   });
@@ -203,6 +276,19 @@ describe('registerTools', () => {
     });
   });
 
+  it('parses confirmBugStoryChange args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ bug: { confirmStoryChange: vi.fn() } } as never);
+
+    await registerTools(registry, 'dev');
+    const command = registry.getCommand('confirmBugStoryChange');
+
+    expect(parseCommandInput(command!.schema, ['--bugId', '84362'])).toMatchObject({
+      bugId: 84362,
+      confirm: false,
+    });
+  });
+
   it('parses recordTaskEstimate args', async () => {
     const registry = new InMemoryCliRegistry();
     setApi({ task: { recordEstimate: vi.fn() } } as never);
@@ -216,6 +302,283 @@ describe('registerTools', () => {
       consumed: 2,
       left: 18,
       work: '今天处理联调',
+      confirm: false,
+    });
+  });
+
+  it('parses editTaskEstimate args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ task: { editEstimate: vi.fn() } } as never);
+
+    await registerTools(registry, 'dev');
+    const command = registry.getCommand('editTaskEstimate');
+
+    expect(parseCommandInput(command!.schema, ['--estimateId', '12', '--date', ' 2026-06-12 ', '--consumed', '2', '--left', '18', '--work', ' 处理联调 '])).toMatchObject({
+      estimateId: 12,
+      date: '2026-06-12',
+      consumed: 2,
+      left: 18,
+      work: '处理联调',
+      confirm: false,
+    });
+  });
+
+  it('parses deleteTaskEstimate args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ task: { deleteEstimate: vi.fn() } } as never);
+
+    await registerTools(registry, 'dev');
+    const command = registry.getCommand('deleteTaskEstimate');
+
+    expect(parseCommandInput(command!.schema, ['--estimateId', '12'])).toMatchObject({
+      estimateId: 12,
+      confirm: false,
+    });
+  });
+
+  it('parses confirmTaskStoryChange args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ task: { confirmStoryChange: vi.fn() } } as never);
+
+    await registerTools(registry, 'dev');
+    const command = registry.getCommand('confirmTaskStoryChange');
+
+    expect(parseCommandInput(command!.schema, ['--taskId', '79922'])).toMatchObject({
+      taskId: 79922,
+      confirm: false,
+    });
+  });
+
+  it('parses confirmTestCaseStoryChange args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ testcase: { confirmStoryChange: vi.fn() } } as never);
+
+    await registerTools(registry, 'full');
+    const command = registry.getCommand('confirmTestCaseStoryChange');
+
+    expect(parseCommandInput(command!.schema, ['--caseId', '58191'])).toMatchObject({
+      caseId: 58191,
+      confirm: false,
+    });
+  });
+
+  it('parses confirmTestCaseLibcaseChange args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ testcase: { confirmLibcaseChange: vi.fn() } } as never);
+
+    await registerTools(registry, 'full');
+    const command = registry.getCommand('confirmTestCaseLibcaseChange');
+
+    expect(parseCommandInput(command!.schema, ['--caseId', '58191', '--libcaseId', '58192'])).toMatchObject({
+      caseId: 58191,
+      libcaseId: 58192,
+      confirm: false,
+    });
+  });
+
+  it('parses ignoreTestCaseLibcaseChange args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ testcase: { ignoreLibcaseChange: vi.fn() } } as never);
+
+    await registerTools(registry, 'full');
+    const command = registry.getCommand('ignoreTestCaseLibcaseChange');
+
+    expect(parseCommandInput(command!.schema, ['--caseId', '58191'])).toMatchObject({
+      caseId: 58191,
+      confirm: false,
+    });
+  });
+
+  it('parses batchConfirmTestCaseStoryChange args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ testcase: { batchConfirmStoryChange: vi.fn() } } as never);
+
+    await registerTools(registry, 'full');
+    const command = registry.getCommand('batchConfirmTestCaseStoryChange');
+
+    expect(parseCommandInput(command!.schema, ['--productId', '153', '--caseIds', '58191', '--caseIds', '58192'])).toMatchObject({
+      productId: 153,
+      caseIds: [58191, 58192],
+      confirm: false,
+    });
+  });
+
+  it('parses batchFinishTasks args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ task: { batchFinishTasks: vi.fn() } } as never);
+
+    await registerTools(registry, 'dev');
+    const command = registry.getCommand('batchFinishTasks');
+
+    expect(parseCommandInput(command!.schema, ['--taskIds', '1', '--taskIds', '2'])).toMatchObject({
+      taskIds: [1, 2],
+      confirm: false,
+    });
+  });
+
+  it('parses batchCancelTasks args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ task: { batchCancelTasks: vi.fn() } } as never);
+
+    await registerTools(registry, 'dev');
+    const command = registry.getCommand('batchCancelTasks');
+
+    expect(parseCommandInput(command!.schema, ['--taskIds', '3'])).toMatchObject({
+      taskIds: [3],
+      confirm: false,
+    });
+  });
+
+  it('parses batchCloseTasks args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ task: { batchCloseTasks: vi.fn() } } as never);
+
+    await registerTools(registry, 'dev');
+    const command = registry.getCommand('batchCloseTasks');
+
+    expect(parseCommandInput(command!.schema, ['--taskIds', '4', '--taskIds', '5'])).toMatchObject({
+      taskIds: [4, 5],
+      confirm: false,
+    });
+  });
+
+  it('parses batchChangeTaskBranch args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ task: { batchChangeTaskBranch: vi.fn() } } as never);
+
+    await registerTools(registry, 'dev');
+    const command = registry.getCommand('batchChangeTaskBranch');
+
+    expect(parseCommandInput(command!.schema, ['--taskIds', '6', '--branchId', '100'])).toMatchObject({
+      taskIds: [6],
+      branchId: 100,
+      confirm: false,
+    });
+  });
+
+  it('parses batchChangeTaskModule args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ task: { batchChangeTaskModule: vi.fn() } } as never);
+
+    await registerTools(registry, 'dev');
+    const command = registry.getCommand('batchChangeTaskModule');
+
+    expect(parseCommandInput(command!.schema, ['--taskIds', '7', '--moduleId', '10'])).toMatchObject({
+      taskIds: [7],
+      moduleId: 10,
+      confirm: false,
+    });
+  });
+
+  it('parses batchChangeTaskPlan args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ task: { batchChangeTaskPlan: vi.fn() } } as never);
+
+    await registerTools(registry, 'dev');
+    const command = registry.getCommand('batchChangeTaskPlan');
+
+    expect(parseCommandInput(command!.schema, ['--taskIds', '8', '--planId', '3'])).toMatchObject({
+      taskIds: [8],
+      planId: 3,
+      confirm: false,
+    });
+  });
+
+  it('parses batchAssignTasksTo args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ task: { batchAssignTasksTo: vi.fn() } } as never);
+
+    await registerTools(registry, 'dev');
+    const command = registry.getCommand('batchAssignTasksTo');
+
+    expect(parseCommandInput(command!.schema, ['--taskIds', '9', '--taskIds', '10', '--assignedTo', 'dev', '--comment', ' 请处理 '])).toMatchObject({
+      taskIds: [9, 10],
+      assignedTo: 'dev',
+      comment: '请处理',
+      confirm: false,
+    });
+  });
+
+  it('parses batchActivateTasks args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ task: { batchActivateTasks: vi.fn() } } as never);
+
+    await registerTools(registry, 'dev');
+    const command = registry.getCommand('batchActivateTasks');
+
+    expect(parseCommandInput(command!.schema, ['--taskIds', '11'])).toMatchObject({
+      taskIds: [11],
+      confirm: false,
+    });
+  });
+
+  it('parses cancelTask args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ task: { cancelTask: vi.fn() } } as never);
+
+    await registerTools(registry, 'dev');
+    const command = registry.getCommand('cancelTask');
+
+    expect(parseCommandInput(command!.schema, ['--taskId', '79922', '--comment', ' 暂不处理 '])).toMatchObject({
+      taskId: 79922,
+      comment: '暂不处理',
+      confirm: false,
+    });
+  });
+
+
+  it('parses closePlan args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ plan: { closePlan: vi.fn() } } as never);
+
+    await registerTools(registry, 'pm');
+    const command = registry.getCommand('closePlan');
+
+    expect(parseCommandInput(command!.schema, ['--planId', '8', '--closedReason', ' done ', '--comment', ' close it '])).toMatchObject({
+      planId: 8,
+      closedReason: 'done',
+      comment: 'close it',
+      confirm: false,
+    });
+  });
+
+  it('parses linkBugsToRelease args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ release: { linkBugsToRelease: vi.fn() } } as never);
+
+    await registerTools(registry, 'pm');
+    const command = registry.getCommand('linkBugsToRelease');
+
+    expect(parseCommandInput(command!.schema, ['--releaseId', '9', '--bugIds', '21', '--bugIds', '22', '--type', 'leftBug'])).toMatchObject({
+      releaseId: 9,
+      bugIds: [21, 22],
+      type: 'leftBug',
+      confirm: false,
+    });
+  });
+
+  it('parses linkStoriesToBuild args', async () => {
+    const registry = new InMemoryCliRegistry();
+    await registerTools(registry, 'full');
+    const command = registry.getCommand('linkStoriesToBuild');
+
+    expect(parseCommandInput(command!.schema, ['--buildId', '9', '--storyIds', '21', '--storyIds', '22'])).toEqual({
+      buildId: 9,
+      storyIds: [21, 22],
+      confirm: false,
+    });
+  });
+
+  it('parses linkStoriesToStory args', async () => {
+    const registry = new InMemoryCliRegistry();
+    setApi({ story: { linkStoriesToStory: vi.fn() } } as never);
+
+    await registerTools(registry, 'pm');
+    const command = registry.getCommand('linkStoriesToStory');
+
+    expect(parseCommandInput(command!.schema, ['--storyId', '9', '--storyIds', '21', '--storyIds', '22'])).toMatchObject({
+      storyId: 9,
+      storyIds: [21, 22],
       confirm: false,
     });
   });
@@ -364,6 +727,11 @@ describe('registerTools', () => {
     const createTestCaseCommand = registry.getCommand('createTestCase');
     const updateTestCaseCommand = registry.getCommand('updateTestCase');
     const createTestTaskCommand = registry.getCommand('createTestTask');
+    const startTestTaskCommand = registry.getCommand('startTestTask');
+    const activateTestTaskCommand = registry.getCommand('activateTestTask');
+    const blockTestTaskCommand = registry.getCommand('blockTestTask');
+    const closeTestTaskCommand = registry.getCommand('closeTestTask');
+    const deleteTestTaskCommand = registry.getCommand('deleteTestTask');
 
     expect(parseCommandInput(createBuildCommand!.schema, ['--project', '1', '--execution', '2', '--product', '3', '--name', ' 构建 ', '--builder', ' me '])).toMatchObject({
       project: 1,
@@ -393,6 +761,32 @@ describe('registerTools', () => {
       begin: '2026-01-01',
       end: '2026-01-02',
       type: ['功能', '冒烟'],
+      confirm: false,
+    });
+    expect(parseCommandInput(startTestTaskCommand!.schema, ['--testTaskId', '1', '--comment', ' start '])).toMatchObject({
+      testTaskId: 1,
+      comment: 'start',
+      confirm: false,
+    });
+    expect(parseCommandInput(activateTestTaskCommand!.schema, ['--testTaskId', '1', '--comment', ' active '])).toMatchObject({
+      testTaskId: 1,
+      comment: 'active',
+      confirm: false,
+    });
+    expect(parseCommandInput(blockTestTaskCommand!.schema, ['--testTaskId', '1', '--comment', ' block '])).toMatchObject({
+      testTaskId: 1,
+      comment: 'block',
+      confirm: false,
+    });
+    expect(parseCommandInput(closeTestTaskCommand!.schema, ['--testTaskId', '1', '--realFinishedDate', ' 2026-01-03 ', '--mailto', '[" qa "," pm "]', '--comment', ' close '])).toMatchObject({
+      testTaskId: 1,
+      realFinishedDate: '2026-01-03',
+      mailto: ['qa', 'pm'],
+      comment: 'close',
+      confirm: false,
+    });
+    expect(parseCommandInput(deleteTestTaskCommand!.schema, ['--testTaskId', '1'])).toMatchObject({
+      testTaskId: 1,
       confirm: false,
     });
 
@@ -695,16 +1089,17 @@ describe('registerTools', () => {
 
   it('falls back to default derived task text when optional values are empty after trim', async () => {
     const registry = new InMemoryCliRegistry();
-    const createTask = vi.fn(async () => ({ status: 'ok' }));
+    const convertBugToTask = vi.fn(async () => ({ status: 'ok' }));
     setApi({
       bug: { getBugDetail: vi.fn(async () => ({ title: '登录失败', steps: '第一步' })) },
-      task: { createTask },
+      task: { convertBugToTask },
     } as never);
 
     await registerTools(registry, 'full');
     const command = registry.getCommand('createTaskFromBug');
     const result = await command!.handler({
       bugId: 1,
+      project: 1772,
       execution: 2,
       taskName: '',
       type: '',
@@ -715,19 +1110,20 @@ describe('registerTools', () => {
       confirm: false,
     });
 
-    expect(createTask).not.toHaveBeenCalled();
+    expect(convertBugToTask).not.toHaveBeenCalled();
     expect(parseResult(result)).toMatchObject({
       ok: false,
       preview: true,
       action: 'createTaskFromBug',
       payload: {
+        bugId: 1,
         execution: 2,
+        project: 1772,
         name: '修复Bug #1: 登录失败',
         type: 'devel',
         assignedTo: 'me',
         estStarted: '2026-01-01',
         deadline: '2026-01-02',
-        fromBug: 1,
         desc: '修复Bug #1: 登录失败\n\n复现步骤:\n第一步',
       },
     });
@@ -793,13 +1189,38 @@ describe('registerTools', () => {
   it('executes supported write tool handlers by default when confirmed', async () => {
     const registry = new InMemoryCliRegistry();
     const api = {
-      bug: { getBugDetail: vi.fn(async () => ({ title: 'b', steps: 's' })), resolveBug: vi.fn(async () => ({ name: 'resolveBug' })) },
-      build: { createBuild: vi.fn(async () => ({ name: 'createBuild' })), updateBuild: vi.fn(async () => ({ name: 'updateBuild' })) },
+      bug: {
+        getBugDetail: vi.fn(async () => ({ title: 'b', steps: 's' })),
+        resolveBug: vi.fn(async () => ({ name: 'resolveBug' })),
+        confirmStoryChange: vi.fn(async () => ({ name: 'confirmBugStoryChange' })),
+        batchChangeBugBranch: vi.fn(async () => ({ name: 'batchChangeBugBranch' })),
+        batchChangeBugModule: vi.fn(async () => ({ name: 'batchChangeBugModule' })),
+        batchChangeBugPlan: vi.fn(async () => ({ name: 'batchChangeBugPlan' })),
+        batchAssignBugs: vi.fn(async () => ({ name: 'batchAssignBugs' })),
+        batchConfirmBugs: vi.fn(async () => ({ name: 'batchConfirmBugs' })),
+        batchResolveBugs: vi.fn(async () => ({ name: 'batchResolveBugs' })),
+        batchCloseBugs: vi.fn(async () => ({ name: 'batchCloseBugs' })),
+        batchActivateBugs: vi.fn(async () => ({ name: 'batchActivateBugs' })),
+      },
+      build: {
+        createBuild: vi.fn(async () => ({ name: 'createBuild' })),
+        updateBuild: vi.fn(async () => ({ name: 'updateBuild' })),
+        linkStoriesToBuild: vi.fn(async () => ({ name: 'linkStoriesToBuild' })),
+        unlinkStoryFromBuild: vi.fn(async () => ({ name: 'unlinkStoryFromBuild' })),
+        batchUnlinkStoriesFromBuild: vi.fn(async () => ({ name: 'batchUnlinkStoriesFromBuild' })),
+        linkBugsToBuild: vi.fn(async () => ({ name: 'linkBugsToBuild' })),
+        unlinkBugFromBuild: vi.fn(async () => ({ name: 'unlinkBugFromBuild' })),
+        batchUnlinkBugsFromBuild: vi.fn(async () => ({ name: 'batchUnlinkBugsFromBuild' })),
+      },
       execution: {
         startExecution: vi.fn(async () => ({ name: 'startExecution' })), closeExecution: vi.fn(async () => ({ name: 'closeExecution' })),
         suspendExecution: vi.fn(async () => ({ name: 'suspendExecution' })), activateExecution: vi.fn(async () => ({ name: 'activateExecution' })), putoffExecution: vi.fn(async () => ({ name: 'putoffExecution' })),
       },
       plan: {
+        startPlan: vi.fn(async () => ({ name: 'startPlan' })),
+        finishPlan: vi.fn(async () => ({ name: 'finishPlan' })),
+        activatePlan: vi.fn(async () => ({ name: 'activatePlan' })),
+        closePlan: vi.fn(async () => ({ name: 'closePlan' })),
         linkStoriesToPlan: vi.fn(async () => ({ name: 'linkStoriesToPlan' })), unlinkStoriesFromPlan: vi.fn(async () => ({ name: 'unlinkStoriesFromPlan' })),
         linkBugsToPlan: vi.fn(async () => ({ name: 'linkBugsToPlan' })), unlinkBugsFromPlan: vi.fn(async () => ({ name: 'unlinkBugsFromPlan' })),
       },
@@ -812,16 +1233,69 @@ describe('registerTools', () => {
         assignStory: vi.fn(async () => ({ name: 'assignStory' })),
         activateStory: vi.fn(async () => ({ name: 'activateStory' })),
         reviewStory: vi.fn(async () => ({ name: 'reviewStory' })),
+      linkStoriesToStory: vi.fn(async () => ({ name: 'linkStoriesToStory' })),
+      unlinkStoryFromStory: vi.fn(async () => ({ name: 'unlinkStoryFromStory' })),
+      recallStory: vi.fn(async () => ({ name: 'recallStory' })),
+      submitStoryReview: vi.fn(async () => ({ name: 'submitStoryReview' })),
+      processStoryChange: vi.fn(async () => ({ name: 'processStoryChange' })),
+      batchReviewStories: vi.fn(async () => ({ name: 'batchReviewStories' })),
+      batchCloseStories: vi.fn(async () => ({ name: 'batchCloseStories' })),
+      batchChangeStoryModule: vi.fn(async () => ({ name: 'batchChangeStoryModule' })),
+      batchChangeStoryPlan: vi.fn(async () => ({ name: 'batchChangeStoryPlan' })),
+      batchChangeStoryBranch: vi.fn(async () => ({ name: 'batchChangeStoryBranch' })),
+      batchChangeStoryStage: vi.fn(async () => ({ name: 'batchChangeStoryStage' })),
+      batchAssignStoriesTo: vi.fn(async () => ({ name: 'batchAssignStoriesTo' })),
+    },
+      release: {
+        changeReleaseStatus: vi.fn(async () => ({ name: 'changeReleaseStatus' })),
+        notifyRelease: vi.fn(async () => ({ name: 'notifyRelease' })),
+        deleteRelease: vi.fn(async () => ({ name: 'deleteRelease' })),
+        linkStoriesToRelease: vi.fn(async () => ({ name: 'linkStoriesToRelease' })),
+        unlinkStoryFromRelease: vi.fn(async () => ({ name: 'unlinkStoryFromRelease' })),
+        batchUnlinkStoriesFromRelease: vi.fn(async () => ({ name: 'batchUnlinkStoriesFromRelease' })),
+        linkBugsToRelease: vi.fn(async () => ({ name: 'linkBugsToRelease' })),
+        unlinkBugFromRelease: vi.fn(async () => ({ name: 'unlinkBugFromRelease' })),
+        batchUnlinkBugsFromRelease: vi.fn(async () => ({ name: 'batchUnlinkBugsFromRelease' })),
       },
-      task: { updateTask: vi.fn(async () => ({ name: 'updateTask' })), finishTask: vi.fn(async () => ({ name: 'finishTask' })), createTask: vi.fn(async () => ({ name: 'createTask' })) },
-      testcase: { createTestCase: vi.fn(async () => ({ name: 'createTestCase' })), updateTestCase: vi.fn(async () => ({ name: 'updateTestCase' })) },
-      testtask: { createTestTask: vi.fn(async () => ({ name: 'createTestTask' })) },
+      task: {
+        editEstimate: vi.fn(async () => ({ name: 'editTaskEstimate' })),
+        deleteEstimate: vi.fn(async () => ({ name: 'deleteTaskEstimate' })),
+        confirmStoryChange: vi.fn(async () => ({ name: 'confirmTaskStoryChange' })),
+        cancelTask: vi.fn(async () => ({ name: 'cancelTask' })),
+        updateTask: vi.fn(async () => ({ name: 'updateTask' })),
+        finishTask: vi.fn(async () => ({ name: 'finishTask' })),
+        createTask: vi.fn(async () => ({ name: 'createTask' })),
+        convertBugToTask: vi.fn(async () => ({ name: 'convertBugToTask' })),
+      },
+      testcase: {
+        createTestCase: vi.fn(async () => ({ name: 'createTestCase' })),
+        updateTestCase: vi.fn(async () => ({ name: 'updateTestCase' })),
+        confirmStoryChange: vi.fn(async () => ({ name: 'confirmTestCaseStoryChange' })),
+        confirmLibcaseChange: vi.fn(async () => ({ name: 'confirmTestCaseLibcaseChange' })),
+        ignoreLibcaseChange: vi.fn(async () => ({ name: 'ignoreTestCaseLibcaseChange' })),
+        batchConfirmStoryChange: vi.fn(async () => ({ name: 'batchConfirmTestCaseStoryChange' })),
+      },
+      testtask: {
+        createTestTask: vi.fn(async () => ({ name: 'createTestTask' })),
+        updateTestTask: vi.fn(async () => ({ name: 'updateTestTask' })),
+        startTestTask: vi.fn(async () => ({ name: 'startTestTask' })),
+        activateTestTask: vi.fn(async () => ({ name: 'activateTestTask' })),
+        blockTestTask: vi.fn(async () => ({ name: 'blockTestTask' })),
+        closeTestTask: vi.fn(async () => ({ name: 'closeTestTask' })),
+        deleteTestTask: vi.fn(async () => ({ name: 'deleteTestTask' })),
+      },
       todo: {
         createTodo: vi.fn(async () => ({ name: 'createTodo' })),
         updateTodo: vi.fn(async () => ({ name: 'updateTodo' })),
         deleteTodo: vi.fn(async () => ({ name: 'deleteTodo' })),
         finishTodo: vi.fn(async () => ({ name: 'finishTodo' })),
         activateTodo: vi.fn(async () => ({ name: 'activateTodo' })),
+        startTodo: vi.fn(async () => ({ name: 'startTodo' })),
+        closeTodo: vi.fn(async () => ({ name: 'closeTodo' })),
+        assignTodo: vi.fn(async () => ({ name: 'assignTodo' })),
+        batchFinishTodos: vi.fn(async () => ({ name: 'batchFinishTodos' })),
+        batchCloseTodos: vi.fn(async () => ({ name: 'batchCloseTodos' })),
+        importTodosToToday: vi.fn(async () => ({ name: 'importTodosToToday' })),
       },
     };
     setApi(api as never);
@@ -830,7 +1304,20 @@ describe('registerTools', () => {
     const calls: Array<[string, Record<string, unknown>]> = [
       ['updateTask', { taskId: 1, name: 't', confirm: true }],
       ['finishTask', { taskId: 1, currentConsumed: 1, realStarted: '2026-01-01', finishedDate: '2026-01-02', confirm: true }],
+      ['editTaskEstimate', { estimateId: 1, date: '2026-01-01', consumed: 1, left: 1, work: 'w', confirm: true }],
+      ['deleteTaskEstimate', { estimateId: 1, confirm: true }],
+      ['confirmTaskStoryChange', { taskId: 1, confirm: true }],
+      ['cancelTask', { taskId: 1, comment: 'cancel', confirm: true }],
       ['resolveBug', { bugId: 1, resolution: 'fixed', confirm: true }],
+      ['confirmBugStoryChange', { bugId: 1, confirm: true }],
+      ['batchChangeBugBranch', { bugIds: [1, 2], branchId: 1, confirm: true }],
+      ['batchChangeBugModule', { bugIds: [1, 2], moduleId: 66, confirm: true }],
+      ['batchChangeBugPlan', { bugIds: [1, 2], planId: 360, confirm: true }],
+      ['batchAssignBugs', { bugIds: [1, 2], objectId: 2, type: 'execution', assignedTo: 'me', comment: 'note', confirm: true }],
+      ['batchConfirmBugs', { bugIds: [1, 2], confirm: true }],
+      ['batchResolveBugs', { bugIds: [1, 2], resolution: 'fixed', resolvedBuild: 'trunk', comment: 'note', confirm: true }],
+      ['batchCloseBugs', { bugIds: [1, 2], releaseId: '', viewType: '', confirm: true }],
+      ['batchActivateBugs', { productId: 153, branch: 0, bugIds: [1, 2], confirm: true }],
       ['updateStory', { storyId: 1, title: 's', confirm: true }],
       ['changeStory', { storyId: 1, title: 's2', confirm: true }],
       ['createStory', { product: 1, title: 's3', confirm: true }],
@@ -838,13 +1325,45 @@ describe('registerTools', () => {
       ['assignStory', { storyId: 1, assignedTo: 'me', confirm: true }],
       ['activateStory', { storyId: 1, comment: 'a', confirm: true }],
       ['reviewStory', { storyId: 1, result: 'pass', confirm: true }],
+      ['linkStoriesToStory', { storyId: 1, storyIds: [2], confirm: true }],
+      ['unlinkStoryFromStory', { storyId: 1, linkedStoryId: 2, confirm: true }],
+      ['recallStory', { storyId: 1, confirm: true }],
+      ['submitStoryReview', { storyId: 1, confirm: true }],
+      ['processStoryChange', { storyId: 1, result: 'yes', confirm: true }],
+      ['batchReviewStories', { storyIds: [1, 2], result: 'pass', reason: 'ok', confirm: true }],
+      ['batchCloseStories', { productId: 153, storyIds: [1, 2], closedReasons: { 1: 'done', 2: 'cancel' }, comments: { 1: 'note1', 2: 'note2' }, confirm: true }],
+      ['batchChangeStoryModule', { storyIds: [1, 2], moduleId: 66, storyType: 'story', confirm: true }],
+      ['batchChangeStoryPlan', { storyIds: [1, 2], planId: 360, oldPlanId: undefined, confirm: true }],
+      ['batchChangeStoryBranch', { storyIds: [1, 2], branchId: 1, confirmBranch: 'yes', storyType: 'story', confirm: true }],
+      ['batchChangeStoryStage', { storyIds: [1, 2], stage: 'verified', confirm: true }],
+      ['batchAssignStoriesTo', { storyIds: [1, 2], assignedTo: 'me', comment: undefined, storyType: 'story', confirm: true }],
+      ['startPlan', { planId: 1, comment: 'go', confirm: true }],
+      ['finishPlan', { planId: 1, comment: 'done', confirm: true }],
+      ['activatePlan', { planId: 1, comment: 'reopen', confirm: true }],
+      ['closePlan', { planId: 1, closedReason: 'done', comment: 'close', confirm: true }],
+      ['changeReleaseStatus', { releaseId: 1, status: 'terminate', confirm: true }],
+      ['notifyRelease', { releaseId: 1, notify: ['FB'], confirm: true }],
+      ['deleteRelease', { releaseId: 1, confirm: true }],
+      ['linkStoriesToRelease', { releaseId: 1, storyIds: [1], confirm: true }],
+      ['unlinkStoryFromRelease', { releaseId: 1, storyId: 1, confirm: true }],
+      ['batchUnlinkStoriesFromRelease', { releaseId: 1, storyIds: [1], confirm: true }],
+      ['linkBugsToRelease', { releaseId: 1, bugIds: [1], type: 'leftBug', confirm: true }],
+      ['unlinkBugFromRelease', { releaseId: 1, bugId: 1, type: 'leftBug', confirm: true }],
+      ['batchUnlinkBugsFromRelease', { releaseId: 1, bugIds: [1], confirm: true }],
       ['createTaskFromStory', { storyId: 1, execution: 2, taskName: 't', assignedTo: 'me', estStarted: '2026-01-01', deadline: '2026-01-02', confirm: true }],
-      ['createTaskFromBug', { bugId: 1, execution: 2, assignedTo: 'me', estStarted: '2026-01-01', deadline: '2026-01-02', confirm: true }],
+      ['createTaskFromBug', { bugId: 1, project: 1772, execution: 2, assignedTo: 'me', estStarted: '2026-01-01', deadline: '2026-01-02', confirm: true }],
       ['createTodo', { name: 'todo', confirm: true }],
+      ['updateTestTask', { testTaskId: 1, name: 'test', confirm: true }],
       ['updateTodo', { todoId: 1, name: 'todo2', confirm: true }],
       ['deleteTodo', { todoId: 1, confirm: true }],
       ['finishTodo', { todoId: 1, confirm: true }],
       ['activateTodo', { todoId: 1, confirm: true }],
+      ['startTodo', { todoId: 1, confirm: true }],
+      ['closeTodo', { todoId: 1, confirm: true }],
+      ['assignTodo', { todoId: 1, assignedTo: 'me', confirm: true }],
+      ['batchFinishTodos', { todoIds: [1, 2], confirm: true }],
+      ['batchCloseTodos', { todoIds: [1, 2], confirm: true }],
+      ['importTodosToToday', { todoIds: [1, 2], date: null, confirm: true }],
       ['linkStoriesToPlan', { planId: 1, storyIds: [1], confirm: true }],
       ['unlinkStoriesFromPlan', { planId: 1, storyIds: [1], confirm: true }],
       ['linkBugsToPlan', { planId: 1, bugIds: [1], confirm: true }],
@@ -856,16 +1375,93 @@ describe('registerTools', () => {
       ['putoffExecution', { executionId: 1, days: 2, confirm: true }],
       ['createBuild', { project: 1, execution: 2, product: 3, name: 'b', builder: 'me', confirm: true }],
       ['updateBuild', { buildId: 1, name: 'b2', confirm: true }],
+      ['linkStoriesToBuild', { buildId: 1, storyIds: [1], confirm: true }],
+      ['unlinkStoryFromBuild', { buildId: 1, storyId: 1, confirm: true }],
+      ['batchUnlinkStoriesFromBuild', { buildId: 1, storyIds: [1], confirm: true }],
+      ['linkBugsToBuild', { buildId: 1, bugIds: [1], confirm: true }],
+      ['unlinkBugFromBuild', { buildId: 1, bugId: 1, confirm: true }],
+      ['batchUnlinkBugsFromBuild', { buildId: 1, bugIds: [1], confirm: true }],
       ['createTestCase', { productId: 1, title: 'c', type: 'feature', steps: [{ desc: 'd', expect: 'e' }], confirm: true }],
       ['updateTestCase', { testCaseId: 1, title: 'c2', confirm: true }],
+      ['confirmTestCaseStoryChange', { caseId: 1, confirm: true }],
+      ['confirmTestCaseLibcaseChange', { caseId: 1, libcaseId: 2, confirm: true }],
+      ['ignoreTestCaseLibcaseChange', { caseId: 1, confirm: true }],
+      ['batchConfirmTestCaseStoryChange', { productId: 153, caseIds: [1, 2], confirm: true }],
       ['createTestTask', { project: 1, productID: 2, name: 'tt', build: 3, begin: '2026-01-01', end: '2026-01-02', confirm: true }],
+      ['startTestTask', { testTaskId: 1, comment: 'start', confirm: true }],
+      ['activateTestTask', { testTaskId: 1, comment: 'active', confirm: true }],
+      ['blockTestTask', { testTaskId: 1, comment: 'block', confirm: true }],
+      ['closeTestTask', { testTaskId: 1, realFinishedDate: '2026-01-03', mailto: ['qa', 'pm'], comment: 'close', confirm: true }],
+      ['deleteTestTask', { testTaskId: 1, confirm: true }],
     ];
 
     for (const [name, input] of calls) {
       await expect(registry.getCommand(name)!.handler(input)).resolves.toMatchObject({ content: [{ type: 'text' }] });
     }
 
-    expect(api.task.createTask).toHaveBeenCalledTimes(2);
+    expect(api.task.createTask).toHaveBeenCalledTimes(1);
+    expect(api.task.convertBugToTask).toHaveBeenCalledTimes(1);
+    expect(api.task.editEstimate).toHaveBeenCalledTimes(1);
+    expect(api.task.deleteEstimate).toHaveBeenCalledTimes(1);
+    expect(api.task.confirmStoryChange).toHaveBeenCalledTimes(1);
+    expect(api.task.cancelTask).toHaveBeenCalledTimes(1);
+    expect(api.plan.startPlan).toHaveBeenCalledTimes(1);
+    expect(api.plan.finishPlan).toHaveBeenCalledTimes(1);
+    expect(api.plan.activatePlan).toHaveBeenCalledTimes(1);
+    expect(api.plan.closePlan).toHaveBeenCalledTimes(1);
+    expect(api.release.changeReleaseStatus).toHaveBeenCalledTimes(1);
+    expect(api.release.notifyRelease).toHaveBeenCalledTimes(1);
+    expect(api.release.deleteRelease).toHaveBeenCalledTimes(1);
+    expect(api.release.linkStoriesToRelease).toHaveBeenCalledTimes(1);
+    expect(api.release.unlinkStoryFromRelease).toHaveBeenCalledTimes(1);
+    expect(api.release.batchUnlinkStoriesFromRelease).toHaveBeenCalledTimes(1);
+    expect(api.release.linkBugsToRelease).toHaveBeenCalledTimes(1);
+    expect(api.release.unlinkBugFromRelease).toHaveBeenCalledTimes(1);
+    expect(api.release.batchUnlinkBugsFromRelease).toHaveBeenCalledTimes(1);
+    expect(api.bug.confirmStoryChange).toHaveBeenCalledTimes(1);
+    expect(api.bug.batchChangeBugBranch).toHaveBeenCalledTimes(1);
+    expect(api.bug.batchChangeBugModule).toHaveBeenCalledTimes(1);
+    expect(api.bug.batchChangeBugPlan).toHaveBeenCalledTimes(1);
+    expect(api.bug.batchAssignBugs).toHaveBeenCalledTimes(1);
+    expect(api.bug.batchConfirmBugs).toHaveBeenCalledTimes(1);
+    expect(api.bug.batchResolveBugs).toHaveBeenCalledTimes(1);
+    expect(api.bug.batchCloseBugs).toHaveBeenCalledTimes(1);
+    expect(api.bug.batchActivateBugs).toHaveBeenCalledTimes(1);
+    expect(api.story.linkStoriesToStory).toHaveBeenCalledTimes(1);
+    expect(api.story.unlinkStoryFromStory).toHaveBeenCalledTimes(1);
+    expect(api.story.recallStory).toHaveBeenCalledTimes(1);
+    expect(api.story.submitStoryReview).toHaveBeenCalledTimes(1);
+    expect(api.story.processStoryChange).toHaveBeenCalledTimes(1);
+    expect(api.story.batchReviewStories).toHaveBeenCalledTimes(1);
+    expect(api.story.batchCloseStories).toHaveBeenCalledTimes(1);
+    expect(api.story.batchChangeStoryModule).toHaveBeenCalledTimes(1);
+    expect(api.story.batchChangeStoryPlan).toHaveBeenCalledTimes(1);
+    expect(api.story.batchChangeStoryBranch).toHaveBeenCalledTimes(1);
+    expect(api.story.batchChangeStoryStage).toHaveBeenCalledTimes(1);
+    expect(api.story.batchAssignStoriesTo).toHaveBeenCalledTimes(1);
+    expect(api.build.linkStoriesToBuild).toHaveBeenCalledTimes(1);
+    expect(api.build.unlinkStoryFromBuild).toHaveBeenCalledTimes(1);
+    expect(api.build.batchUnlinkStoriesFromBuild).toHaveBeenCalledTimes(1);
+    expect(api.build.linkBugsToBuild).toHaveBeenCalledTimes(1);
+    expect(api.build.unlinkBugFromBuild).toHaveBeenCalledTimes(1);
+    expect(api.build.batchUnlinkBugsFromBuild).toHaveBeenCalledTimes(1);
+    expect(api.testtask.createTestTask).toHaveBeenCalledTimes(1);
+    expect(api.testtask.updateTestTask).toHaveBeenCalledTimes(1);
+    expect(api.testtask.startTestTask).toHaveBeenCalledTimes(1);
+    expect(api.testtask.activateTestTask).toHaveBeenCalledTimes(1);
+    expect(api.testtask.blockTestTask).toHaveBeenCalledTimes(1);
+    expect(api.testtask.closeTestTask).toHaveBeenCalledTimes(1);
+    expect(api.testtask.deleteTestTask).toHaveBeenCalledTimes(1);
+    expect(api.testcase.confirmStoryChange).toHaveBeenCalledTimes(1);
+    expect(api.testcase.confirmLibcaseChange).toHaveBeenCalledTimes(1);
+    expect(api.testcase.ignoreLibcaseChange).toHaveBeenCalledTimes(1);
+    expect(api.testcase.batchConfirmStoryChange).toHaveBeenCalledTimes(1);
+    expect(api.todo.startTodo).toHaveBeenCalledTimes(1);
+    expect(api.todo.closeTodo).toHaveBeenCalledTimes(1);
+    expect(api.todo.assignTodo).toHaveBeenCalledTimes(1);
+    expect(api.todo.batchFinishTodos).toHaveBeenCalledTimes(1);
+    expect(api.todo.batchCloseTodos).toHaveBeenCalledTimes(1);
+    expect(api.todo.importTodosToToday).toHaveBeenCalledTimes(1);
     expect(api.execution.putoffExecution).toHaveBeenCalledWith(1, { days: 2 });
   });
 });

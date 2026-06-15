@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import type { CliRegistry } from '../core/cli-registry.js';
 import { getApi } from '../core/api-provider.js';
+import { previewOrAssertWriteAllowed } from '../core/write-guard.js';
 import { jsonResult, optionalTrimmedText } from './shared.js';
+import { runWithPreview } from './shared.js';
 
 export function registerPlanTools(server: CliRegistry): void {
   server.tool('getProductPlans', {
@@ -13,4 +15,29 @@ export function registerPlanTools(server: CliRegistry): void {
   }, async (input) => jsonResult(await getApi().plan.getProductPlans(input)));
 
   server.tool('getPlanDetail', { planId: z.number().int().positive() }, async ({ planId }) => jsonResult(await getApi().plan.getPlanDetail(planId)));
+
+  server.tool('startPlan', {
+    planId: z.number().int().positive(),
+    comment: optionalTrimmedText,
+    confirm: z.boolean().optional().default(false),
+  }, async ({ planId, confirm, ...payload }) => runWithPreview('startPlan', confirm, { planId, payload }, previewOrAssertWriteAllowed, () => getApi().plan.startPlan(planId, payload)));
+
+  server.tool('finishPlan', {
+    planId: z.number().int().positive(),
+    comment: optionalTrimmedText,
+    confirm: z.boolean().optional().default(false),
+  }, async ({ planId, confirm, ...payload }) => runWithPreview('finishPlan', confirm, { planId, payload }, previewOrAssertWriteAllowed, () => getApi().plan.finishPlan(planId, payload)));
+
+  server.tool('activatePlan', {
+    planId: z.number().int().positive(),
+    comment: optionalTrimmedText,
+    confirm: z.boolean().optional().default(false),
+  }, async ({ planId, confirm, ...payload }) => runWithPreview('activatePlan', confirm, { planId, payload }, previewOrAssertWriteAllowed, () => getApi().plan.activatePlan(planId, payload)));
+
+  server.tool('closePlan', {
+    planId: z.number().int().positive(),
+    closedReason: z.string().trim().min(1).describe('关闭原因。18.5 页面默认候选通常为 done/cancel'),
+    comment: optionalTrimmedText,
+    confirm: z.boolean().optional().default(false),
+  }, async ({ planId, confirm, ...payload }) => runWithPreview('closePlan', confirm, { planId, payload }, previewOrAssertWriteAllowed, () => getApi().plan.closePlan(planId, payload)));
 }

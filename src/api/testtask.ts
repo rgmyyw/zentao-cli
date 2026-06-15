@@ -38,6 +38,15 @@ export interface UpdateTestTaskInput {
   desc?: string;
 }
 
+export interface TestTaskActionInput {
+  comment?: string;
+}
+
+export interface CloseTestTaskInput extends TestTaskActionInput {
+  realFinishedDate?: string;
+  mailto?: string[];
+}
+
 export class TestTaskApi {
   constructor(private readonly http: ZentaoHttpClient) {}
 
@@ -77,6 +86,41 @@ export class TestTaskApi {
     });
   }
 
+  async startTestTask(testTaskId: number, input: TestTaskActionInput = {}): Promise<unknown> {
+    return this.submitStatusAction('start', testTaskId, 'doing', input);
+  }
+
+  async activateTestTask(testTaskId: number, input: TestTaskActionInput = {}): Promise<unknown> {
+    return this.submitStatusAction('activate', testTaskId, 'doing', input);
+  }
+
+  async blockTestTask(testTaskId: number, input: TestTaskActionInput = {}): Promise<unknown> {
+    return this.submitStatusAction('block', testTaskId, 'blocked', input);
+  }
+
+  async closeTestTask(testTaskId: number, input: CloseTestTaskInput = {}): Promise<unknown> {
+    const normalized = this.normalizeActionInput(input) as Record<string, unknown>;
+    normalized.status = 'done';
+    if (Array.isArray(input.mailto)) {
+      normalized.mailto = input.mailto
+        .map((item) => (typeof item === 'string' ? item.trim() : item))
+        .filter((item): item is string => typeof item === 'string' && item !== '');
+    }
+    if (typeof input.realFinishedDate === 'string') {
+      const realFinishedDate = this.normalizeOptionalString(input.realFinishedDate);
+      if (realFinishedDate !== undefined) normalized.realFinishedDate = realFinishedDate;
+    }
+
+    return this.http.legacyRequest('POST', `/testtask-close-${testTaskId}.json`, {
+      data: toFormUrlEncoded(normalized).toString(),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async deleteTestTask(testTaskId: number): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/testtask-delete-${testTaskId}-yes.json`);
+  }
+
   private normalizeTestTaskInput<T extends object>(input: T, requiredFields: Array<'name' | 'begin' | 'end'>): T {
     const normalized = { ...(input as Record<string, unknown>) };
 
@@ -111,6 +155,26 @@ export class TestTaskApi {
   private normalizeOptionalString(value: string): string | undefined {
     const trimmed = value.trim();
     return trimmed === '' ? undefined : trimmed;
+  }
+
+  private submitStatusAction(action: 'start' | 'activate' | 'block', testTaskId: number, status: string, input: TestTaskActionInput): Promise<unknown> {
+    const normalized = this.normalizeActionInput(input) as Record<string, unknown>;
+    normalized.status = status;
+    return this.http.legacyRequest('POST', `/testtask-${action}-${testTaskId}.json`, {
+      data: toFormUrlEncoded(normalized).toString(),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  private normalizeActionInput<T extends TestTaskActionInput>(input: T): T {
+    const normalized = { ...(input as Record<string, unknown>) };
+    const comment = normalized.comment;
+    if (typeof comment === 'string') {
+      const trimmed = this.normalizeOptionalString(comment);
+      if (trimmed === undefined) delete normalized.comment;
+      else normalized.comment = trimmed;
+    }
+    return normalized as unknown as T;
   }
 
 }

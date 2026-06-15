@@ -77,7 +77,10 @@ zentao getProductBugs --productId <productId>
 
 ```bash
 zentao resolveBug --bugId <id> --resolution fixed --confirm true
+zentao confirmBugStoryChange --bugId <id> --confirm true
 ```
+
+说明：`confirmBugStoryChange` 对齐 18.5 Bug 详情页在关联需求版本变化时出现的“确认”按钮，会更新 Bug 记录里的需求版本并写入 `confirmed` 动作。
 
 ### 把 Bug 关联到指定执行
 
@@ -93,6 +96,20 @@ zentao updateBug --bugId <bugId> --project <projectId> --execution <executionId>
 - 只传 `execution` 时，服务端可能因为缺少所属 `project` 而拒绝更新。
 - 跨项目 / 跨执行迁移 Bug 时，优先走上面的两步链路。
 - 如果用户给的是旧版页面 URL，例如 `bug-view-84733.html`，先解析成 `bugId=84733` 再执行。
+
+### 把 Bug 转成任务
+
+先查执行，再把页面链路里的 `project` / `execution` 显式带上：
+
+```bash
+zentao getExecutionDetail --executionId <executionId>
+zentao createTaskFromBug --bugId <bugId> --project <projectId> --execution <executionId> --assignedTo <account> --estStarted <YYYY-MM-DD> --deadline <YYYY-MM-DD> --confirm true
+```
+
+说明：
+
+- `createTaskFromBug` 走的是旧版 `task/create + bugID`，不是 REST `/executions/{id}/tasks`。
+- 不要只传 `execution` 让 CLI 猜 `project`；按页面链路显式传参，才能稳定对齐 `toTask` 语义。
 
 ### updateBug 字段保留规则
 

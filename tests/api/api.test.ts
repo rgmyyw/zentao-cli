@@ -68,6 +68,102 @@ describe('simple API wrappers', () => {
     expect(http.request).toHaveBeenNthCalledWith(5, 'GET', '/user');
   });
 
+  it('ReleaseApi reads and executes short legacy write flows', async () => {
+    const http = createHttp([{ releases: [] }, { id: 2 }, {}, {}, {}, {}, {}, {}, {}, {}]);
+    const api = new ReleaseApi(http as never);
+
+    await api.getProjectReleases(9);
+    await api.getReleaseDetail(2);
+    await api.changeReleaseStatus(2, 'terminate');
+    await api.notifyRelease(2, { notify: ['FB', 'BETA'] });
+    await api.deleteRelease(2);
+    await api.linkStoriesToRelease(2, { storyIds: [11, 12] });
+    await api.unlinkStoryFromRelease(2, 11);
+    await api.batchUnlinkStoriesFromRelease(2, { storyIds: [11, 12] });
+    await api.linkBugsToRelease(2, { bugIds: [21], type: 'leftBug' });
+    await api.unlinkBugFromRelease(2, 21, 'leftBug');
+    await api.batchUnlinkBugsFromRelease(2, { bugIds: [21, 22] });
+
+    expect(http.request).toHaveBeenNthCalledWith(1, 'GET', '/projects/9/releases');
+    expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/releases/2');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'GET', '/release-changeStatus-2-terminate.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/release-notify-2.json', {
+      data: 'notify%5B%5D=FB&notify%5B%5D=BETA',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'GET', '/release-delete-2-yes.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'POST', '/release-linkStory-2--0.json', {
+      data: 'stories%5B%5D=11&stories%5B%5D=12',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'GET', '/release-unlinkStory-2-11-yes.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(6, 'POST', '/release-batchUnlinkStory-2.json', {
+      data: 'storyIdList%5B%5D=11&storyIdList%5B%5D=12',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(7, 'POST', '/release-linkBug-2--0-leftBug.json', {
+      data: 'bugs%5B%5D=21',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(8, 'GET', '/release-unlinkBug-2-21-leftBug.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(9, 'POST', '/release-batchUnlinkBug-2-bug.json', {
+      data: 'unlinkBugs%5B%5D=21&unlinkBugs%5B%5D=22',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
+  it('ReleaseApi trims and validates release write inputs', async () => {
+    const http = createHttp([{}, {}, {}, {}, {}]);
+    const api = new ReleaseApi(http as never);
+
+    await api.notifyRelease(3, { notify: [' FB ', ' BETA '] });
+    await api.linkStoriesToRelease(3, { storyIds: [5] });
+    await api.batchUnlinkStoriesFromRelease(3, { storyIds: [6] });
+    await api.linkBugsToRelease(3, { bugIds: [7] });
+    await api.batchUnlinkBugsFromRelease(3, { bugIds: [8], type: 'leftBug' });
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/release-notify-3.json', {
+      data: 'notify%5B%5D=FB&notify%5B%5D=BETA',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/release-linkStory-3--0.json', {
+      data: 'stories%5B%5D=5',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/release-batchUnlinkStory-3.json', {
+      data: 'storyIdList%5B%5D=6',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'POST', '/release-linkBug-3--0-bug.json', {
+      data: 'bugs%5B%5D=7',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'POST', '/release-batchUnlinkBug-3-leftBug.json', {
+      data: 'unlinkBugs%5B%5D=8',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
+  it('ReleaseApi rejects empty array inputs before sending request', async () => {
+    const http = createHttp();
+    const api = new ReleaseApi(http as never);
+
+    await expect(api.notifyRelease(1, { notify: [] })).rejects.toThrow('notify 至少需要 1 项');
+    await expect(api.linkStoriesToRelease(1, { storyIds: [] })).rejects.toThrow('storyIds 至少需要 1 项');
+    await expect(api.linkBugsToRelease(1, { bugIds: [] })).rejects.toThrow('bugIds 至少需要 1 项');
+    expect(http.legacyRequest).not.toHaveBeenCalled();
+  });
+
+  it('BugApi confirms related story changes through legacy short flow', async () => {
+    const http = createHttp([{}]);
+    const api = new BugApi(http as never);
+
+    await api.confirmStoryChange(84362);
+
+    expect(http.legacyRequest).toHaveBeenCalledWith('GET', '/bug-confirmStoryChange-84362.json');
+    expect(http.request).not.toHaveBeenCalled();
+  });
+
   it('trims low-frequency list query strings before sending requests', async () => {
     const programHttp = createHttp([{ programs: [] }]);
     const planHttp = createHttp([{ plans: [] }]);
@@ -98,19 +194,60 @@ describe('simple API wrappers', () => {
     });
   });
 
-  it('BuildApi strips project when creating build', async () => {
-    const http = createHttp([{ builds: [{ id: 1 }] }, { id: 1 }, { id: 2 }, { id: 2 }]);
+  it('BuildApi strips project when creating build and links related objects', async () => {
+    const http = createHttp([{ builds: [{ id: 1 }] }, { id: 1 }, { id: 2 }, { id: 2 }, {}, {}, {}, {}, {}, {}]);
     const api = new BuildApi(http as never);
 
     await api.getProjectBuilds(3);
     await api.getBuildDetail(1);
     await api.createBuild({ project: 3, execution: 4, product: 5, name: 'b1', builder: 'me' });
     await api.updateBuild(2, { name: 'b2' });
+    await api.linkStoriesToBuild(2, { storyIds: [11, 12] });
+    await api.unlinkStoryFromBuild(2, 11);
+    await api.batchUnlinkStoriesFromBuild(2, { storyIds: [11, 12] });
+    await api.linkBugsToBuild(2, { bugIds: [21, 22] });
+    await api.unlinkBugFromBuild(2, 21);
+    await api.batchUnlinkBugsFromBuild(2, { bugIds: [21, 22] });
 
     expect(http.request).toHaveBeenNthCalledWith(1, 'GET', '/projects/3/builds');
     expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/builds/1');
     expect(http.request).toHaveBeenNthCalledWith(3, 'POST', '/projects/3/builds', { data: { execution: 4, product: 5, name: 'b1', builder: 'me' } });
     expect(http.request).toHaveBeenNthCalledWith(4, 'PUT', '/builds/2', { data: { name: 'b2' } });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/build-linkStory-2--0.json', {
+      data: 'stories%5B%5D=11&stories%5B%5D=12',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'GET', '/build-unlinkStory-2-11-yes.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/build-batchUnlinkStory-2.json', {
+      data: 'unlinkStories%5B%5D=11&unlinkStories%5B%5D=12',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'POST', '/build-linkBug-2--0.json', {
+      data: 'bugs%5B%5D=21&bugs%5B%5D=22',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'GET', '/build-unlinkBug-2-21.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(6, 'POST', '/build-batchUnlinkBug-2.json', {
+      data: 'unlinkBugs%5B%5D=21&unlinkBugs%5B%5D=22',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
+  it('calls notifyBug and assignTo on BuildApi', async () => {
+    const http = createHttp([{}, {}]);
+    const api = new BuildApi(http as never);
+
+    await api.notifyBug(1, { bugIds: [10, 20] });
+    await api.assignTo(2, { assignedTo: 'dev', comment: '请验收' });
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/build-notifyBug-1.json', {
+      data: 'bugs%5B%5D=10&bugs%5B%5D=20',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/build-assignTo-2.json', {
+      data: 'assignedTo=dev&comment=%E8%AF%B7%E9%AA%8C%E6%94%B6',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
   });
 
   it('trims and validates build write strings before sending requests', async () => {
@@ -137,8 +274,17 @@ describe('simple API wrappers', () => {
     expect(http.request).not.toHaveBeenCalled();
   });
 
-  it('PlanApi links and unlinks stories and bugs', async () => {
-    const http = createHttp([{ plans: [] }, {}, {}, {}, {}, { id: 8 }]);
+  it('BuildApi rejects empty relation arrays before sending requests', async () => {
+    const http = createHttp();
+    const api = new BuildApi(http as never);
+
+    await expect(api.linkStoriesToBuild(1, { storyIds: [] })).rejects.toThrow('storyIds 至少需要 1 项');
+    await expect(api.linkBugsToBuild(1, { bugIds: [] })).rejects.toThrow('bugIds 至少需要 1 项');
+    expect(http.legacyRequest).not.toHaveBeenCalled();
+  });
+
+  it('PlanApi links, unlinks, and changes plan status', async () => {
+    const http = createHttp([{ plans: [] }, {}, {}, {}, {}, { id: 8 }, {}, {}, {}, {}]);
     const api = new PlanApi(http as never);
 
     await api.getProductPlans({ productId: 1, branch: 'all', status: 'doing', query: 'q', order: 'id_desc' });
@@ -147,6 +293,10 @@ describe('simple API wrappers', () => {
     await api.linkBugsToPlan(8, [3]);
     await api.unlinkBugsFromPlan(8, [4]);
     await api.getPlanDetail(8);
+    await api.startPlan(8, { comment: ' start ' });
+    await api.finishPlan(8, {});
+    await api.activatePlan(8, { comment: ' activate ' });
+    await api.closePlan(8, { closedReason: ' done ', comment: ' close ' });
 
     expect(http.request).toHaveBeenNthCalledWith(1, 'GET', '/products/1/plans', { params: { branch: 'all', status: 'doing', query: 'q', order: 'id_desc' } });
     expect(http.request).toHaveBeenNthCalledWith(2, 'POST', '/productplans/8/linkstories', { data: { stories: [1, 2] } });
@@ -154,6 +304,39 @@ describe('simple API wrappers', () => {
     expect(http.request).toHaveBeenNthCalledWith(4, 'POST', '/productplans/8/linkbugs', { data: { bugs: [3] } });
     expect(http.request).toHaveBeenNthCalledWith(5, 'POST', '/productplans/8/unlinkbugs', { data: { bugs: [4] } });
     expect(http.request).toHaveBeenNthCalledWith(6, 'GET', '/productplans/8');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'GET', '/productplan-start-8-yes.json?comment=start');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'GET', '/productplan-finish-8-yes.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'GET', '/productplan-activate-8-yes.json?comment=activate');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'POST', '/productplan-close-8.json', {
+      data: 'closedReason=done&comment=close',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
+  it('PlanApi trims and validates plan status inputs', async () => {
+    const http = createHttp([{}, {}, {}, {}]);
+    const api = new PlanApi(http as never);
+
+    await api.startPlan(9, { comment: ' start ' });
+    await api.finishPlan(9, { comment: '   ' });
+    await api.activatePlan(9, { comment: ' activate ' });
+    await api.closePlan(9, { closedReason: ' cancel ', comment: ' reason ' });
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'GET', '/productplan-start-9-yes.json?comment=start');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'GET', '/productplan-finish-9-yes.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'GET', '/productplan-activate-9-yes.json?comment=activate');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'POST', '/productplan-close-9.json', {
+      data: 'closedReason=cancel&comment=reason',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
+  it('PlanApi rejects blank close reason before sending request', async () => {
+    const http = createHttp();
+    const api = new PlanApi(http as never);
+
+    await expect(api.closePlan(9, { closedReason: '   ' })).rejects.toThrow('closedReason 不能为空');
+    expect(http.legacyRequest).not.toHaveBeenCalled();
   });
 });
 
@@ -183,13 +366,18 @@ describe('TaskApi', () => {
   });
 
   it('calls detail and write endpoints', async () => {
-    const http = createHttp([{ id: 1 }, {}, {}, {}, {}]);
+    const http = createHttp([{ id: 1 }, {}, {}, {}, {}, {}, {}, {}, {}, {}]);
     const api = new TaskApi(http as never);
     await api.getTaskDetail(1);
     await api.recordEstimate(1, { date: '2026-06-12', consumed: 2, left: 18, work: '处理联调' });
     await api.updateTask(1, { name: 'n' });
     await api.finishTask(1, { consumed: 1, realStarted: '2026-01-01', finishedDate: '2026-01-02' });
     await api.createTask({ execution: 7, name: 't', assignedTo: 'me', estStarted: '2026-01-01', deadline: '2026-01-02' });
+    await api.convertBugToTask({ bugId: 84733, execution: 2140, project: 1772, name: '修复登录失败', assignedTo: 'me', estStarted: '2026-01-01', deadline: '2026-01-02' });
+    await api.editEstimate(12, { date: '2026-06-12', consumed: 2, left: 18, work: '处理联调' });
+    await api.deleteEstimate(12);
+    await api.confirmStoryChange(1);
+    await api.cancelTask(1, { comment: '暂不处理' });
 
     expect(http.request).toHaveBeenNthCalledWith(1, 'GET', '/tasks/1');
     expect(http.request).toHaveBeenNthCalledWith(2, 'POST', '/taskrecordestimate/1', {
@@ -209,10 +397,24 @@ describe('TaskApi', () => {
     expect(http.request).toHaveBeenNthCalledWith(5, 'POST', '/executions/7/tasks', {
       data: { execution: 7, name: 't', assignedTo: 'me', estStarted: '2026-01-01', deadline: '2026-01-02' },
     });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/task-create-2140-0-0-0-0-projectID=1772-84733.json', {
+      data: 'execution=2140&project=1772&module=0&story=0&name=%E4%BF%AE%E5%A4%8D%E7%99%BB%E5%BD%95%E5%A4%B1%E8%B4%A5&type=devel&assignedTo%5B%5D=me&estStarted=2026-01-01&deadline=2026-01-02&desc=&status=wait&after=toTaskList',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/task-editEstimate-12.json', {
+      data: 'date=2026-06-12&consumed=2&left=18&work=%E5%A4%84%E7%90%86%E8%81%94%E8%B0%83',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'GET', '/task-deleteEstimate-12-yes.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'GET', '/task-confirmStoryChange-1.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'POST', '/task-cancel-1.json', {
+      data: 'status=cancel&comment=%E6%9A%82%E4%B8%8D%E5%A4%84%E7%90%86',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
   });
 
   it('trims and validates task write string fields before sending requests', async () => {
-    const http = createHttp([{}, {}, {}, {}, { assignedTo: 'owner', openedBy: 'creator' }, {}, {}, {}, {}, {}, {}]);
+    const http = createHttp([{}, {}, {}, {}, { assignedTo: 'owner', openedBy: 'creator' }, {}, {}, {}, {}, {}, {}, {}, {}]);
     const api = new TaskApi(http as never);
 
     await api.recordEstimate(8, { date: ' 2026-06-12 ', consumed: 2, left: 18, work: ' 今天处理联调 ' });
@@ -225,6 +427,9 @@ describe('TaskApi', () => {
     await api.closeTask(6, { comment: ' 已关闭 ' });
     await api.activateTask(7, { assignedTo: ' pm ', comment: ' 恢复 ' });
     await api.createTask({ execution: 8, name: ' 新建任务 ', assignedTo: ' owner ', estStarted: ' 2026-02-01 ', deadline: ' 2026-02-02 ', desc: ' 描述 ' });
+    await api.convertBugToTask({ bugId: 84731, execution: 2140, project: 1772, name: ' 修复支付异常 ', assignedTo: ' dev ', estStarted: ' 2026-02-03 ', deadline: ' 2026-02-04 ', type: ' devel ', desc: ' 处理 bug ', estimate: 2, pri: 1 });
+    await api.editEstimate(12, { date: ' 2026-06-12 ', consumed: 2, left: 18, work: ' 处理联调 ' });
+    await api.cancelTask(13, { comment: ' 暂不处理 ' });
 
     expect(http.request).toHaveBeenNthCalledWith(1, 'POST', '/taskrecordestimate/8', {
       data: {
@@ -257,6 +462,74 @@ describe('TaskApi', () => {
     expect(http.request).toHaveBeenNthCalledWith(12, 'POST', '/executions/8/tasks', {
       data: { execution: 8, name: '新建任务', assignedTo: 'owner', estStarted: '2026-02-01', deadline: '2026-02-02', desc: '描述' },
     });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/task-create-2140-0-0-0-0-projectID=1772-84731.json', {
+      data: 'execution=2140&project=1772&module=0&story=0&name=%E4%BF%AE%E5%A4%8D%E6%94%AF%E4%BB%98%E5%BC%82%E5%B8%B8&type=devel&assignedTo%5B%5D=dev&estStarted=2026-02-03&deadline=2026-02-04&desc=%E5%A4%84%E7%90%86+bug&pri=1&status=wait&after=toTaskList&estimate=2&left=2',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/task-editEstimate-12.json', {
+      data: 'date=2026-06-12&consumed=2&left=18&work=%E5%A4%84%E7%90%86%E8%81%94%E8%B0%83',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/task-cancel-13.json', {
+      data: 'status=cancel&comment=%E6%9A%82%E4%B8%8D%E5%A4%84%E7%90%86',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
+  it('calls batch task operations', async () => {
+    const http = createHttp([{}, {}, {}, {}, {}, {}, {}, {}]);
+    const api = new TaskApi(http as never);
+
+    await api.batchFinishTasks({ taskIds: [1, 2] });
+    await api.batchCancelTasks({ taskIds: [3] });
+    await api.batchCloseTasks({ taskIds: [4, 5] });
+    await api.batchChangeTaskBranch({ taskIds: [6], branchId: 100 });
+    await api.batchChangeTaskModule({ taskIds: [7], moduleId: 10 });
+    await api.batchChangeTaskPlan({ taskIds: [8], planId: 3 });
+    await api.batchAssignTasksTo({ taskIds: [9, 10], assignedTo: 'dev', comment: '请处理' });
+    await api.batchActivateTasks({ taskIds: [11] });
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/task-batchFinish.json', {
+      data: 'taskIDList%5B%5D=1&taskIDList%5B%5D=2',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/task-batchCancel.json', {
+      data: 'taskIDList%5B%5D=3',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/task-batchClose.json', {
+      data: 'taskIDList%5B%5D=4&taskIDList%5B%5D=5',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'POST', '/task-batchChangeBranch.json', {
+      data: 'taskIDList%5B%5D=6&branch=100',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'POST', '/task-batchChangeModule.json', {
+      data: 'taskIDList%5B%5D=7&module=10',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(6, 'POST', '/task-batchChangePlan.json', {
+      data: 'taskIDList%5B%5D=8&plan=3',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(7, 'POST', '/task-batchAssignTo.json', {
+      data: 'taskIDList%5B%5D=9&taskIDList%5B%5D=10&assignedTo=dev&comment=%E8%AF%B7%E5%A4%84%E7%90%86',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(8, 'POST', '/task-batchActivate.json', {
+      data: 'taskIDList%5B%5D=11',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
+  it('rejects empty task ID arrays in batch operations', async () => {
+    const http = createHttp();
+    const api = new TaskApi(http as never);
+
+    await expect(api.batchFinishTasks({ taskIds: [] })).rejects.toThrow('taskIds 至少需要 1 项');
+    await expect(api.batchAssignTasksTo({ taskIds: [1], assignedTo: '   ' })).rejects.toThrow('assignedTo 不能为空');
+    expect(http.legacyRequest).not.toHaveBeenCalled();
   });
 
   it('falls back to legacy task-recordEstimate when taskrecordestimate entry is unavailable', async () => {
@@ -292,7 +565,11 @@ describe('TaskApi', () => {
     await expect(api.recordEstimate(1, { date: '   ', consumed: 2, left: 1 })).rejects.toThrow('date 不能为空');
     await expect(api.recordEstimate(1, { date: '2026-06-12', consumed: 0, left: 1 })).rejects.toThrow('consumed 必须大于 0');
     await expect(api.recordEstimate(1, { date: '2026-06-12', consumed: 1, left: -1 })).rejects.toThrow('left 不能小于 0');
+    await expect(api.editEstimate(12, { date: '   ', consumed: 2, left: 1 })).rejects.toThrow('date 不能为空');
+    await expect(api.editEstimate(12, { date: '2026-06-12', consumed: 0, left: 1 })).rejects.toThrow('consumed 必须大于 0');
+    await expect(api.editEstimate(12, { date: '2026-06-12', consumed: 1, left: -1 })).rejects.toThrow('left 不能小于 0');
     expect(http.request).not.toHaveBeenCalled();
+    expect(http.legacyRequest).not.toHaveBeenCalled();
   });
 
   it('rejects blank required task write strings before sending requests', async () => {
@@ -500,11 +777,69 @@ describe('BugApi', () => {
     await expect(api.assignBug(2, { assignedTo: '   ' })).rejects.toThrow('assignedTo 不能为空');
     expect(http.request).not.toHaveBeenCalled();
   });
+
+  it('BugApi executes 18.5 batch short flows', async () => {
+    const http = createHttp([{}, {}, {}, {}, {}, {}, {}, {}]);
+    const api = new BugApi(http as never);
+
+    await api.batchChangeBugBranch({ bugIds: [84362, 84363], branchId: 1 });
+    await api.batchChangeBugModule({ bugIds: [84362, 84363], moduleId: 66 });
+    await api.batchChangeBugPlan({ bugIds: [84362, 84363], planId: 360 });
+    await api.batchAssignBugs({ bugIds: [84362, 84363], objectId: 2140, type: 'execution', assignedTo: ' lixm1 ', comment: ' please handle ' });
+    await api.batchConfirmBugs({ bugIds: [84362, 84363] });
+    await api.batchResolveBugs({ bugIds: [84362, 84363], resolution: 'fixed', resolvedBuild: 'trunk', comment: ' done ' });
+    await api.batchCloseBugs({ bugIds: [84362, 84363], releaseId: '', viewType: '' });
+    await api.batchActivateBugs({ productId: 153, branch: 0, bugIds: [84362, 84363] });
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/bug-batchChangeBranch-1.json', {
+      data: 'bugIDList%5B%5D=84362&bugIDList%5B%5D=84363',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/bug-batchChangeModule-66.json', {
+      data: 'bugIDList%5B%5D=84362&bugIDList%5B%5D=84363',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/bug-batchChangePlan-360.json', {
+      data: 'bugIDList%5B%5D=84362&bugIDList%5B%5D=84363',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'POST', '/bug-batchAssignTo-2140-execution.json', {
+      data: 'bugIDList%5B%5D=84362&bugIDList%5B%5D=84363&assignedTo=lixm1&comment=please+handle',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'POST', '/bug-batchConfirm.json', {
+      data: 'bugIDList%5B%5D=84362&bugIDList%5B%5D=84363',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(6, 'POST', '/bug-batchResolve-fixed-trunk.json', {
+      data: 'bugIDList%5B%5D=84362&bugIDList%5B%5D=84363&resolution=fixed&resolvedBuild=trunk&comment=done',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(7, 'POST', '/bug-batchClose--.json', {
+      data: 'bugIDList%5B%5D=84362&bugIDList%5B%5D=84363',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(8, 'POST', '/bug-batchActivate-153-0.json', {
+      data: 'statusList%5B84362%5D=activate&statusList%5B84363%5D=activate&bugIDList%5B%5D=84362&bugIDList%5B%5D=84363',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
+  it('BugApi rejects empty or invalid batch inputs before sending requests', async () => {
+    const http = createHttp();
+    const api = new BugApi(http as never);
+
+    await expect(api.batchChangeBugBranch({ bugIds: [], branchId: 1 })).rejects.toThrow('bugIds 至少需要 1 项');
+    await expect(api.batchChangeBugModule({ bugIds: [0], moduleId: 1 })).rejects.toThrow('bugIds 必须是正整数');
+    await expect(api.batchAssignBugs({ bugIds: [1], objectId: 1, assignedTo: '   ' })).rejects.toThrow('assignedTo 不能为空');
+    await expect(api.batchResolveBugs({ bugIds: [1], resolution: '   ' })).rejects.toThrow('resolution 不能为空');
+    expect(http.legacyRequest).not.toHaveBeenCalled();
+  });
 });
 
 describe('StoryApi, TestCaseApi and TestTaskApi', () => {
   it('StoryApi calls list/detail/write endpoints', async () => {
-    const http = createHttp([{ stories: [{ id: 1 }], total: 1 }, { id: 1 }, {}, {}, {}, {}, {}, {}]);
+    const http = createHttp([{ stories: [{ id: 1 }], total: 1 }, { id: 1 }, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}]);
     const api = new StoryApi(http as never);
     await api.getProductStories({ productId: 2, page: 1, limit: 3 });
     await api.getStoryDetail(1);
@@ -515,6 +850,18 @@ describe('StoryApi, TestCaseApi and TestTaskApi', () => {
     await api.assignStory(1, { assignedTo: 'me' });
     await api.activateStory(1, { comment: 'a' });
     await api.reviewStory(1, { result: 'pass' });
+    await api.linkStoriesToStory(1, { storyIds: [2, 3] });
+    await api.unlinkStoryFromStory(1, 2);
+    await api.recallStory(1);
+    await api.submitStoryReview(1);
+    await api.processStoryChange(1, 'yes');
+    await api.batchReviewStories({ storyIds: [1, 2], result: 'pass', reason: ' ok ' });
+    await api.batchCloseStories({ productId: 153, storyIds: [1, 2], closedReasons: { 1: 'done', 2: 'cancel' }, comments: { 1: 'note1', 2: 'note2' } });
+    await api.batchChangeStoryModule({ storyIds: [1, 2], moduleId: 66 });
+    await api.batchChangeStoryPlan({ storyIds: [1, 2], planId: 360 });
+    await api.batchChangeStoryBranch({ storyIds: [1, 2], branchId: 1, confirm: 'yes' });
+    await api.batchChangeStoryStage({ storyIds: [1, 2], stage: ' verified ' });
+    await api.batchAssignStoriesTo({ storyIds: [1, 2], assignedTo: ' me ', comment: ' please handle ' });
 
     expect(http.request).toHaveBeenNthCalledWith(1, 'GET', '/products/2/stories', { params: { page: 1, limit: 3 } });
     expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/stories/1');
@@ -525,6 +872,73 @@ describe('StoryApi, TestCaseApi and TestTaskApi', () => {
     expect(http.request).toHaveBeenNthCalledWith(7, 'POST', '/stories/1/assignto', { data: { assignedTo: 'me' } });
     expect(http.request).toHaveBeenNthCalledWith(8, 'POST', '/stories/1/activate', { data: { comment: 'a' } });
     expect(http.request).toHaveBeenNthCalledWith(9, 'POST', '/stories/1/review', { data: { result: 'pass' } });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/story-linkStory-1-linkStories-0.json', {
+      data: 'stories%5B%5D=2&stories%5B%5D=3',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'GET', '/story-linkStory-1-remove-2.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'GET', '/story-recall-1-list-yes.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'POST', '/story-submitReview-1-story.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'GET', '/story-processStoryChange-1-yes.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(6, 'POST', '/story-batchReview-pass-ok-story.json', {
+      data: 'storyIdList%5B%5D=1&storyIdList%5B%5D=2',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(7, 'POST', '/story-batchClose-153-0-story.json', {
+      data: 'storyIdList%5B1%5D=1&storyIdList%5B2%5D=2&closedReasons%5B1%5D=done&closedReasons%5B2%5D=cancel&comments%5B1%5D=note1&comments%5B2%5D=note2',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(8, 'POST', '/story-batchChangeModule-66-story.json', {
+      data: 'storyIdList%5B%5D=1&storyIdList%5B%5D=2',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(9, 'POST', '/story-batchChangePlan-360-0.json', {
+      data: 'storyIdList%5B%5D=1&storyIdList%5B%5D=2',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(10, 'POST', '/story-batchChangeBranch-1-yes-story.json', {
+      data: 'storyIdList%5B%5D=1&storyIdList%5B%5D=2',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(11, 'POST', '/story-batchChangeStage-verified.json', {
+      data: 'storyIdList%5B%5D=1&storyIdList%5B%5D=2',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(12, 'POST', '/story-batchAssignTo-story.json', {
+      data: 'storyIdList%5B%5D=1&storyIdList%5B%5D=2&assignedTo=me&comment=please+handle',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
+  it('rejects empty batch story id lists before sending requests', async () => {
+    const http = createHttp();
+    const api = new StoryApi(http as never);
+
+    await expect(api.batchReviewStories({ storyIds: [], result: 'pass' })).rejects.toThrow('storyIds 至少需要 1 项');
+    await expect(api.batchCloseStories({ productId: 1, storyIds: [] })).rejects.toThrow('storyIds 至少需要 1 项');
+    await expect(api.batchChangeStoryModule({ storyIds: [], moduleId: 1 })).rejects.toThrow('storyIds 至少需要 1 项');
+    await expect(api.batchChangeStoryPlan({ storyIds: [], planId: 1 })).rejects.toThrow('storyIds 至少需要 1 项');
+    await expect(api.batchChangeStoryBranch({ storyIds: [], branchId: 1 })).rejects.toThrow('storyIds 至少需要 1 项');
+    await expect(api.batchChangeStoryStage({ storyIds: [], stage: 'verified' })).rejects.toThrow('storyIds 至少需要 1 项');
+    await expect(api.batchAssignStoriesTo({ storyIds: [], assignedTo: 'me' })).rejects.toThrow('storyIds 至少需要 1 项');
+    expect(http.legacyRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects blank assign target and stage for story batch APIs before sending requests', async () => {
+    const http = createHttp();
+    const api = new StoryApi(http as never);
+
+    await expect(api.batchChangeStoryStage({ storyIds: [1], stage: '   ' })).rejects.toThrow('stage 不能为空');
+    await expect(api.batchAssignStoriesTo({ storyIds: [1], assignedTo: '   ' })).rejects.toThrow('assignedTo 不能为空');
+    expect(http.legacyRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects empty linked story ids before sending requests', async () => {
+    const http = createHttp();
+    const api = new StoryApi(http as never);
+
+    await expect(api.linkStoriesToStory(1, { storyIds: [] })).rejects.toThrow('storyIds 至少需要 1 项');
+    expect(http.legacyRequest).not.toHaveBeenCalled();
   });
 
   it('trims and validates story write strings before sending requests', async () => {
@@ -569,17 +983,19 @@ describe('StoryApi, TestCaseApi and TestTaskApi', () => {
   });
 
   it('TestCaseApi client-paginates cases and writes cases', async () => {
-    const http = createHttp([{ cases: [{ id: 1 }, { id: 2 }] }, { id: 1 }, {}, {}]);
+    const http = createHttp([{ cases: [{ id: 1 }, { id: 2 }] }, { id: 1 }, {}, {}, {}]);
     const api = new TestCaseApi(http as never);
     await expect(api.getProductTestCases({ productId: 2, page: 2, limit: 1, status: 'normal', moduleId: 3 })).resolves.toMatchObject({ items: [{ id: 2 }], total: 2 });
     await api.getTestCaseDetail(1);
     await api.createTestCase(2, { title: 'c', type: 'feature', steps: [] });
     await api.updateTestCase(1, { title: 'd' });
+    await api.confirmStoryChange(1);
 
     expect(http.request).toHaveBeenNthCalledWith(1, 'GET', '/products/2/testcases', { params: { page: 2, limit: 1, status: 'normal', module: 3 } });
     expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/testcases/1');
     expect(http.request).toHaveBeenNthCalledWith(3, 'POST', '/products/2/testcases', { data: { title: 'c', type: 'feature', steps: [] } });
     expect(http.request).toHaveBeenNthCalledWith(4, 'PUT', '/testcases/1', { data: { title: 'd' } });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'GET', '/testcase-confirmStoryChange-1.json');
   });
 
   it('trims and validates test case write strings before sending requests', async () => {
@@ -625,25 +1041,81 @@ describe('StoryApi, TestCaseApi and TestTaskApi', () => {
     expect(http.request).not.toHaveBeenCalled();
   });
 
+  it('TestCaseApi confirms story changes through legacy short flow', async () => {
+    const http = createHttp([{}]);
+    const api = new TestCaseApi(http as never);
+
+    await api.confirmStoryChange(58191);
+
+    expect(http.legacyRequest).toHaveBeenCalledWith('GET', '/testcase-confirmStoryChange-58191.json');
+    expect(http.request).not.toHaveBeenCalled();
+  });
+
+  it('TestCaseApi confirms and ignores libcase changes through legacy short flow', async () => {
+    const http = createHttp([{}, {}]);
+    const api = new TestCaseApi(http as never);
+
+    await api.confirmLibcaseChange({ caseId: 58191, libcaseId: 58192 });
+    await api.ignoreLibcaseChange(58191);
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'GET', '/testcase-confirmLibcaseChange-58191-58192.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'GET', '/testcase-ignoreLibcaseChange-58191.json');
+    expect(http.request).not.toHaveBeenCalled();
+  });
+
+  it('TestCaseApi batch confirms story changes through legacy short flow', async () => {
+    const http = createHttp([{}]);
+    const api = new TestCaseApi(http as never);
+
+    await api.batchConfirmStoryChange(153, { caseIds: [58191, 58192] });
+
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/testcase-batchConfirmStoryChange-153.json', {
+      data: 'caseIDList%5B%5D=58191&caseIDList%5B%5D=58192',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
   it('TestTaskApi maps productID to product on create', async () => {
-    const http = createHttp([{ testtasks: [] }, { id: 1 }, {}, {}]);
+    const http = createHttp([{ testtasks: [] }, { id: 1 }, {}, {}, {}, {}, {}, {}]);
     const api = new TestTaskApi(http as never);
     await api.getTestTasks({ productId: 4, page: 1, limit: 10 });
     await api.getTestTaskDetail(5);
     await api.createTestTask({ project: 1, productID: 4, name: 'tt', build: 2, begin: '2026-01-01', end: '2026-01-02' });
     await api.updateTestTask(5, { name: 'next' });
+    await api.startTestTask(5, { comment: ' start ' });
+    await api.activateTestTask(5, { comment: ' active ' });
+    await api.blockTestTask(5, { comment: ' block ' });
+    await api.closeTestTask(5, { realFinishedDate: '2026-01-03', mailto: ['qa', ' pm '], comment: ' close ' });
+    await api.deleteTestTask(5);
 
     expect(http.request).toHaveBeenNthCalledWith(1, 'GET', '/testtasks', { params: { page: 1, limit: 10, product: 4 } });
     expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/testtasks/5');
     expect(http.request).toHaveBeenNthCalledWith(3, 'POST', '/projects/1/testtasks', { data: { product: 4, name: 'tt', build: 2, begin: '2026-01-01', end: '2026-01-02' } });
-    expect(http.legacyRequest).toHaveBeenLastCalledWith('POST', '/testtask-edit-5.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/testtask-edit-5.json', {
       data: 'name=next',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/testtask-start-5.json', {
+      data: 'comment=start&status=doing',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/testtask-activate-5.json', {
+      data: 'comment=active&status=doing',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'POST', '/testtask-block-5.json', {
+      data: 'comment=block&status=blocked',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'POST', '/testtask-close-5.json', {
+      data: 'realFinishedDate=2026-01-03&mailto%5B%5D=qa&mailto%5B%5D=pm&comment=close&status=done',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(6, 'GET', '/testtask-delete-5-yes.json');
   });
 
   it('trims and validates test task write strings before sending requests', async () => {
-    const http = createHttp([{}, {}]);
+    const http = createHttp([{}, {}, {}, {}, {}]);
     const api = new TestTaskApi(http as never);
 
     await api.createTestTask({
@@ -657,6 +1129,8 @@ describe('StoryApi, TestCaseApi and TestTaskApi', () => {
       type: [' 功能 ', '  冒烟  '],
     });
     await api.updateTestTask(5, { name: ' next ', owner: ' qa ', desc: ' note ' });
+    await api.startTestTask(5, { comment: ' start ' });
+    await api.closeTestTask(5, { realFinishedDate: ' 2026-01-03 ', mailto: [' qa ', ' pm '], comment: ' close ' });
 
     expect(http.request).toHaveBeenNthCalledWith(1, 'POST', '/projects/1/testtasks', {
       data: {
@@ -671,6 +1145,14 @@ describe('StoryApi, TestCaseApi and TestTaskApi', () => {
     });
     expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/testtask-edit-5.json', {
       data: 'name=next&owner=qa&desc=note',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/testtask-start-5.json', {
+      data: 'comment=start&status=doing',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/testtask-close-5.json', {
+      data: 'realFinishedDate=2026-01-03&mailto%5B%5D=qa&mailto%5B%5D=pm&comment=close&status=done',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   });
@@ -689,13 +1171,19 @@ describe('StoryApi, TestCaseApi and TestTaskApi', () => {
 
 describe('TodoApi', () => {
   it('calls todo read and write endpoints', async () => {
-    const http = createHttp([{ todos: [{ id: 1 }] }, { id: 1 }, {}, {}, {}, {}, {}]);
+    const http = createHttp([{ todos: [{ id: 1 }] }, { id: 1 }, {}, {}, {}, {}, {}, {}, {}, {}]);
     const api = new TodoApi(http as never);
 
     await api.getTodos();
     await api.getTodoDetail(1);
     await api.createTodo({ name: 'a' });
     await api.updateTodo(1, { name: 'b' });
+    await api.startTodo(1);
+    await api.closeTodo(1);
+    await api.assignTodo(1, { assignedTo: 'me', comment: ' please handle ' });
+    await api.batchFinishTodos({ todoIds: [1, 2] });
+    await api.batchCloseTodos({ todoIds: [1, 2] });
+    await api.importTodosToToday({ todoIds: [1, 2], date: ' 2026-06-15 ' });
     await api.deleteTodo(1);
     await api.finishTodo(1);
     await api.activateTodo(1);
@@ -704,9 +1192,45 @@ describe('TodoApi', () => {
     expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/todos/1');
     expect(http.request).toHaveBeenNthCalledWith(3, 'POST', '/todos', { data: { name: 'a' } });
     expect(http.request).toHaveBeenNthCalledWith(4, 'PUT', '/todos/1', { data: { name: 'b' } });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'GET', '/todo-start-1.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'GET', '/todo-close-1.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/todo-assignTo-1.json', {
+      data: 'assignedTo=me&comment=please+handle',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'POST', '/todo-batchFinish.json', {
+      data: 'todoIDList%5B%5D=1&todoIDList%5B%5D=2',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'POST', '/todo-batchClose.json', {
+      data: 'todoIDList%5B%5D=1&todoIDList%5B%5D=2',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(6, 'POST', '/todo-import2Today.json', {
+      data: 'todoIDList%5B%5D=1&todoIDList%5B%5D=2&date=2026-06-15',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
     expect(http.request).toHaveBeenNthCalledWith(5, 'DELETE', '/todos/1');
     expect(http.request).toHaveBeenNthCalledWith(6, 'GET', '/todos/1/finish');
     expect(http.request).toHaveBeenNthCalledWith(7, 'GET', '/todos/1/activate');
+  });
+
+  it('TodoApi rejects blank assignTodo target before sending request', async () => {
+    const http = createHttp();
+    const api = new TodoApi(http as never);
+
+    await expect(api.assignTodo(1, { assignedTo: '   ' })).rejects.toThrow('assignedTo 不能为空');
+    expect(http.legacyRequest).not.toHaveBeenCalled();
+  });
+
+  it('TodoApi rejects empty batch todo id lists before sending requests', async () => {
+    const http = createHttp();
+    const api = new TodoApi(http as never);
+
+    await expect(api.batchFinishTodos({ todoIds: [] })).rejects.toThrow('todoIds 至少需要 1 项');
+    await expect(api.batchCloseTodos({ todoIds: [] })).rejects.toThrow('todoIds 至少需要 1 项');
+    await expect(api.importTodosToToday({ todoIds: [] })).rejects.toThrow('todoIds 至少需要 1 项');
+    expect(http.legacyRequest).not.toHaveBeenCalled();
   });
 
   it('trims and validates todo names before sending requests', async () => {
@@ -941,6 +1465,17 @@ describe('ExecutionApi', () => {
       data: 'name=n',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
+  });
+
+  it('calls confirmStoryChange and computeBurn legacy endpoints', async () => {
+    const http = createHttp([{}, {}]);
+    const api = new ExecutionApi(http as never);
+
+    await api.confirmStoryChange(1);
+    await api.computeBurn(2);
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'GET', '/execution-confirmStoryChange-1.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'GET', '/execution-computeBurn-2.json');
   });
 
   it('trims execution write strings before sending requests', async () => {
