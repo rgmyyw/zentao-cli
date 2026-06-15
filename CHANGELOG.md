@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.28 - 2026-06-15
+
+### 修复
+
+- 修复 `0.1.27` 发布包中未包含 `zentao skill` 的问题。
+  - 根因：`skills/zentao-cli` 是符号链接，npm pack 不跟随，导致安装/更新时无法找到 skill。
+  - 解决：新增 `scripts/copy-skills.mjs`，在 build 时将 `.agents/skills/zentao-cli` 复制为真实目录 `skills/zentao-cli`。
+
 ## 0.1.27 - 2026-06-15
 
 ### 新增

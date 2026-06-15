@@ -70,6 +70,8 @@ zentao update --skip-config-check
 npx -y @cloudglab/zentao-cli@latest update
 ```
 
+> 提示：默认安装 / 更新会从 CLI 包内自带 skill 读取。如果个别旧版本 npm 包未正确包含 skill 文件，可临时用 `--skill-source git` 安装 skill。
+
 如果 npm 全局目录或 npx 缓存目录存在上次失败留下的残留目录，安装 / 更新会自动清理并重试一次；若仍失败，可按提示执行手动清理：
 
 ```bash
