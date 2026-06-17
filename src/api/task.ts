@@ -8,6 +8,8 @@ import { toFormUrlEncoded } from '../utils/form.js';
 
 export interface MyTaskListInput extends PaginationInput {
   status?: string;
+  /** 为 true 时只拉取首页，不扫描全量分页（用于 whoami 等快速预览场景）。 */
+  scan?: boolean;
 }
 
 export interface RecordTaskEstimateInput {
@@ -37,11 +39,52 @@ export interface CancelTaskInput {
   comment?: string;
 }
 
+export interface BatchEditTaskRowInput {
+  taskId: number;
+  name: string;
+  type: string;
+  pri: number | string;
+  estStarted: string;
+  deadline: string;
+  color?: string;
+  module?: number | string;
+  status?: string;
+  estimate?: number | string;
+  left?: number | string;
+  finishedBy?: string;
+  canceledBy?: string;
+  closedBy?: string;
+  closedReason?: string;
+  assignedTo?: string;
+  consumed?: number | string;
+}
+
 export class TaskApi {
   constructor(private readonly http: ZentaoHttpClient) {}
 
   async getMyTasks(input: MyTaskListInput = {}): Promise<unknown> {
     const pagination = normalizePagination(input);
+
+    // 快速模式：只拉首页，不扫描全部分页。用于 whoami 等只需采样统计的场景。
+    if (input.scan === false) {
+      const response = await this.http.request<{ tasks?: ZentaoTask[] } | ZentaoTask[]>('GET', '/tasks', {
+        params: {
+          assignedTo: this.http.username,
+          page: 1,
+          limit: pagination.limit,
+        },
+      });
+      const tasks = extractItems<ZentaoTask>(response, ['tasks']);
+      const filteredTasks = input.status && input.status !== 'all'
+        ? tasks.filter(task => task.status === input.status)
+        : tasks;
+
+      return {
+        ...toClientPaginatedListResult({ tasks: filteredTasks }, ['tasks'], { page: 1, limit: pagination.limit }),
+        partial: true,
+        scanned: tasks.length,
+      };
+    }
 
     // ZenTao's /tasks endpoint ignores status/limit in some deployments, and its
     // page query behaves like "return the first N tasks". Fetch the user's full
@@ -210,11 +253,8 @@ export class TaskApi {
   }
 
   async batchFinishTasks(input: { taskIds: number[] }): Promise<unknown> {
-    const taskIds = normalizeTaskIdList(input.taskIds, 'taskIds');
-    return this.http.legacyRequest('POST', '/task-batchFinish.json', {
-      data: toFormUrlEncoded({ taskIDList: taskIds } as unknown as Record<string, unknown>),
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    });
+    normalizeTaskIdList(input.taskIds, 'taskIds');
+    throw new Error('禅道 18.5 不支持 task/batchFinish，请逐个调用 finishTask');
   }
 
   async batchCancelTasks(input: { taskIds: number[] }): Promise<unknown> {
@@ -227,34 +267,33 @@ export class TaskApi {
 
   async batchCloseTasks(input: { taskIds: number[] }): Promise<unknown> {
     const taskIds = normalizeTaskIdList(input.taskIds, 'taskIds');
-    return this.http.legacyRequest('POST', '/task-batchClose.json', {
+    const response = await this.http.legacyRequest('POST', '/task-batchClose.json', {
+      data: toFormUrlEncoded({ taskIDList: taskIds } as unknown as Record<string, unknown>),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    const skipTaskIdList = this.extractBatchCloseSkipTaskIdList(response);
+    if (skipTaskIdList === undefined) return response;
+    return this.http.legacyRequest('GET', `/task-batchClose-${skipTaskIdList}.json`);
+  }
+
+  async batchChangeTaskBranch(input: { taskIds: number[]; branchId: number }): Promise<unknown> {
+    normalizeTaskIdList(input.taskIds, 'taskIds');
+    void input.branchId;
+    throw new Error('禅道 18.5 不支持 task/batchChangeBranch');
+  }
+
+  async batchChangeTaskModule(input: { taskIds: number[]; moduleId: number }): Promise<unknown> {
+    const taskIds = normalizeTaskIdList(input.taskIds, 'taskIds');
+    return this.http.legacyRequest('POST', `/task-batchChangeModule-${input.moduleId}.json`, {
       data: toFormUrlEncoded({ taskIDList: taskIds } as unknown as Record<string, unknown>),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   }
 
-  async batchChangeTaskBranch(input: { taskIds: number[]; branchId: number }): Promise<unknown> {
-    const taskIds = normalizeTaskIdList(input.taskIds, 'taskIds');
-    return this.http.legacyRequest('POST', '/task-batchChangeBranch.json', {
-      data: toFormUrlEncoded({ taskIDList: taskIds, branch: input.branchId } as unknown as Record<string, unknown>),
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    });
-  }
-
-  async batchChangeTaskModule(input: { taskIds: number[]; moduleId: number }): Promise<unknown> {
-    const taskIds = normalizeTaskIdList(input.taskIds, 'taskIds');
-    return this.http.legacyRequest('POST', '/task-batchChangeModule.json', {
-      data: toFormUrlEncoded({ taskIDList: taskIds, module: input.moduleId } as unknown as Record<string, unknown>),
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    });
-  }
-
   async batchChangeTaskPlan(input: { taskIds: number[]; planId: number }): Promise<unknown> {
-    const taskIds = normalizeTaskIdList(input.taskIds, 'taskIds');
-    return this.http.legacyRequest('POST', '/task-batchChangePlan.json', {
-      data: toFormUrlEncoded({ taskIDList: taskIds, plan: input.planId } as unknown as Record<string, unknown>),
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    });
+    normalizeTaskIdList(input.taskIds, 'taskIds');
+    void input.planId;
+    throw new Error('禅道 18.5 不支持 task/batchChangePlan');
   }
 
   async batchAssignTasksTo(input: { taskIds: number[]; assignedTo: string; comment?: string }): Promise<unknown> {
@@ -271,9 +310,74 @@ export class TaskApi {
   }
 
   async batchActivateTasks(input: { taskIds: number[] }): Promise<unknown> {
-    const taskIds = normalizeTaskIdList(input.taskIds, 'taskIds');
-    return this.http.legacyRequest('POST', '/task-batchActivate.json', {
-      data: toFormUrlEncoded({ taskIDList: taskIds } as unknown as Record<string, unknown>),
+    normalizeTaskIdList(input.taskIds, 'taskIds');
+    throw new Error('禅道 18.5 不支持 task/batchActivate');
+  }
+
+  async batchChangeTaskStory(input: { taskIds: number[]; storyId: number }): Promise<unknown> {
+    normalizeTaskIdList(input.taskIds, 'taskIds');
+    void input.storyId;
+    throw new Error('禅道 18.5 不支持 task/batchChangeStory');
+  }
+
+  async batchCreateTasks(input: { execution: number; project?: number; tasks: Array<Record<string, unknown>> }): Promise<unknown> {
+    if (!Array.isArray(input.tasks) || input.tasks.length === 0) throw new Error('tasks 至少需要 1 项');
+    const formData: Record<string, unknown> = { tasks: input.tasks };
+    if (input.project !== undefined) formData.project = input.project;
+    return this.http.legacyRequest('POST', `/task-batchCreate-${input.execution}.json`, {
+      data: toFormUrlEncoded(formData as unknown as Record<string, unknown>),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async batchEditTasks(input: { tasks: BatchEditTaskRowInput[]; executionId?: number }): Promise<unknown> {
+    if (!Array.isArray(input.tasks) || input.tasks.length === 0) throw new Error('tasks 至少需要 1 项');
+    const formData = new URLSearchParams();
+    for (const task of input.tasks) {
+      const taskId = this.normalizePositiveInt(task.taskId, 'taskId');
+      formData.append('taskIDList[]', String(taskId));
+      this.appendIndexedField(formData, 'colors', taskId, task.color ?? '');
+      this.appendIndexedField(formData, 'names', taskId, requireNonBlank(task.name, 'name 不能为空'));
+      this.appendIndexedField(formData, 'modules', taskId, task.module ?? 0);
+      this.appendIndexedField(formData, 'types', taskId, requireNonBlank(task.type, 'type 不能为空'));
+      if (task.status !== undefined) this.appendIndexedField(formData, 'statuses', taskId, task.status);
+      this.appendIndexedField(formData, 'pris', taskId, task.pri);
+      if (task.estimate !== undefined) this.appendIndexedField(formData, 'estimates', taskId, task.estimate);
+      if (task.left !== undefined) this.appendIndexedField(formData, 'lefts', taskId, task.left);
+      this.appendIndexedField(formData, 'estStarteds', taskId, requireNonBlank(task.estStarted, 'estStarted 不能为空'));
+      this.appendIndexedField(formData, 'deadlines', taskId, requireNonBlank(task.deadline, 'deadline 不能为空'));
+      this.appendIndexedField(formData, 'finishedBys', taskId, task.finishedBy ?? '');
+      this.appendIndexedField(formData, 'canceledBys', taskId, task.canceledBy ?? '');
+      this.appendIndexedField(formData, 'closedBys', taskId, task.closedBy ?? '');
+      this.appendIndexedField(formData, 'closedReasons', taskId, task.closedReason ?? '');
+      if (task.assignedTo !== undefined) this.appendIndexedField(formData, 'assignedTos', taskId, task.assignedTo);
+      if (task.consumed !== undefined) this.appendIndexedField(formData, 'consumeds', taskId, task.consumed);
+    }
+    return this.http.legacyRequest('POST', '/task-batchEdit.json', {
+      data: formData.toString(),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async importTaskToLib(input: { taskId: number; libId: number }): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/task-importToLib-${input.taskId}-${input.libId}.json`);
+  }
+
+  async exportTasks(input: { executionId: number; orderBy?: string; taskIdList?: number[] }): Promise<unknown> {
+    const params = new URLSearchParams();
+    if (input.orderBy) params.set('orderBy', input.orderBy);
+    if (Array.isArray(input.taskIdList) && input.taskIdList.length > 0) params.set('taskIdList', input.taskIdList.join(','));
+    const qs = params.toString();
+    return this.http.legacyRequest('GET', `/task-export-${input.executionId}.json${qs ? `?${qs}` : ''}`);
+  }
+
+  async editTaskTeam(input: { taskId: number; accounts: string[]; hours?: string[]; roles?: string[] }): Promise<unknown> {
+    if (!Array.isArray(input.accounts) || input.accounts.length === 0) throw new Error('accounts 至少需要 1 项');
+    const formData: Record<string, unknown> = { accounts: input.accounts.join(',') };
+    if (input.hours !== undefined) formData.hours = input.hours.join(',');
+    if (input.roles !== undefined) formData.roles = input.roles.join(',');
+    return this.http.legacyRequest('POST', `/task-editTeam-${input.taskId}.json`, {
+      data: toFormUrlEncoded(formData as unknown as Record<string, unknown>),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   }
@@ -381,6 +485,22 @@ export class TaskApi {
     if (typeof value !== 'string') return undefined;
     const normalized = value.trim();
     return normalized === '' ? undefined : normalized;
+  }
+
+  private appendIndexedField(formData: URLSearchParams, field: string, id: number, value: unknown): void {
+    if (value === undefined || value === null) return;
+    formData.append(`${field}[${id}]`, String(value));
+  }
+
+  private normalizePositiveInt(value: unknown, field: string): number {
+    if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) throw new Error(`${field} 必须是正整数`);
+    return value;
+  }
+
+  private extractBatchCloseSkipTaskIdList(response: unknown): string | undefined {
+    if (typeof response !== 'string') return undefined;
+    const match = response.match(/skipTaskIdList=([0-9,]+)/);
+    return match?.[1];
   }
 
 }

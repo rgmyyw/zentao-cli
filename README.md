@@ -6,6 +6,20 @@
 
 除了标准 REST API，本工具还补充了部分扩展场景：会在必要时读取页面 JSON、详情页动作记录，或模拟禅道前端请求，把标准接口不好覆盖的查询、统计和流转动作封装成可调用命令。
 
+## 这版补了什么
+
+- 按禅道 **18.5** 本地源码重新校准了一批写操作链路，重点覆盖任务、执行、测试用例、需求、待办和 Bug 的批量操作。
+- 一批原本只是“看起来有命令、实际会打错页面字段 / 控制器”的入口，现在要么改成真实可用链路，要么在 18.5 下直接明确报“不支持”，避免误写线上数据。
+- 新增覆盖率统计脚本 `pnpm coverage`，可以快速看到 CLI 对 18.5 控制器入口的覆盖比例和剩余缺口。
+
+### 典型变化
+
+- **批量任务编辑**：`batchEditTasks` 改成按任务行 JSON 数组提交，和 18.5 页面 `taskIDList[]`、`names[id]`、`types[id]`、`pris[id]` 等字段一致。
+- **批量测试用例创建 / 编辑**：`batchCreateTestCases`、`batchEditTestCases` 改成按行字段提交，支持 `stage[]`、步骤数组和按 case ID 索引字段。
+- **执行模块**：修正了 `startExecution` / `closeExecution` / `activateExecution` 等状态动作路径，`computeCfd` 已可用；对 18.5 不存在的 controller 会直接报错，不再静默打错链路。
+- **批量关闭任务**：遇到 18.5 返回 `skipTaskIdList` 的确认链接时，CLI 会自动继续执行，避免只关闭部分任务。
+- **产品线维护**：`manageProductLine` 现支持已有项与新增项混合提交，按真实 `modules[...]` / `programs[...]` 页面字段编码。
+
 ## 版本要求
 
 - **禅道版本**：优先适配禅道 **18.5** 的 REST v1 API，部分扩展能力依赖旧版页面 JSON，建议目标环境为 18.x 系列。
@@ -122,6 +136,31 @@ npx -y @cloudglab/zentao-cli@latest --help
 npx -y @cloudglab/zentao-cli@latest --role qa getMyTasks --status all --limit 20
 ```
 
+### 批量写操作示例
+
+以下示例展示的是这次重新对齐 18.5 页面后的推荐写法：
+
+```bash
+zentao batchEditTasks \
+  --tasks '[{"taskId":12,"name":"联调任务","type":"devel","pri":2,"module":66,"status":"doing","estimate":4,"left":3,"estStarted":"2026-06-01","deadline":"2026-06-02","assignedTo":"dev","consumed":1.5}]' \
+  --confirm true
+
+zentao batchEditTestCases \
+  --productId 153 \
+  --branch 1 \
+  --type feature \
+  --moduleId 66 \
+  --cases '[{"caseId":58191,"title":"登录成功","type":"feature","pri":2,"module":66,"story":10154,"stage":["wait","developed"]}]' \
+  --confirm true
+
+zentao batchCreateTodos \
+  --date today \
+  --todos '[{"name":"跟进线上问题","type":"custom","pri":2,"begin":"0900","end":"1830","assignedTo":"ditto"}]' \
+  --confirm true
+```
+
+如果某个写命令在禅道 18.5 下没有对应 controller，CLI 会在确认执行时直接报错，而不是继续请求一个必然 404 或语义错误的旧页面入口。
+
 ### 全局安装
 
 ```bash
@@ -177,6 +216,14 @@ export ZENTAO_API_VERSION="v1"
 `ZENTAO_URL` 传根域名即可，不要带 `/zentao`。
 
 CLI 参数支持 `--key value` 和 `--key=value` 两种写法；如果参数名拼错，会直接提示未知参数，避免写操作时静默忽略字段。需要确认某条命令参数时，可以运行 `zentao help <command>`，例如 `zentao help getExecutionDetail`。
+
+发布前建议至少执行：
+
+```bash
+pnpm check
+pnpm release:smoke-query
+pnpm coverage
+```
 
 ## 可以这样问
 

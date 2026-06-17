@@ -69,18 +69,103 @@ export function registerExecutionTools(server: CliRegistry): void {
   server.tool(
     'confirmExecutionStoryChange',
     {
-      executionId: z.number().int().positive().describe('执行 ID。对齐禅道 18.5 execution/confirmStoryChange 页面按钮'),
+      executionId: z.number().int().positive().describe('执行 ID。禅道 18.5 无 execution/confirmStoryChange 控制器，确认执行时会提示使用 task/testcase 对应能力'),
+      storyId: z.number().int().positive().describe('需求 ID'),
+      status: z.enum(['active', 'closed', 'reject']).describe('需求变更结果：active=接受，closed=关闭，reject=拒绝'),
+      comment: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },
-    async ({ executionId, confirm }) => runWithPreview('confirmExecutionStoryChange', confirm, { executionId }, previewOrAssertWriteAllowed, () => getApi().execution.confirmStoryChange(executionId)),
+    async ({ executionId, storyId, status, comment, confirm }) =>
+      runWithPreview('confirmExecutionStoryChange', confirm, { executionId, storyId, status, comment }, previewOrAssertWriteAllowed, () =>
+        getApi().execution.confirmExecutionStoryChange({ executionId, storyId, status, comment }),
+      ),
   );
 
   server.tool(
     'computeExecutionBurn',
     {
-      executionId: z.number().int().positive().describe('执行 ID。对齐禅道 18.5 execution/computeBurn 页面按钮'),
+      executionId: z.number().int().positive().describe('执行 ID。禅道 18.5 execution::computeBurn($reload) 不接收 executionId，确认执行时会显式报错'),
+      date: optionalTrimmedText.describe('可选，YYYY-MM-DD。无 effect（控制器忽略）'),
       confirm: z.boolean().optional().default(false),
     },
-    async ({ executionId, confirm }) => runWithPreview('computeExecutionBurn', confirm, { executionId }, previewOrAssertWriteAllowed, () => getApi().execution.computeBurn(executionId)),
+    async ({ executionId, date, confirm }) =>
+      runWithPreview('computeExecutionBurn', confirm, { executionId, date }, previewOrAssertWriteAllowed, () =>
+        getApi().execution.computeExecutionBurn(executionId, date),
+      ),
+  );
+
+  server.tool(
+    'getExecutionManageMembers',
+    {
+      executionId: z.number().int().positive().describe('执行 ID。对齐禅道 18.5 execution/manageMembers 页面按钮'),
+    },
+    async ({ executionId }) => jsonResult(await getApi().execution.manageMembers(executionId)),
+  );
+
+  server.tool(
+    'getExecutionAll',
+    {
+      status: optionalTrimmedText.describe('可选，状态过滤，默认 undone（wait/doing/suspended/closed/finished），对应 18.5 execution::all $status 段'),
+      orderBy: optionalTrimmedText.describe('可选，排序方式，默认 order_asc，对应 18.5 execution::all $orderBy 段'),
+      limit: z.number().int().positive().optional().describe('可选，每页条数，对应 recPerPage 参数'),
+      productId: z.number().int().positive().optional().describe('可选，限定产品 ID，对应 18.5 execution::all $productID 参数'),
+    },
+    async ({ status, orderBy, limit, productId }) =>
+      jsonResult(await getApi().execution.executionAll({ status, orderBy, limit, productId })),
+  );
+
+  server.tool(
+    'getExecutionTrack',
+    {
+      executionId: z.number().int().positive().describe('执行 ID。禅道 18.5 execution 模块无 track 控制器，确认执行时会显式报错'),
+    },
+    async ({ executionId }) => jsonResult(await getApi().execution.executionTrack(executionId)),
+  );
+
+  server.tool(
+    'getExecutionStoryKanban',
+    {
+      executionId: z.number().int().positive().describe('执行 ID。对齐禅道 18.5 execution/storyKanban 页面视图'),
+    },
+    async ({ executionId }) => jsonResult(await getApi().execution.executionStoryKanban(executionId)),
+  );
+
+  server.tool(
+    'getExecutionStoryTasks',
+    {
+      executionId: z.number().int().positive().describe('执行 ID。禅道 18.5 execution 模块无 storyTasks 控制器，确认执行时会显式报错'),
+      storyId: z.number().int().positive().describe('需求 ID（不会被提交到不存在控制器）'),
+    },
+    async ({ executionId, storyId }) => jsonResult(await getApi().execution.executionStoryTasks(executionId, storyId)),
+  );
+
+  server.tool(
+    'getExecutionKanban',
+    {
+      executionId: z.number().int().positive().describe('执行 ID。对齐禅道 18.5 execution/kanban 页面视图'),
+      browseType: optionalTrimmedText.describe('看板浏览类型：all | story | task | bug。默认 all'),
+      orderBy: optionalTrimmedText.describe('排序方式，默认 id_asc'),
+      groupBy: optionalTrimmedText.describe('分组方式，默认 default'),
+    },
+    async ({ executionId, browseType, orderBy, groupBy }) => jsonResult(await getApi().execution.getExecutionKanban(executionId, { browseType, orderBy, groupBy })),
+  );
+
+  server.tool(
+    'getExecutionTaskKanban',
+    {
+      executionId: z.number().int().positive().describe('执行 ID。对齐禅道 18.5 execution/taskKanban 页面视图'),
+      browseType: optionalTrimmedText.describe('任务看板浏览类型：all | story | task | bug。默认 all'),
+      orderBy: optionalTrimmedText.describe('排序方式，默认 order_asc'),
+      groupBy: optionalTrimmedText.describe('分组方式，默认 default'),
+    },
+    async ({ executionId, browseType, orderBy, groupBy }) => jsonResult(await getApi().execution.getExecutionTaskKanban(executionId, { browseType, orderBy, groupBy })),
+  );
+
+  server.tool(
+    'getExecutionExecutionKanban',
+    {
+      executionId: z.number().int().positive().optional().describe('可选参数。禅道 18.5 execution/executionKanban 是全公司执行看板，无路径参数；本参数仅用于占位/未来的 from 过滤，不写入 URL'),
+    },
+    async () => jsonResult(await getApi().execution.getAllExecutionKanban()),
   );
 }

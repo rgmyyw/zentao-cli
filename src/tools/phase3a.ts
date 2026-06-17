@@ -2,9 +2,46 @@ import { z } from 'zod';
 import type { CliRegistry } from '../core/cli-registry.js';
 import { getApi } from '../core/api-provider.js';
 import { previewOrAssertWriteAllowed } from '../core/write-guard.js';
-import { optionalTrimmedText, runWithPreview } from './shared.js';
+import { jsonResult, optionalTrimmedText, runWithPreview } from './shared.js';
 
 export function registerStoryWriteTools(server: CliRegistry): void {
+  server.tool('batchCreateStories', {
+    productId: z.number().int().positive().describe('产品 ID。对应 18.5 story/batchCreate 页面 productID 参数'),
+    branch: z.number().int().nonnegative().optional(),
+    moduleId: z.number().int().nonnegative().optional(),
+    storyId: z.number().int().positive().optional().describe('拆分/子需求来源需求 ID'),
+    executionId: z.number().int().nonnegative().optional(),
+    planId: z.number().int().nonnegative().optional(),
+    storyType: z.enum(['story', 'requirement']).optional().default('story'),
+    extra: optionalTrimmedText,
+    confirm: z.boolean().optional().default(false),
+  }, async ({ confirm, ...input }) => runWithPreview('batchCreateStories', confirm, input, previewOrAssertWriteAllowed, () => getApi().story.batchCreateStories(input)));
+
+  server.tool('batchEditStories', {
+    productId: z.number().int().positive().describe('产品 ID。对应 18.5 story/batchEdit 页面 productID 参数'),
+    executionId: z.number().int().nonnegative().optional(),
+    branch: z.number().int().nonnegative().optional(),
+    storyType: z.enum(['story', 'requirement']).optional().default('story'),
+    from: optionalTrimmedText,
+    confirm: z.boolean().optional().default(false),
+  }, async ({ confirm, ...input }) => runWithPreview('batchEditStories', confirm, input, previewOrAssertWriteAllowed, () => getApi().story.batchEditStories(input)));
+
+  server.tool('deleteStory', {
+    storyId: z.number().int().positive(),
+    confirm: z.boolean().optional().default(false),
+    from: optionalTrimmedText,
+    storyType: z.enum(['story', 'requirement']).optional().default('story'),
+  }, async ({ storyId, confirm, from, storyType }) => runWithPreview('deleteStory', confirm, { storyId, from, storyType }, previewOrAssertWriteAllowed, () => getApi().story.deleteStory(storyId, 'yes', from, storyType)));
+
+  server.tool('exportStories', {
+    productId: z.number().int().positive().describe('产品 ID。对应 18.5 story/export 页面 productID 参数'),
+    orderBy: z.string().trim().min(1).describe('排序字段，对应 orderBy 参数'),
+    executionId: z.number().int().nonnegative().optional(),
+    browseType: optionalTrimmedText,
+    storyType: z.enum(['story', 'requirement']).optional().default('story'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ confirm, ...input }) => runWithPreview('exportStories', confirm, input, previewOrAssertWriteAllowed, () => getApi().story.exportStories(input)));
+
   server.tool('updateStory', {
     storyId: z.number().int().positive(),
     title: z.string().trim().min(1).optional(),
@@ -96,6 +133,16 @@ export function registerStoryWriteTools(server: CliRegistry): void {
     storyIds: z.array(z.number().int().positive()).min(1).describe('要关联到当前需求的需求 ID 列表，对应 18.5 页面 stories[] 字段'),
     confirm: z.boolean().optional().default(false),
   }, async ({ storyId, storyIds, confirm }) => runWithPreview('linkStoriesToStory', confirm, { storyId, storyIds }, previewOrAssertWriteAllowed, () => getApi().story.linkStoriesToStory(storyId, { storyIds })));
+
+  server.tool('linkRequirements', {
+    storyId: z.number().int().positive(),
+    browseType: optionalTrimmedText,
+    excludeStories: optionalTrimmedText,
+    param: z.number().int().nonnegative().optional(),
+    recTotal: z.number().int().nonnegative().optional(),
+    recPerPage: z.number().int().positive().optional(),
+    pageID: z.number().int().positive().optional(),
+  }, async ({ storyId, browseType, excludeStories, param, recTotal, recPerPage, pageID }) => jsonResult(await getApi().story.linkRequirements(storyId, { browseType, excludeStories, param, recTotal, recPerPage, pageID })));
 
   server.tool('unlinkStoryFromStory', {
     storyId: z.number().int().positive(),
@@ -251,6 +298,32 @@ export function registerTaskDerivedTools(server: CliRegistry): void {
       pri,
     };
     return runWithPreview('createTaskFromBug', confirm, payload, previewOrAssertWriteAllowed, () => getApi().task.convertBugToTask(payload));
+  });
+
+  server.tool('createTask', {
+    execution: z.number().int().positive(),
+    name: z.string().min(1),
+    type: z.string().optional(),
+    pri: z.number().int().min(0).max(4).optional(),
+    assignedTo: z.string().optional(),
+    estStarted: z.string().optional(),
+    deadline: z.string().optional(),
+    desc: z.string().optional(),
+    story: z.number().int().positive().optional(),
+    module: z.number().int().min(0).optional(),
+    estimate: z.number().optional(),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ confirm, ...payload }) => {
+    const cleaned: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(payload)) {
+      if (typeof v === 'string') {
+        const trimmed = v.trim();
+        if (trimmed !== '') cleaned[k] = trimmed;
+      } else if (v !== undefined) {
+        cleaned[k] = v;
+      }
+    }
+    return runWithPreview('createTask', confirm, cleaned, previewOrAssertWriteAllowed, () => getApi().task.createTask(cleaned as Record<string, unknown> & { execution: number }));
   });
 }
 

@@ -83,6 +83,64 @@ export class TodoApi {
     });
   }
 
+  async batchCreateTodos(input: { date?: string; todos: Array<Record<string, unknown>> }): Promise<unknown> {
+    if (!Array.isArray(input.todos) || input.todos.length === 0) throw new Error('todos 至少需要 1 项');
+    const date = (input.date ?? 'today').trim() || 'today';
+    const formData: Record<string, unknown> = { date };
+    for (const [i, t] of input.todos.entries()) {
+      const normalized = this.normalizeTodoBatchCreateInput(t, i);
+      formData[`names[${i}]`] = normalized.name;
+      formData[`types[${i}]`] = normalized.type;
+      formData[`pris[${i}]`] = normalized.pri;
+      formData[`descs[${i}]`] = normalized.desc;
+      formData[`begins[${i}]`] = normalized.begin;
+      formData[`ends[${i}]`] = normalized.end;
+      formData[`assignedTos[${i}]`] = normalized.assignedTo;
+    }
+    return this.http.legacyRequest('POST', `/todo-batchCreate-${date}.json`, {
+      data: toFormUrlEncoded(formData),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async batchEditTodos(input: { todos: Array<Record<string, unknown> & { todoId: number }> }): Promise<unknown> {
+    if (!Array.isArray(input.todos) || input.todos.length === 0) throw new Error('todos 至少需要 1 项');
+    const formData: Record<string, unknown> = {};
+    for (const todo of input.todos) {
+      const todoId = Number(todo.todoId);
+      if (!Number.isInteger(todoId) || todoId <= 0) throw new Error('todoId 必须是正整数');
+      formData[`todoIDList[${todoId}]`] = todoId;
+      if (todo.date !== undefined) formData[`dates[${todoId}]`] = String(todo.date);
+      if (todo.type !== undefined) formData[`types[${todoId}]`] = String(todo.type);
+      if (todo.pri !== undefined) formData[`pris[${todoId}]`] = String(todo.pri);
+      if (todo.status !== undefined) formData[`status[${todoId}]`] = String(todo.status);
+      if (todo.name !== undefined) formData[`names[${todoId}]`] = String(todo.name);
+      if (todo.begin !== undefined) formData[`begins[${todoId}]`] = String(todo.begin);
+      if (todo.end !== undefined) formData[`ends[${todoId}]`] = String(todo.end);
+      if (todo.assignedTo !== undefined) formData[`assignedTos[${todoId}]`] = String(todo.assignedTo);
+    }
+    return this.http.legacyRequest('POST', '/todo-batchEdit-todoBatchEdit.json', {
+      data: toFormUrlEncoded(formData),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async exportTodos(input: { userId?: string; orderBy?: string } = {}): Promise<unknown> {
+    const userID = input.userId ?? '';
+    const orderBy = input.orderBy ?? '';
+    return this.http.legacyRequest('GET', `/todo-export-${userID}-${orderBy}.json`);
+  }
+
+  async createTodoCycle(input: { name: string; type: string; begin: string; end: string; desc?: string }): Promise<unknown> {
+    const name = requireNonBlank(input.name, 'name 不能为空');
+    const formData: Record<string, unknown> = { name, type: input.type, begin: input.begin, end: input.end };
+    if (input.desc) formData.desc = input.desc;
+    return this.http.legacyRequest('POST', '/todo-createCycle.json', {
+      data: toFormUrlEncoded(formData),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
   private normalizeTodoInput(input: Record<string, unknown>, requireName: boolean): Record<string, unknown> {
     const normalized: Record<string, unknown> = { ...input };
 
@@ -99,6 +157,17 @@ export class TodoApi {
     }
 
     return normalized;
+  }
+
+  private normalizeTodoBatchCreateInput(input: Record<string, unknown>, index: number): { name: string; type: string; pri: number; desc: string; begin: string; end: string; assignedTo: string } {
+    const name = requireNonBlank(input.name as string | undefined, `todos[${index}].name 不能为空`);
+    const type = typeof input.type === 'string' && input.type.trim() !== '' ? input.type.trim() : 'custom';
+    const pri = typeof input.pri === 'number' ? input.pri : Number(input.pri ?? 3);
+    const desc = typeof input.desc === 'string' ? input.desc : '';
+    const begin = typeof input.begin === 'string' && input.begin.trim() !== '' ? input.begin.trim() : '2400';
+    const end = typeof input.end === 'string' && input.end.trim() !== '' ? input.end.trim() : '2400';
+    const assignedTo = typeof input.assignedTo === 'string' && input.assignedTo.trim() !== '' ? input.assignedTo.trim() : 'ditto';
+    return { name, type, pri, desc, begin, end, assignedTo };
   }
 }
 

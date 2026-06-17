@@ -13,6 +13,25 @@ export interface LinkStoriesToStoryInput {
   storyIds: number[];
 }
 
+export interface BatchCreateStoriesInput {
+  productId: number;
+  branch?: number;
+  moduleId?: number;
+  storyId?: number;
+  executionId?: number;
+  planId?: number;
+  storyType?: 'story' | 'requirement';
+  extra?: string;
+}
+
+export interface BatchEditStoriesInput {
+  productId: number;
+  executionId?: number;
+  branch?: number;
+  storyType?: 'story' | 'requirement';
+  from?: string;
+}
+
 export class StoryApi {
   constructor(private readonly http: ZentaoHttpClient) {}
 
@@ -67,6 +86,35 @@ export class StoryApi {
     return this.http.request('POST', `/stories/${storyId}/review`, {
       data: this.normalizeStoryInput(data, { requiredFields: [] }),
     });
+  }
+
+  async batchCreateStories(input: BatchCreateStoriesInput): Promise<unknown> {
+    const storyType = input.storyType ?? 'story';
+    const path = `/story-batchCreate-${input.productId}-${input.branch ?? 0}-${input.moduleId ?? 0}-${input.storyId ?? 0}-${input.executionId ?? 0}-${input.planId ?? 0}-${storyType}${input.extra ? `-${encodeURIComponent(input.extra)}` : ''}.json`;
+    return this.http.legacyRequest('GET', path);
+  }
+
+  async batchEditStories(input: BatchEditStoriesInput): Promise<unknown> {
+    const storyType = input.storyType ?? 'story';
+    const from = input.from ?? '';
+    const path = `/story-batchEdit-${input.productId}-${input.executionId ?? 0}-${input.branch ?? 0}-${storyType}${from ? `-${encodeURIComponent(from)}` : ''}.json`;
+    return this.http.legacyRequest('GET', path);
+  }
+
+  async deleteStory(storyId: number, confirm: 'yes' | 'no' = 'yes', from = '', storyType: 'story' | 'requirement' = 'story'): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/story-delete-${storyId}-${confirm}${from ? `-${encodeURIComponent(from)}` : ''}-${storyType}.json`);
+  }
+
+  async linkRequirements(storyId: number, input: { browseType?: string; excludeStories?: string; param?: number; recTotal?: number; recPerPage?: number; pageID?: number } = {}): Promise<unknown> {
+    const browseType = input.browseType ?? '';
+    const excludeStories = input.excludeStories ?? '';
+    return this.http.legacyRequest('GET', `/story-linkRequirements-${storyId}-${encodeURIComponent(browseType)}-${encodeURIComponent(excludeStories)}-${input.param ?? 0}-${input.recTotal ?? 0}-${input.recPerPage ?? 20}-${input.pageID ?? 1}.json`);
+  }
+
+  async exportStories(input: { productId: number; orderBy: string; executionId?: number; browseType?: string; storyType?: 'story' | 'requirement' }): Promise<unknown> {
+    const storyType = input.storyType ?? 'story';
+    const browseType = input.browseType ?? '';
+    return this.http.legacyRequest('GET', `/story-export-${input.productId}-${encodeURIComponent(input.orderBy)}-${input.executionId ?? 0}-${encodeURIComponent(browseType)}-${storyType}.json`);
   }
 
   async linkStoriesToStory(storyId: number, input: LinkStoriesToStoryInput): Promise<unknown> {
@@ -171,6 +219,56 @@ export class StoryApi {
     const data = toFormUrlEncoded({ storyIdList: storyIds, assignedTo, comment });
     return this.http.legacyRequest('POST', `/story-batchAssignTo-${storyType}.json`, {
       data,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async batchToTaskStories(input: {
+    tasks: Array<{
+      story: number | 'ditto';
+      name: string;
+      module?: number | 'ditto';
+      assignedTo?: string;
+      estStarted?: string;
+      deadline?: string;
+      type?: string;
+      pri?: number;
+      estimate?: number;
+      color?: string;
+    }>;
+    executionId?: number;
+    projectId?: number;
+    storyType?: 'story' | 'requirement';
+    syncFields?: string[];
+  }): Promise<unknown> {
+    if (!Array.isArray(input.tasks) || input.tasks.length === 0) throw new Error('tasks 至少需要 1 项');
+    const executionId = input.executionId ?? 0;
+    const projectId = input.projectId ?? 0;
+    const storyType = input.storyType ?? 'story';
+    const formData = new URLSearchParams();
+
+    input.tasks.forEach((task, index) => {
+      if (typeof task.name !== 'string' || task.name.trim() === '') {
+        throw new Error(`tasks[${index}].name 不能为空`);
+      }
+      formData.append(`story[${index}]`, String(task.story));
+      formData.append(`name[${index}]`, task.name.trim());
+      if (task.module !== undefined) formData.append(`module[${index}]`, String(task.module));
+      if (task.assignedTo !== undefined) formData.append(`assignedTo[${index}]`, task.assignedTo);
+      if (task.estStarted !== undefined) formData.append(`estStarted[${index}]`, task.estStarted);
+      if (task.deadline !== undefined) formData.append(`deadline[${index}]`, task.deadline);
+      if (task.type !== undefined) formData.append(`type[${index}]`, task.type);
+      if (task.pri !== undefined) formData.append(`pri[${index}]`, String(task.pri));
+      if (task.estimate !== undefined) formData.append(`estimate[${index}]`, String(task.estimate));
+      if (task.color !== undefined) formData.append(`color[${index}]`, task.color);
+    });
+
+    if (Array.isArray(input.syncFields) && input.syncFields.length > 0) {
+      formData.set('syncFields', input.syncFields.join(','));
+    }
+
+    return this.http.legacyRequest('POST', `/story-batchToTask-${executionId}-${projectId}-${storyType}.json`, {
+      data: formData.toString(),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   }

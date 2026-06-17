@@ -124,6 +124,10 @@ export class BuildApi {
     });
   }
 
+  async deleteBuild(buildId: number, confirm: 'yes' | 'no' = 'yes'): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/build-delete-${buildId}-${confirm}.json`);
+  }
+
   private normalizeBuildInput<T extends object>(input: T, requiredFields: Array<'name' | 'builder'>): T {
     const normalized = { ...(input as Record<string, unknown>) };
 

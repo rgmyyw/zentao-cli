@@ -104,4 +104,37 @@ export function registerReleaseWriteTools(server: CliRegistry): void {
     const payload = { releaseId, payload: { bugIds, type } };
     return runWithPreview('batchUnlinkBugsFromRelease', confirm, payload, previewOrAssertWriteAllowed, () => getApi().release.batchUnlinkBugsFromRelease(releaseId, { bugIds, type }));
   });
+
+  server.tool('createRelease', {
+    product: z.number().int().positive().describe('产品 ID'),
+    name: z.string().trim().min(1).describe('发布名'),
+    branch: z.number().int().nonnegative().optional().default(0).describe('分支 ID'),
+    build: z.number().int().positive().optional().describe('构建 ID'),
+    date: z.string().trim().optional().describe('发布日期'),
+    desc: z.string().trim().optional().describe('发布说明'),
+    status: z.enum(['normal', 'terminate']).optional().describe('状态'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ product, name, branch, build, date, desc, status, confirm }) => {
+    const payload: Record<string, unknown> = { product, name };
+    if (branch !== undefined) payload.branch = branch;
+    if (build !== undefined) payload.build = build;
+    if (date) payload.date = date;
+    if (desc) payload.desc = desc;
+    if (status) payload.status = status;
+    return runWithPreview('createRelease', confirm, payload, previewOrAssertWriteAllowed, () => getApi().release.createRelease({ product, branch, name, build, date, desc, status }));
+  });
+
+  server.tool('updateRelease', {
+    releaseId: z.number().int().positive().describe('发布 ID'),
+    name: z.string().trim().optional().describe('发布名'),
+    build: z.number().int().positive().optional().describe('构建 ID'),
+    date: z.string().trim().optional().describe('发布日期'),
+    desc: z.string().trim().optional().describe('发布说明'),
+    status: z.enum(['normal', 'terminate']).optional().describe('状态'),
+    confirm: z.boolean().optional().default(false),
+  }, async ({ releaseId, name, build, date, desc, status, confirm }) => runWithPreview('updateRelease', confirm, { releaseId, name, build, date, desc, status }, previewOrAssertWriteAllowed, () => getApi().release.updateRelease(releaseId, { name, build, date, desc, status })));
+
+  server.tool('exportRelease', {
+    releaseId: z.number().int().positive().describe('发布 ID'),
+  }, async ({ releaseId }) => jsonResult(await getApi().release.exportRelease(releaseId)));
 }

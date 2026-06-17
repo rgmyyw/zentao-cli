@@ -183,6 +183,71 @@ export function registerBugTools(server: CliRegistry): void {
   );
 
   server.tool(
+    'deleteBugViaForm',
+    {
+      bugId: z.number().int().positive().describe('Bug ID。对齐禅道 18.5 bug/delete 页面确认链路'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ bugId, confirm }) => runWithPreview('deleteBugViaForm', confirm, { bugId }, previewOrAssertWriteAllowed, () => getApi().bug.deleteBugViaForm(bugId)),
+  );
+
+  server.tool(
+    'batchCreateBugs',
+    {
+      productId: z.number().int().positive(),
+      branch: z.number().int().nonnegative().optional().default(0),
+      executionId: z.number().int().nonnegative().optional().default(0),
+      moduleId: z.number().int().nonnegative().optional().default(0),
+      titles: z.array(z.string().trim().min(1)).min(1).describe('批量 Bug 标题数组，对应页面表单 titles[]'),
+      assignedTo: optionalTrimmedText,
+      openedBuild: optionalTrimmedText,
+      type: optionalTrimmedText,
+      severity: z.number().optional(),
+      pri: z.number().optional(),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ confirm, ...input }) => runWithPreview('batchCreateBugs', confirm, input, previewOrAssertWriteAllowed, () => getApi().bug.batchCreateBugs(input)),
+  );
+
+  server.tool(
+    'batchEditBugs',
+    {
+      productId: z.number().int().positive(),
+      executionId: z.number().int().nonnegative().optional().default(0),
+      branch: z.number().int().nonnegative().optional().default(0),
+      bugIds: z.array(z.number().int().positive()).min(1).describe('要批量编辑的 Bug ID 列表，对应 bugIDList[]'),
+      assignedTo: optionalTrimmedText,
+      openedBuild: optionalTrimmedText,
+      type: optionalTrimmedText,
+      severity: z.number().optional(),
+      pri: z.number().optional(),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ confirm, ...input }) => runWithPreview('batchEditBugs', confirm, input, previewOrAssertWriteAllowed, () => getApi().bug.batchEditBugs(input)),
+  );
+
+  server.tool(
+    'linkBugs',
+    {
+      bugId: z.number().int().positive(),
+      linkedBugIds: z.array(z.number().int().positive()).min(1).describe('要关联到当前 Bug 的 Bug ID 列表，对应 18.5 bug/linkBugs 页面 bugs[] 字段'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ confirm, ...input }) => runWithPreview('linkBugs', confirm, input, previewOrAssertWriteAllowed, () => getApi().bug.linkBugs(input)),
+  );
+
+  server.tool(
+    'exportBugs',
+    {
+      productId: z.number().int().positive(),
+      orderBy: optionalTrimmedText.default('id_desc'),
+      browseType: optionalTrimmedText.default('all'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ confirm, ...input }) => runWithPreview('exportBugs', confirm, input, previewOrAssertWriteAllowed, () => getApi().bug.exportBugs(input)),
+  );
+
+  server.tool(
     'batchChangeBugBranch',
     {
       bugIds: z.array(z.number().int().positive()).min(1).describe('要切换分支的 Bug ID 列表，对应 18.5 bug/batchChangeBranch 页面 bugIDList[] 字段'),
@@ -266,5 +331,13 @@ export function registerBugTools(server: CliRegistry): void {
       confirm: z.boolean().optional().default(false),
     },
     async ({ productId, branch, bugIds, confirm }) => runWithPreview('batchActivateBugs', confirm, { productId, branch, bugIds }, previewOrAssertWriteAllowed, () => getApi().bug.batchActivateBugs({ productId, branch, bugIds })),
+  );
+
+  server.tool(
+    'getBugTrack',
+    {
+      bugId: z.number().int().positive().describe('Bug ID'),
+    },
+    async ({ bugId }) => jsonResult(await getApi().bug.getBugTrack(bugId)),
   );
 }

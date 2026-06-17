@@ -28,4 +28,13 @@ export function registerBuildTools(server: CliRegistry): void {
     },
     async ({ buildId, assignedTo, comment, confirm }) => runWithPreview('assignBuildTo', confirm, { buildId, assignedTo, comment }, previewOrAssertWriteAllowed, () => getApi().build.assignTo(buildId, { assignedTo, comment })),
   );
+
+  server.tool(
+    'deleteBuild',
+    {
+      buildId: z.number().int().positive().describe('构建 ID'),
+      confirm: z.boolean().optional().default(false),
+    },
+    async ({ buildId, confirm }) => runWithPreview('deleteBuild', confirm, { buildId, confirm: 'yes' }, previewOrAssertWriteAllowed, () => getApi().build.deleteBuild(buildId, 'yes')),
+  );
 }

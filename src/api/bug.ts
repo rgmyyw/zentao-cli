@@ -29,6 +29,33 @@ export interface MyBugListParams extends PaginationInput {
   productId?: number;
   branch?: string;
   order?: string;
+  /** 为 true 时只拉取首页，不扫描全量分页（用于 whoami 等快速预览场景）。 */
+  scan?: boolean;
+}
+
+export interface BatchCreateBugsInput extends Record<string, unknown> {
+  productId: number;
+  branch?: number;
+  executionId?: number;
+  moduleId?: number;
+}
+
+export interface BatchEditBugsInput extends Record<string, unknown> {
+  productId: number;
+  executionId?: number;
+  branch?: number;
+  bugIds: number[];
+}
+
+export interface LinkBugsInput {
+  bugId: number;
+  linkedBugIds: number[];
+}
+
+export interface ExportBugsInput {
+  productId: number;
+  orderBy?: string;
+  browseType?: string;
 }
 
 export class BugApi {
@@ -45,6 +72,46 @@ export class BugApi {
 
     if (normalizedParams.productId) {
       return this.getProductBugs({ ...normalizedParams, productId: normalizedParams.productId, status: 'assigntome' });
+    }
+
+    // 快速模式：每个产品只拉首页，收集够 limit 就停，不扫描全部分页。
+    if (params.scan === false) {
+      const limit = normalizePagination(normalizedParams).limit;
+      const response = await this.http.request<ZentaoListResponse<{ id: number; name?: string }> & { products?: Array<{ id: number; name?: string }> }>('GET', '/products');
+      const productsResult = toServerListResult<{ id: number; name?: string }>(response, ['products']);
+      const allBugs: ZentaoBug[] = [];
+
+      for (const product of productsResult.items) {
+        if (allBugs.length >= limit) break;
+        const productId = product.id;
+        if (!productId) continue;
+
+        const pageResult = await this.getProductBugs({
+          productId,
+          status: 'assigntome',
+          page: 1,
+          limit,
+          branch: normalizedParams.branch,
+          order: normalizedParams.order,
+        }) as ListResult<ZentaoBug>;
+        const pageItems = pageResult.items ?? [];
+        const remaining = limit - allBugs.length;
+
+        allBugs.push(...pageItems.slice(0, remaining).map((bug) => ({
+          ...bug,
+          product: bug.product ?? productId,
+          productName: bug.productName ?? product.name,
+        })));
+      }
+
+      const sorted = this.sortBugs(allBugs, normalizedParams.order);
+      const paginated = toClientPaginatedListResult<ZentaoBug>({ bugs: sorted }, ['bugs'], { page: 1, limit });
+      return {
+        ...paginated,
+        partial: true,
+        scope: 'global-assigntome',
+        scannedProducts: productsResult.items.length,
+      };
     }
 
     const response = await this.http.request<ZentaoListResponse<{ id: number; name?: string }> & { products?: Array<{ id: number; name?: string }> }>('GET', '/products');
@@ -195,6 +262,39 @@ export class BugApi {
     return this.http.request('DELETE', `/bugs/${bugId}`);
   }
 
+  async deleteBugViaForm(bugId: number): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/bug-delete-${bugId}-yes.json`);
+  }
+
+  async batchCreateBugs(input: BatchCreateBugsInput): Promise<unknown> {
+    const { productId, branch = 0, executionId = 0, moduleId = 0, ...data } = input;
+    return this.http.legacyRequest('POST', `/bug-batchCreate-${productId}-${branch}-${executionId}-${moduleId}.json`, {
+      data: toFormUrlEncoded(this.normalizeBugWriteInput(data, { requiredFields: [] })),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async batchEditBugs(input: BatchEditBugsInput): Promise<unknown> {
+    const { productId, executionId = 0, branch = 0, bugIds, ...data } = input;
+    return this.http.legacyRequest('POST', `/bug-batchEdit-${productId}-${executionId}-${branch}.json`, {
+      data: toFormUrlEncoded({ bugIDList: this.normalizeIdArray(bugIds, 'bugIds'), ...this.normalizeBugWriteInput(data, { requiredFields: [] }) }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async linkBugs(input: LinkBugsInput): Promise<unknown> {
+    return this.http.legacyRequest('POST', `/bug-linkBugs-${input.bugId}.json`, {
+      data: toFormUrlEncoded({ bugs: this.normalizeIdArray(input.linkedBugIds, 'linkedBugIds') }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async exportBugs(input: ExportBugsInput): Promise<unknown> {
+    const orderBy = encodeURIComponent(input.orderBy?.trim() || 'id_desc');
+    const browseType = encodeURIComponent(input.browseType?.trim() || 'all');
+    return this.http.legacyRequest('GET', `/bug-export-${input.productId}-${orderBy}-${browseType}.json`);
+  }
+
   async okBug(bugId: number, data: Record<string, unknown> = {}): Promise<unknown> {
     // 禅道 18.5 REST 没暴露 /bugs/{id}/ok，UI 的 OK 按钮调旧版控制器
     return this.http.legacyRequest('POST', `/bug-ok-${bugId}.json`, {
@@ -278,6 +378,7 @@ export class BugApi {
   async batchCloseBugs(input: { bugIds: number[]; releaseId?: string; viewType?: string }): Promise<unknown> {
     const bugIds = this.normalizeIdArray(input.bugIds, 'bugIds');
     const formData: Record<string, unknown> = { bugIDList: bugIds };
+    if (input.releaseId && input.releaseId.trim() !== '') formData.unlinkBugs = bugIds;
     return this.http.legacyRequest(
       'POST',
       `/bug-batchClose-${input.releaseId ?? ''}-${input.viewType ?? ''}.json`,
@@ -308,6 +409,10 @@ export class BugApi {
     return fetchAllPages<ZentaoBug>({
       fetchPage: (page) => this.getProductBugs({ ...params, status: 'assigntome', page, limit: 100 }) as Promise<ListResult<ZentaoBug>>,
     });
+  }
+
+  async getBugTrack(bugId: number): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/bug-track-${bugId}.json`);
   }
 
   private sortBugs(bugs: ZentaoBug[], order?: string): ZentaoBug[] {

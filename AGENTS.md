@@ -30,13 +30,13 @@
 
 - 登录和 token 管理：token 登录、token 失效后自动重试一次、明文密码失败时回退 MD5。
 - 任务：`getMyTasks`、`getTaskDetail`、`updateTask`、`finishTask`。
-- Bug：`getMyBugs`、`getProductBugs`、`getBugDetail`、`resolveBug`。
+- Bug：`getMyBugs`、`getProductBugs`、`getBugDetail`、`createBug`、`updateBug`、`resolveBug`、`assignBug`、`confirmBug`、`closeBug`、`activateBug`、`deleteBug`、`deleteBugViaForm`、`batchCreateBugs`、`batchEditBugs`、`linkBugs`、`exportBugs`、`batchChangeBugBranch`、`batchChangeBugModule`、`batchChangeBugPlan`、`batchAssignBugs`、`batchConfirmBugs`、`batchResolveBugs`、`batchCloseBugs`、`batchActivateBugs`。
 - 执行：`getExecutionDetail`、`getProjectExecutions`、`getExecutionBugs`、`getExecutionBuilds`、`getExecutionDynamic`、`getExecutionDailyBugStats`。
 - 统计：`getMyTaskStatistics`、`getMyBugStatistics`、`getMyWeeklyActivity`。
-- 需求：`getStoryDetail`、`getProductStories`、`searchStories`、`searchStoriesByProductName`、`updateStory`、`changeStory`。
-- 产品 / 项目 / 计划：`getProducts`、`getProductDetail`、`getProjects`、`getProjectDetail`、`getProductPlans`、`getPlanDetail`。
-- 测试：`getProductTestCases`、`getTestCaseDetail`、`getTestTasks`、`getTestTaskDetail`、`createTestCase`、`updateTestCase`、`createTestTask`、`updateTestTask`。
-- 构建 / 发布：`getProjectBuilds`、`getBuildDetail`、`getExecutionBuilds`、`createBuild`、`updateBuild`、`getProjectReleases`。
+- 需求：`getStoryDetail`、`getProductStories`、`searchStories`、`searchStoriesByProductName`、`updateStory`、`changeStory`、`batchCreateStories`、`batchEditStories`、`deleteStory`、`exportStories`、`linkRequirements`。
+- 产品 / 项目 / 计划：`getProducts`、`getProductDetail`、`getProjects`、`getProjectDetail`、`getProductPlans`、`getPlanDetail`、`createProduct`、`editProduct`、`batchEditProducts`、`closeProduct`、`deleteProduct`、`addProductWhitelist`、`unbindProductWhitelist`、`createProject`、`editProject`、`batchEditProjects`、`startProject`、`suspendProject`、`activateProject`、`closeProject`、`deleteProject`、`manageProjectMembers`、`unlinkProjectMember`、`createProgram`、`editProgram`、`startProgram`、`activateProgram`、`suspendProgram`、`closeProgram`、`deleteProgram`。
+- 测试：`getProductTestCases`、`getTestCaseDetail`、`getTestTasks`、`getTestTaskDetail`、`createTestCase`、`updateTestCase`、`createTestTask`、`updateTestTask`、`batchCreateTestCases`、`batchEditTestCases`、`batchDeleteTestCases`、`exportTestCases`、`importTestCases`、`importTestCasesFromLib`、`importTestCaseToLib`、`linkBugToTestCase`、`unlinkBugFromTestCase`、`linkCases`、`createBugFromTestCase`。
+- 构建 / 发布：`getProjectBuilds`、`getBuildDetail`、`getExecutionBuilds`、`createBuild`、`updateBuild`、`getProjectReleases`、`notifyBuildBug`、`assignBuildTo`、`linkStoriesToBuild`、`unlinkStoryFromBuild`、`batchUnlinkStoriesFromBuild`、`linkBugsToBuild`、`unlinkBugFromBuild`、`batchUnlinkBugsFromBuild`、`changeReleaseStatus`、`notifyRelease`、`deleteRelease`、`linkStoriesToRelease`、`unlinkStoryFromRelease`、`batchUnlinkStoriesFromRelease`、`linkBugsToRelease`、`unlinkBugFromRelease`、`batchUnlinkBugsFromRelease`。
 - 评论 / 动态：`getComments`，以及 execution / user dynamic 的近似读取能力。
 - 关联能力：`getStoryRelatedBugs`、`getBugRelatedStory`、`getDevelopmentContext`、`createTaskFromStory`、`createTaskFromBug`、`linkStoriesToPlan`、`unlinkStoriesFromPlan`、`linkBugsToPlan`、`unlinkBugsFromPlan`。
 
@@ -136,6 +136,40 @@ pnpm build
 ```
 
 不要在未被明确要求时提交代码。
+
+## 开发态：覆盖率统计
+
+为了量化 CLI 工具对真实禅道 18.5 控制器的覆盖情况，提供一个零依赖的统计脚本。
+
+### 跑法
+
+```bash
+pnpm coverage
+# 等价于 node scripts/coverage.mjs
+```
+
+输出三段：
+
+- 总览：合计 `已覆盖 / 总数 = 比例`
+- 各模块：execution / testcase / product / project / program / task / build / bug / testtask / story / release / todo
+- 各模块缺失入口
+
+退出码：100% 覆盖返回 0，否则返回 1（CI 门禁用）。
+
+可选参数：`--json` / `--json <path>` / `--missing` / `--missing <module>`。
+
+### 当前快照
+
+- 合计：`192 / 218 = 88.1%`（2026-06-16 实测）
+- CLI 工具总数：280
+- 已 100% 模块：program
+- 仍需补齐（按缺口数）：execution 5 / project 5 / todo 4 / release 3 / testtask 3 / 其余模块各 1
+
+### 维护约定
+
+- `ENTRIES` 和 `ALIAS` 表是手写死的，写在 `scripts/coverage.mjs` 顶部。新模块 / 新 entry 必须同步维护。
+- 每次补全 PR 提交前必须把"当前快照"小节数字更新一次，CI 按这个数字卡门禁。
+- 不要尝试"自动从 control.php 推断 entry"——同名 entry 在多个模块里复用，CLI 工具名带模块前缀，动态推断不稳定。
 
 ## 发布链路
 

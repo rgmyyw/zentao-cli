@@ -44,6 +44,37 @@ export class ReleaseApi {
     return this.http.legacyRequest('GET', `/release-changeStatus-${releaseId}-${status}.json`);
   }
 
+  async createRelease(input: { product: number; branch?: number; name: string; build?: number; date?: string; desc?: string; status?: string }): Promise<unknown> {
+    const name = requireNonBlank(input.name, 'name 不能为空');
+    const formData: Record<string, unknown> = { product: input.product, name };
+    if (input.branch !== undefined) formData.branch = input.branch;
+    if (input.build) formData.build = input.build;
+    if (input.date) formData.date = input.date;
+    if (input.desc) formData.desc = input.desc;
+    if (input.status) formData.status = input.status;
+    return this.http.legacyRequest('POST', `/release-create-${input.product}-${input.branch ?? 0}.json`, {
+      data: toFormUrlEncoded(formData),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async updateRelease(releaseId: number, input: { name?: string; build?: number; date?: string; desc?: string; status?: string }): Promise<unknown> {
+    const formData: Record<string, unknown> = {};
+    if (typeof input.name === 'string' && input.name.trim() !== '') formData.name = input.name.trim();
+    if (input.build !== undefined) formData.build = input.build;
+    if (input.date) formData.date = input.date;
+    if (typeof input.desc === 'string' && input.desc.trim() !== '') formData.desc = input.desc.trim();
+    if (input.status) formData.status = input.status;
+    return this.http.legacyRequest('POST', `/release-edit-${releaseId}.json`, {
+      data: toFormUrlEncoded(formData),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async exportRelease(releaseId: number): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/release-export-${releaseId}.json`);
+  }
+
   async notifyRelease(releaseId: number, input: NotifyReleaseInput): Promise<unknown> {
     const notify = this.normalizeStringArray(input.notify, 'notify');
     return this.http.legacyRequest('POST', `/release-notify-${releaseId}.json`, {

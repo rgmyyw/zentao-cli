@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InMemoryCliRegistry, parseCommandInput } from '../../src/core/cli-registry.js';
 import { setApi } from '../../src/core/api-provider.js';
 import { registerTools } from '../../src/core/tool-registry.js';
+import { commandToGroup } from '../../src/core/command-groups.generated.js';
 
 function parseResult(result: { content: Array<{ text: string }> }) {
   return JSON.parse(result.content[0].text) as unknown;
@@ -18,175 +19,7 @@ describe('registerTools', () => {
 
     await registerTools(registry, 'full');
 
-    expect(registry.listCommands().map((command) => command.name).sort()).toEqual([
-      'activateBug',
-      'activateExecution',
-      'activatePlan',
-      'activateStory',
-      'activateTask',
-      'activateTodo',
-      'addComment',
-      'analyzeBugResources',
-      'analyzeTaskResources',
-      'assignBug',
-      'assignBuildTo',
-      'assignStory',
-      'assignTask',
-      'assignTodo',
-      'batchActivateBugs',
-      'batchActivateTasks',
-      'batchAssignBugs',
-      'batchAssignStoriesTo',
-      'batchAssignTasksTo',
-      'batchCancelTasks',
-      'batchChangeBugBranch',
-      'batchChangeBugModule',
-      'batchChangeBugPlan',
-      'batchChangeStoryBranch',
-      'batchChangeStoryModule',
-      'batchChangeStoryPlan',
-      'batchChangeStoryStage',
-      'batchChangeTaskBranch',
-      'batchChangeTaskModule',
-      'batchChangeTaskPlan',
-      'batchCloseBugs',
-      'batchCloseStories',
-      'batchCloseTasks',
-      'batchCloseTodos',
-      'batchConfirmBugs',
-      'batchConfirmTestCaseStoryChange',
-      'batchFinishTasks',
-      'batchFinishTodos',
-      'batchResolveBugs',
-      'batchReviewStories',
-      'batchUnlinkBugsFromBuild',
-      'batchUnlinkBugsFromRelease',
-      'batchUnlinkStoriesFromBuild',
-      'batchUnlinkStoriesFromRelease',
-      'cancelTask',
-      'changeReleaseStatus',
-      'changeStory',
-      'closeBug',
-      'closeExecution',
-      'closePlan',
-      'closeStory',
-      'closeTask',
-      'computeExecutionBurn',
-      'confirmBug',
-      'confirmBugStoryChange',
-      'confirmExecutionStoryChange',
-      'confirmTaskStoryChange',
-      'confirmTestCaseStoryChange',
-      'confirmTestCaseLibcaseChange',
-      'ignoreTestCaseLibcaseChange',
-      'createBug',
-      'createBuild',
-      'createStory',
-      'createTaskFromBug',
-      'createTaskFromStory',
-      'createTestCase',
-      'createTestTask',
-      'createTodo',
-      'deleteBug',
-      'deleteRelease',
-      'deleteTask',
-      'deleteTaskEstimate',
-      'deleteTestTask',
-      'deleteTodo',
-      'editTaskEstimate',
-      'finishPlan',
-      'finishTask',
-      'finishTodo',
-      'getBugDetail',
-      'getBugRelatedStory',
-      'getBuildDetail',
-      'getComments',
-      'getDevelopmentContext',
-      'getExecutionBugs',
-      'getExecutionBuilds',
-      'getExecutionDailyBugStats',
-      'getExecutionDetail',
-      'getExecutionDynamic',
-      'getMyBugs',
-      'getMyBugStatistics',
-      'getMyProfile',
-      'getMyTasks',
-      'getMyTaskStatistics',
-      'getMyTodos',
-      'getMyWeeklyActivity',
-      'getPlanDetail',
-      'getProductBugs',
-      'getProductDetail',
-      'getProductPlans',
-      'getProducts',
-      'getProductStories',
-      'getProductTestCases',
-      'getProgramDetail',
-      'getPrograms',
-      'getProjectBuilds',
-      'getProjectDetail',
-      'getProjectExecutions',
-      'getProjectReleases',
-      'getProjects',
-      'getReleaseDetail',
-      'getStoryDetail',
-      'getStoryRelatedBugs',
-      'getTaskDetail',
-      'getTestCaseDetail',
-      'getTestTaskDetail',
-      'getTestTasks',
-      'getTodoDetail',
-      'importTodosToToday',
-      'initZentao',
-      'linkBugsToBuild',
-      'linkBugsToPlan',
-      'linkBugsToRelease',
-      'linkStoriesToBuild',
-      'linkStoriesToPlan',
-      'linkStoriesToRelease',
-      'linkStoriesToStory',
-      'notifyBuildBug',
-      'notifyRelease',
-      'okBug',
-      'pauseTask',
-      'processStoryChange',
-      'putoffExecution',
-      'recallStory',
-      'recordTaskEstimate',
-      'resolveBug',
-      'restartTask',
-      'reviewStory',
-      'searchStories',
-      'searchStoriesByProductName',
-      'startTestTask',
-      'startExecution',
-      'startPlan',
-      'startTask',
-      'startTodo',
-      'submitStoryReview',
-      'activateTestTask',
-      'blockTestTask',
-      'closeTestTask',
-      'closeTodo',
-      'suspendExecution',
-      'unlinkBugFromBuild',
-      'unlinkBugFromRelease',
-      'unlinkBugsFromPlan',
-      'unlinkStoriesFromPlan',
-      'unlinkStoryFromBuild',
-      'unlinkStoryFromRelease',
-      'unlinkStoryFromStory',
-      'updateBug',
-      'updateBuild',
-      'updateExecution',
-      'updateStory',
-      'updateTask',
-      'updateTestCase',
-      'updateTestTask',
-      'updateTodo',
-      'who-am-i',
-      'whoami',
-    ].sort());
+    expect(registry.listCommands().map((command) => command.name).sort()).toEqual(Object.keys(commandToGroup).sort());
   });
 
   it('filters commands by role', async () => {
@@ -1143,11 +976,18 @@ describe('registerTools', () => {
         getExecutionBuilds: vi.fn(async () => ({ name: 'getExecutionBuilds' })),
         getExecutionBugs: vi.fn(async () => ({ name: 'getExecutionBugs' })),
         getExecutionDailyBugStats: vi.fn(async () => ({ name: 'getExecutionDailyBugStats' })),
+        getExecutionKanban: vi.fn(async () => ({ name: 'getExecutionKanban' })),
+        getExecutionTaskKanban: vi.fn(async () => ({ name: 'getExecutionTaskKanban' })),
+        getAllExecutionKanban: vi.fn(async () => ({ name: 'getAllExecutionKanban' })),
       },
       plan: { getProductPlans: vi.fn(async () => ({ name: 'getProductPlans' })), getPlanDetail: vi.fn(async () => ({ name: 'getPlanDetail' })) },
       product: { getProducts: vi.fn(async () => ({ name: 'getProducts' })), getProductDetail: vi.fn(async () => ({ name: 'getProductDetail' })) },
       program: { getPrograms: vi.fn(async () => ({ name: 'getPrograms' })), getProgramDetail: vi.fn(async () => ({ name: 'getProgramDetail' })) },
-      project: { getProjects: vi.fn(async () => ({ name: 'getProjects' })), getProjectDetail: vi.fn(async () => ({ name: 'getProjectDetail' })) },
+      project: {
+        getProjects: vi.fn(async () => ({ name: 'getProjects' })),
+        getProjectDetail: vi.fn(async () => ({ name: 'getProjectDetail' })),
+        getProjectLinkedProducts: vi.fn(async () => ({ name: 'getProjectLinkedProducts' })),
+      },
       relation: { getStoryRelatedBugs: vi.fn(async () => ({ name: 'getStoryRelatedBugs' })), getBugRelatedStory: vi.fn(async () => ({ name: 'getBugRelatedStory' })) },
       release: { getProjectReleases: vi.fn(async () => ({ name: 'getProjectReleases' })), getReleaseDetail: vi.fn(async () => ({ name: 'getReleaseDetail' })) },
       resourceAnalysis: { analyzeObjectResources: vi.fn(async () => ({ name: 'analyzeObjectResources' })) },
@@ -1170,7 +1010,11 @@ describe('registerTools', () => {
       ['getProjectExecutions', { projectId: 1 }], ['getExecutionBuilds', { executionId: 1 }], ['getExecutionBugs', { executionId: 1, page: 1, limit: 2, status: 'active' }],
       ['getExecutionDailyBugStats', { executionId: 1, iterationName: 'i', date: 'today' }], ['getProductPlans', { productId: 1 }], ['getPlanDetail', { planId: 1 }],
       ['getProducts', {}], ['getProductDetail', { productId: 1 }], ['getPrograms', { order: 'id_desc' }], ['getProgramDetail', { programId: 1 }],
-      ['getProjects', { page: 1 }], ['getProjectDetail', { projectId: 1 }], ['getStoryRelatedBugs', { storyId: 1, productId: 1 }], ['getBugRelatedStory', { bugId: 1 }],
+      ['getProjects', { page: 1 }], ['getProjectDetail', { projectId: 1 }], ['getProjectLinkedProducts', { projectId: 1, from: 'project' }],
+      ['getExecutionKanban', { executionId: 1, browseType: 'all', orderBy: 'id_asc', groupBy: 'default' }],
+      ['getExecutionTaskKanban', { executionId: 1, browseType: 'all', orderBy: 'order_asc', groupBy: '' }],
+      ['getExecutionExecutionKanban', { executionId: 1 }],
+      ['getStoryRelatedBugs', { storyId: 1, productId: 1 }], ['getBugRelatedStory', { bugId: 1 }],
       ['getProjectReleases', { projectId: 1 }], ['getReleaseDetail', { releaseId: 1 }], ['searchStories', { keyword: 'a', productId: 1 }], ['searchStoriesByProductName', { productName: 'p', keyword: 'a' }],
       ['analyzeBugResources', { bugId: 1, download: false }], ['analyzeTaskResources', { taskId: 1, download: false }],
       ['getMyTaskStatistics', {}], ['getMyBugStatistics', { productId: 1 }], ['getMyWeeklyActivity', { week: 'this' }],
@@ -1215,6 +1059,16 @@ describe('registerTools', () => {
       execution: {
         startExecution: vi.fn(async () => ({ name: 'startExecution' })), closeExecution: vi.fn(async () => ({ name: 'closeExecution' })),
         suspendExecution: vi.fn(async () => ({ name: 'suspendExecution' })), activateExecution: vi.fn(async () => ({ name: 'activateExecution' })), putoffExecution: vi.fn(async () => ({ name: 'putoffExecution' })),
+        computeCfd: vi.fn(async () => ({ name: 'computeCfd' })),
+        linkStoriesToExecution: vi.fn(async () => ({ name: 'linkStoriesToExecution' })),
+        unlinkStoryFromExecution: vi.fn(async () => ({ name: 'unlinkStoryFromExecution' })),
+        batchUnlinkStoriesFromExecution: vi.fn(async () => ({ name: 'batchUnlinkStoriesFromExecution' })),
+        batchChangeExecutionStatus: vi.fn(async () => ({ name: 'batchChangeExecutionStatus' })),
+        unlinkMemberFromExecution: vi.fn(async () => ({ name: 'unlinkMemberFromExecution' })),
+        deleteExecution: vi.fn(async () => ({ name: 'deleteExecution' })),
+        storyEstimate: vi.fn(async () => ({ name: 'storyEstimate' })),
+        createExecution: vi.fn(async () => ({ name: 'createExecution' })),
+        batchEditExecutions: vi.fn(async () => ({ name: 'batchEditExecutions' })),
       },
       plan: {
         startPlan: vi.fn(async () => ({ name: 'startPlan' })),
@@ -1257,6 +1111,11 @@ describe('registerTools', () => {
         unlinkBugFromRelease: vi.fn(async () => ({ name: 'unlinkBugFromRelease' })),
         batchUnlinkBugsFromRelease: vi.fn(async () => ({ name: 'batchUnlinkBugsFromRelease' })),
       },
+      project: {
+        createProjectGroup: vi.fn(async () => ({ name: 'createProjectGroup' })),
+        editProjectGroup: vi.fn(async () => ({ name: 'editProjectGroup' })),
+        copyProjectGroup: vi.fn(async () => ({ name: 'copyProjectGroup' })),
+      },
       task: {
         editEstimate: vi.fn(async () => ({ name: 'editTaskEstimate' })),
         deleteEstimate: vi.fn(async () => ({ name: 'deleteTaskEstimate' })),
@@ -1283,6 +1142,13 @@ describe('registerTools', () => {
         blockTestTask: vi.fn(async () => ({ name: 'blockTestTask' })),
         closeTestTask: vi.fn(async () => ({ name: 'closeTestTask' })),
         deleteTestTask: vi.fn(async () => ({ name: 'deleteTestTask' })),
+        unlinkCase: vi.fn(async () => ({ name: 'unlinkCase' })),
+        batchUnlinkCases: vi.fn(async () => ({ name: 'batchUnlinkCases' })),
+        runCase: vi.fn(async () => ({ name: 'runCase' })),
+        batchRunTestCases: vi.fn(async () => ({ name: 'batchRunTestCases' })),
+        batchAssignTestTasks: vi.fn(async () => ({ name: 'batchAssignTestTasks' })),
+        importTestTaskUnitResult: vi.fn(async () => ({ name: 'importTestTaskUnitResult' })),
+        linkCase: vi.fn(async () => ({ name: 'linkCase' })),
       },
       todo: {
         createTodo: vi.fn(async () => ({ name: 'createTodo' })),
@@ -1373,6 +1239,19 @@ describe('registerTools', () => {
       ['suspendExecution', { executionId: 1, confirm: true }],
       ['activateExecution', { executionId: 1, confirm: true }],
       ['putoffExecution', { executionId: 1, days: 2, confirm: true }],
+      ['computeCfd', { executionId: 1, confirm: true }],
+      ['linkStoriesToExecution', { executionId: 1, storyIds: [11, 12], productId: undefined, branch: undefined, confirm: true }],
+      ['unlinkStoryFromExecution', { executionId: 1, storyId: 11, confirm: true }],
+      ['batchUnlinkStoriesFromExecution', { executionId: 1, storyIds: [11, 12], confirm: true }],
+      ['batchChangeExecutionStatus', { executionIds: [1, 2], status: 'doing', projectId: 0, confirm: true }],
+      ['unlinkMemberFromExecution', { executionId: 1, userId: 2, confirm: true }],
+      ['deleteExecution', { executionId: 1, confirm: true }],
+      ['storyEstimate', { executionId: 1, storyId: 2, estimate: undefined, round: 0, confirm: true }],
+      ['createExecution', { project: 1772, name: '迭代', begin: '2026-01-01', end: '2026-01-02', confirm: true }],
+      ['batchEditExecutions', { executionIds: [1, 2], names: { 1: 'a', 2: 'b' }, days: { 1: 1, 2: 2 }, confirm: true }],
+      ['createProjectGroup', { projectId: 1772, name: 'g', confirm: true }],
+      ['editProjectGroup', { groupId: 5, name: 'g2', desc: 'd', confirm: true }],
+      ['copyProjectGroup', { fromGroupId: 5, name: 'g3', confirm: true }],
       ['createBuild', { project: 1, execution: 2, product: 3, name: 'b', builder: 'me', confirm: true }],
       ['updateBuild', { buildId: 1, name: 'b2', confirm: true }],
       ['linkStoriesToBuild', { buildId: 1, storyIds: [1], confirm: true }],
@@ -1393,6 +1272,13 @@ describe('registerTools', () => {
       ['blockTestTask', { testTaskId: 1, comment: 'block', confirm: true }],
       ['closeTestTask', { testTaskId: 1, realFinishedDate: '2026-01-03', mailto: ['qa', 'pm'], comment: 'close', confirm: true }],
       ['deleteTestTask', { testTaskId: 1, confirm: true }],
+      ['unlinkCase', { rowID: 1, confirm: 'yes', draft: true }],
+      ['batchUnlinkCases', { testTaskId: 1, caseIds: [11, 12], confirm: true }],
+      ['runCase', { runID: 9, caseId: undefined, version: undefined, confirm: undefined, result: 'pass', comment: 'ok', assignedTo: 'qa', draft: true }],
+      ['batchRunTestCases', { productId: 153, from: 'testtask', testTaskId: 1, caseIds: [11, 12], results: { '11': { result: 'pass', comment: 'a' }, '12': { result: 'fail', comment: 'b' } }, draft: true }],
+      ['batchAssignTestTasks', { testTaskId: 1, caseIds: [11, 12], assignedTo: 'qa', comment: undefined, confirm: true }],
+      ['importTestTaskUnitResult', { productId: 153, execution: 2140, build: 5648, owner: 'qa', members: ['qa1', 'qa2'], frame: 'ztf', projectId: 1772, confirm: true }],
+      ['linkCaseToTestTask', { testTaskId: 5, caseIds: [11, 12], type: 'all', param: 0, confirm: true }],
     ];
 
     for (const [name, input] of calls) {
@@ -1452,6 +1338,13 @@ describe('registerTools', () => {
     expect(api.testtask.blockTestTask).toHaveBeenCalledTimes(1);
     expect(api.testtask.closeTestTask).toHaveBeenCalledTimes(1);
     expect(api.testtask.deleteTestTask).toHaveBeenCalledTimes(1);
+    expect(api.testtask.unlinkCase).toHaveBeenCalledTimes(1);
+    expect(api.testtask.batchUnlinkCases).toHaveBeenCalledTimes(1);
+    expect(api.testtask.runCase).toHaveBeenCalledTimes(1);
+    expect(api.testtask.batchRunTestCases).toHaveBeenCalledTimes(1);
+    expect(api.testtask.batchAssignTestTasks).toHaveBeenCalledTimes(1);
+    expect(api.testtask.importTestTaskUnitResult).toHaveBeenCalledTimes(1);
+    expect(api.testtask.linkCase).toHaveBeenCalledTimes(1);
     expect(api.testcase.confirmStoryChange).toHaveBeenCalledTimes(1);
     expect(api.testcase.confirmLibcaseChange).toHaveBeenCalledTimes(1);
     expect(api.testcase.ignoreLibcaseChange).toHaveBeenCalledTimes(1);
@@ -1463,6 +1356,19 @@ describe('registerTools', () => {
     expect(api.todo.batchCloseTodos).toHaveBeenCalledTimes(1);
     expect(api.todo.importTodosToToday).toHaveBeenCalledTimes(1);
     expect(api.execution.putoffExecution).toHaveBeenCalledWith(1, { days: 2 });
+    expect(api.execution.computeCfd).toHaveBeenCalledTimes(1);
+    expect(api.execution.linkStoriesToExecution).toHaveBeenCalledTimes(1);
+    expect(api.execution.unlinkStoryFromExecution).toHaveBeenCalledTimes(1);
+    expect(api.execution.batchUnlinkStoriesFromExecution).toHaveBeenCalledTimes(1);
+    expect(api.execution.batchChangeExecutionStatus).toHaveBeenCalledTimes(1);
+    expect(api.execution.unlinkMemberFromExecution).toHaveBeenCalledTimes(1);
+    expect(api.execution.deleteExecution).toHaveBeenCalledTimes(1);
+    expect(api.execution.storyEstimate).toHaveBeenCalledTimes(1);
+    expect(api.execution.createExecution).toHaveBeenCalledTimes(1);
+    expect(api.execution.batchEditExecutions).toHaveBeenCalledTimes(1);
+    expect(api.project.createProjectGroup).toHaveBeenCalledTimes(1);
+    expect(api.project.editProjectGroup).toHaveBeenCalledTimes(1);
+    expect(api.project.copyProjectGroup).toHaveBeenCalledTimes(1);
   });
 });
 

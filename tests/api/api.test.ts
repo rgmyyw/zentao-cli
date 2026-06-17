@@ -53,6 +53,32 @@ describe('simple API wrappers', () => {
     await expect(api.getProjectDetail(2)).resolves.toEqual({ id: 2 });
   });
 
+  it('ProjectApi executes 18.5 manageProducts / group legacy flows', async () => {
+    const http = createHttp([{}, {}, {}, {}, {}]);
+    const api = new ProjectApi(http as never);
+
+    await api.getProjectLinkedProducts(1772);
+    await api.getProjectLinkedProducts(1772, 'program');
+    await api.createProjectGroup({ projectId: 1772, name: 'g1', desc: ' note ', roles: ['dev'], accounts: ['u1', 'u2'] });
+    await api.editProjectGroup({ groupId: 9, name: 'g2', accounts: ['u3'] });
+    await api.copyProjectGroup(9, ' copy ');
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'GET', '/project-manageProducts-1772-project.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'GET', '/project-manageProducts-1772-program.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/project-createGroup-1772.json', {
+      data: 'name=g1&desc=note&roles=dev&accounts=u1%2Cu2',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'POST', '/project-editGroup-9.json', {
+      data: 'name=g2&accounts=u3',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'POST', '/project-copyGroup-9.json', {
+      data: 'from=9&name=+copy+',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
   it('ProgramApi, ReleaseApi and UserApi call expected endpoints', async () => {
     const http = createHttp([{ programs: [] }, { id: 1 }, { releases: [] }, { id: 2 }, { account: 'me' }]);
     await new ProgramApi(http as never).getPrograms('id_desc');
@@ -365,6 +391,15 @@ describe('TaskApi', () => {
     expect(http.request).toHaveBeenNthCalledWith(3, 'GET', '/tasks', { params: { assignedTo: 'me', page: 1, limit: 100 } });
   });
 
+  it('scans only the first page when scan is false', async () => {
+    const http = createHttp([{ tasks: [{ id: 1, status: 'doing' }, { id: 2, status: 'done' }], total: 99 }]);
+    const result = await new TaskApi(http as never).getMyTasks({ status: 'all', limit: 100, scan: false });
+
+    expect(result).toMatchObject({ partial: true, scanned: 2, total: 2, items: [{ id: 1 }, { id: 2 }] });
+    expect(http.request).toHaveBeenCalledWith('GET', '/tasks', { params: { assignedTo: 'me', page: 1, limit: 100 } });
+    expect(http.request).toHaveBeenCalledTimes(1);
+  });
+
   it('calls detail and write endpoints', async () => {
     const http = createHttp([{ id: 1 }, {}, {}, {}, {}, {}, {}, {}, {}, {}]);
     const api = new TaskApi(http as never);
@@ -477,50 +512,60 @@ describe('TaskApi', () => {
   });
 
   it('calls batch task operations', async () => {
-    const http = createHttp([{}, {}, {}, {}, {}, {}, {}, {}]);
+    const http = createHttp([{}, {}, {}, {}]);
     const api = new TaskApi(http as never);
 
-    await api.batchFinishTasks({ taskIds: [1, 2] });
     await api.batchCancelTasks({ taskIds: [3] });
     await api.batchCloseTasks({ taskIds: [4, 5] });
-    await api.batchChangeTaskBranch({ taskIds: [6], branchId: 100 });
     await api.batchChangeTaskModule({ taskIds: [7], moduleId: 10 });
-    await api.batchChangeTaskPlan({ taskIds: [8], planId: 3 });
     await api.batchAssignTasksTo({ taskIds: [9, 10], assignedTo: 'dev', comment: '请处理' });
-    await api.batchActivateTasks({ taskIds: [11] });
+    await api.batchEditTasks({ tasks: [{ taskId: 12, name: '联调任务', type: 'devel', pri: 2, module: 66, status: 'doing', estimate: 4, left: 3, estStarted: '2026-06-01', deadline: '2026-06-02', assignedTo: 'dev', consumed: 1.5 }] });
 
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/task-batchFinish.json', {
-      data: 'taskIDList%5B%5D=1&taskIDList%5B%5D=2',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/task-batchCancel.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/task-batchCancel.json', {
       data: 'taskIDList%5B%5D=3',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/task-batchClose.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/task-batchClose.json', {
       data: 'taskIDList%5B%5D=4&taskIDList%5B%5D=5',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'POST', '/task-batchChangeBranch.json', {
-      data: 'taskIDList%5B%5D=6&branch=100',
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/task-batchChangeModule-10.json', {
+      data: 'taskIDList%5B%5D=7',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'POST', '/task-batchChangeModule.json', {
-      data: 'taskIDList%5B%5D=7&module=10',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(6, 'POST', '/task-batchChangePlan.json', {
-      data: 'taskIDList%5B%5D=8&plan=3',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(7, 'POST', '/task-batchAssignTo.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'POST', '/task-batchAssignTo.json', {
       data: 'taskIDList%5B%5D=9&taskIDList%5B%5D=10&assignedTo=dev&comment=%E8%AF%B7%E5%A4%84%E7%90%86',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(8, 'POST', '/task-batchActivate.json', {
-      data: 'taskIDList%5B%5D=11',
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'POST', '/task-batchEdit.json', {
+      data: 'taskIDList%5B%5D=12&colors%5B12%5D=&names%5B12%5D=%E8%81%94%E8%B0%83%E4%BB%BB%E5%8A%A1&modules%5B12%5D=66&types%5B12%5D=devel&statuses%5B12%5D=doing&pris%5B12%5D=2&estimates%5B12%5D=4&lefts%5B12%5D=3&estStarteds%5B12%5D=2026-06-01&deadlines%5B12%5D=2026-06-02&finishedBys%5B12%5D=&canceledBys%5B12%5D=&closedBys%5B12%5D=&closedReasons%5B12%5D=&assignedTos%5B12%5D=dev&consumeds%5B12%5D=1.5',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
+  });
+
+  it('follows ZenTao 18.5 batch close confirmation for skipped tasks', async () => {
+    const http = createHttp(["js::confirm('skip', '/task-batchClose-skipTaskIdList=4,5.html', '', 'self', 'parent')", {}]);
+    const api = new TaskApi(http as never);
+
+    await api.batchCloseTasks({ taskIds: [4, 5] });
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/task-batchClose.json', {
+      data: 'taskIDList%5B%5D=4&taskIDList%5B%5D=5',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'GET', '/task-batchClose-4,5.json');
+  });
+
+  it('rejects task batch operations missing in ZenTao 18.5', async () => {
+    const http = createHttp();
+    const api = new TaskApi(http as never);
+
+    await expect(api.batchFinishTasks({ taskIds: [1, 2] })).rejects.toThrow('禅道 18.5 不支持 task/batchFinish');
+    await expect(api.batchChangeTaskBranch({ taskIds: [6], branchId: 100 })).rejects.toThrow('禅道 18.5 不支持 task/batchChangeBranch');
+    await expect(api.batchChangeTaskPlan({ taskIds: [8], planId: 3 })).rejects.toThrow('禅道 18.5 不支持 task/batchChangePlan');
+    await expect(api.batchActivateTasks({ taskIds: [11] })).rejects.toThrow('禅道 18.5 不支持 task/batchActivate');
+    await expect(api.batchChangeTaskStory({ taskIds: [12], storyId: 0 })).rejects.toThrow('禅道 18.5 不支持 task/batchChangeStory');
+    expect(http.legacyRequest).not.toHaveBeenCalled();
   });
 
   it('rejects empty task ID arrays in batch operations', async () => {
@@ -665,6 +710,23 @@ describe('BugApi', () => {
     });
   });
 
+  it('scans only the first page per product when scan is false', async () => {
+    const http = createHttp([
+      { products: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }] },
+      { bugs: [{ id: 2 }], total: 1 },
+      { bugs: [{ id: 5 }], total: 1 },
+    ]);
+    const result = await new BugApi(http as never).getMyBugs({ limit: 100, scan: false });
+
+    expect(result).toMatchObject({ partial: true, scope: 'global-assigntome', scannedProducts: 2, items: [{ id: 5, product: 2, productName: 'B' }, { id: 2, product: 1, productName: 'A' }] });
+    expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/products/1/bugs', {
+      params: { page: 1, limit: 100, branch: 'all', order: 'id_desc', status: 'assigntome' },
+    });
+    expect(http.request).toHaveBeenNthCalledWith(3, 'GET', '/products/2/bugs', {
+      params: { page: 1, limit: 100, branch: 'all', order: 'id_desc', status: 'assigntome' },
+    });
+  });
+
   it('treats blank bug query strings as missing values', async () => {
     const http = createHttp([{ bugs: [], total: 0 }]);
 
@@ -779,9 +841,14 @@ describe('BugApi', () => {
   });
 
   it('BugApi executes 18.5 batch short flows', async () => {
-    const http = createHttp([{}, {}, {}, {}, {}, {}, {}, {}]);
+    const http = createHttp([{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}]);
     const api = new BugApi(http as never);
 
+    await api.deleteBugViaForm(84362);
+    await api.batchCreateBugs({ productId: 153, branch: 0, executionId: 2140, moduleId: 66, titles: ['问题一', '问题二'], assignedTo: ' lixm1 ' });
+    await api.batchEditBugs({ productId: 153, executionId: 2140, branch: 0, bugIds: [84362, 84363], assignedTo: ' lixm1 ' });
+    await api.linkBugs({ bugId: 84362, linkedBugIds: [84363, 84364] });
+    await api.exportBugs({ productId: 153, orderBy: ' id_desc ', browseType: ' all ' });
     await api.batchChangeBugBranch({ bugIds: [84362, 84363], branchId: 1 });
     await api.batchChangeBugModule({ bugIds: [84362, 84363], moduleId: 66 });
     await api.batchChangeBugPlan({ bugIds: [84362, 84363], planId: 360 });
@@ -789,37 +856,56 @@ describe('BugApi', () => {
     await api.batchConfirmBugs({ bugIds: [84362, 84363] });
     await api.batchResolveBugs({ bugIds: [84362, 84363], resolution: 'fixed', resolvedBuild: 'trunk', comment: ' done ' });
     await api.batchCloseBugs({ bugIds: [84362, 84363], releaseId: '', viewType: '' });
+    await api.batchCloseBugs({ bugIds: [84362, 84363], releaseId: '5648', viewType: 'release' });
     await api.batchActivateBugs({ productId: 153, branch: 0, bugIds: [84362, 84363] });
 
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/bug-batchChangeBranch-1.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'GET', '/bug-delete-84362-yes.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/bug-batchCreate-153-0-2140-66.json', {
+      data: 'titles%5B%5D=%E9%97%AE%E9%A2%98%E4%B8%80&titles%5B%5D=%E9%97%AE%E9%A2%98%E4%BA%8C&assignedTo=lixm1',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/bug-batchEdit-153-2140-0.json', {
+      data: 'bugIDList%5B%5D=84362&bugIDList%5B%5D=84363&assignedTo=lixm1',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'POST', '/bug-linkBugs-84362.json', {
+      data: 'bugs%5B%5D=84363&bugs%5B%5D=84364',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'GET', '/bug-export-153-id_desc-all.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(6, 'POST', '/bug-batchChangeBranch-1.json', {
       data: 'bugIDList%5B%5D=84362&bugIDList%5B%5D=84363',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/bug-batchChangeModule-66.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(7, 'POST', '/bug-batchChangeModule-66.json', {
       data: 'bugIDList%5B%5D=84362&bugIDList%5B%5D=84363',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/bug-batchChangePlan-360.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(8, 'POST', '/bug-batchChangePlan-360.json', {
       data: 'bugIDList%5B%5D=84362&bugIDList%5B%5D=84363',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'POST', '/bug-batchAssignTo-2140-execution.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(9, 'POST', '/bug-batchAssignTo-2140-execution.json', {
       data: 'bugIDList%5B%5D=84362&bugIDList%5B%5D=84363&assignedTo=lixm1&comment=please+handle',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'POST', '/bug-batchConfirm.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(10, 'POST', '/bug-batchConfirm.json', {
       data: 'bugIDList%5B%5D=84362&bugIDList%5B%5D=84363',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(6, 'POST', '/bug-batchResolve-fixed-trunk.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(11, 'POST', '/bug-batchResolve-fixed-trunk.json', {
       data: 'bugIDList%5B%5D=84362&bugIDList%5B%5D=84363&resolution=fixed&resolvedBuild=trunk&comment=done',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(7, 'POST', '/bug-batchClose--.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(12, 'POST', '/bug-batchClose--.json', {
       data: 'bugIDList%5B%5D=84362&bugIDList%5B%5D=84363',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(8, 'POST', '/bug-batchActivate-153-0.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(13, 'POST', '/bug-batchClose-5648-release.json', {
+      data: 'bugIDList%5B%5D=84362&bugIDList%5B%5D=84363&unlinkBugs%5B%5D=84362&unlinkBugs%5B%5D=84363',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(14, 'POST', '/bug-batchActivate-153-0.json', {
       data: 'statusList%5B84362%5D=activate&statusList%5B84363%5D=activate&bugIDList%5B%5D=84362&bugIDList%5B%5D=84363',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
@@ -833,13 +919,15 @@ describe('BugApi', () => {
     await expect(api.batchChangeBugModule({ bugIds: [0], moduleId: 1 })).rejects.toThrow('bugIds 必须是正整数');
     await expect(api.batchAssignBugs({ bugIds: [1], objectId: 1, assignedTo: '   ' })).rejects.toThrow('assignedTo 不能为空');
     await expect(api.batchResolveBugs({ bugIds: [1], resolution: '   ' })).rejects.toThrow('resolution 不能为空');
+    await expect(api.batchEditBugs({ productId: 1, bugIds: [] })).rejects.toThrow('bugIds 至少需要 1 项');
+    await expect(api.linkBugs({ bugId: 1, linkedBugIds: [] })).rejects.toThrow('linkedBugIds 至少需要 1 项');
     expect(http.legacyRequest).not.toHaveBeenCalled();
   });
 });
 
 describe('StoryApi, TestCaseApi and TestTaskApi', () => {
   it('StoryApi calls list/detail/write endpoints', async () => {
-    const http = createHttp([{ stories: [{ id: 1 }], total: 1 }, { id: 1 }, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}]);
+    const http = createHttp([{ stories: [{ id: 1 }], total: 1 }, { id: 1 }, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}]);
     const api = new StoryApi(http as never);
     await api.getProductStories({ productId: 2, page: 1, limit: 3 });
     await api.getStoryDetail(1);
@@ -850,11 +938,16 @@ describe('StoryApi, TestCaseApi and TestTaskApi', () => {
     await api.assignStory(1, { assignedTo: 'me' });
     await api.activateStory(1, { comment: 'a' });
     await api.reviewStory(1, { result: 'pass' });
+    await api.batchCreateStories({ productId: 2, branch: 0, moduleId: 0, storyId: 0, executionId: 0, planId: 0, storyType: 'story' });
+    await api.batchEditStories({ productId: 2, executionId: 0, branch: 0, storyType: 'story' });
     await api.linkStoriesToStory(1, { storyIds: [2, 3] });
     await api.unlinkStoryFromStory(1, 2);
     await api.recallStory(1);
     await api.submitStoryReview(1);
     await api.processStoryChange(1, 'yes');
+    await api.deleteStory(1);
+    await api.linkRequirements(1, { browseType: 'all' });
+    await api.exportStories({ productId: 2, orderBy: 'id_desc' });
     await api.batchReviewStories({ storyIds: [1, 2], result: 'pass', reason: ' ok ' });
     await api.batchCloseStories({ productId: 153, storyIds: [1, 2], closedReasons: { 1: 'done', 2: 'cancel' }, comments: { 1: 'note1', 2: 'note2' } });
     await api.batchChangeStoryModule({ storyIds: [1, 2], moduleId: 66 });
@@ -872,39 +965,44 @@ describe('StoryApi, TestCaseApi and TestTaskApi', () => {
     expect(http.request).toHaveBeenNthCalledWith(7, 'POST', '/stories/1/assignto', { data: { assignedTo: 'me' } });
     expect(http.request).toHaveBeenNthCalledWith(8, 'POST', '/stories/1/activate', { data: { comment: 'a' } });
     expect(http.request).toHaveBeenNthCalledWith(9, 'POST', '/stories/1/review', { data: { result: 'pass' } });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/story-linkStory-1-linkStories-0.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'GET', '/story-batchCreate-2-0-0-0-0-0-story.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'GET', '/story-batchEdit-2-0-0-story.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/story-linkStory-1-linkStories-0.json', {
       data: 'stories%5B%5D=2&stories%5B%5D=3',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'GET', '/story-linkStory-1-remove-2.json');
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'GET', '/story-recall-1-list-yes.json');
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'POST', '/story-submitReview-1-story.json');
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'GET', '/story-processStoryChange-1-yes.json');
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(6, 'POST', '/story-batchReview-pass-ok-story.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'GET', '/story-linkStory-1-remove-2.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'GET', '/story-recall-1-list-yes.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(6, 'POST', '/story-submitReview-1-story.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(7, 'GET', '/story-processStoryChange-1-yes.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(8, 'GET', '/story-delete-1-yes-story.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(9, 'GET', '/story-linkRequirements-1-all--0-0-20-1.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(10, 'GET', '/story-export-2-id_desc-0--story.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(11, 'POST', '/story-batchReview-pass-ok-story.json', {
       data: 'storyIdList%5B%5D=1&storyIdList%5B%5D=2',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(7, 'POST', '/story-batchClose-153-0-story.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(12, 'POST', '/story-batchClose-153-0-story.json', {
       data: 'storyIdList%5B1%5D=1&storyIdList%5B2%5D=2&closedReasons%5B1%5D=done&closedReasons%5B2%5D=cancel&comments%5B1%5D=note1&comments%5B2%5D=note2',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(8, 'POST', '/story-batchChangeModule-66-story.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(13, 'POST', '/story-batchChangeModule-66-story.json', {
       data: 'storyIdList%5B%5D=1&storyIdList%5B%5D=2',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(9, 'POST', '/story-batchChangePlan-360-0.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(14, 'POST', '/story-batchChangePlan-360-0.json', {
       data: 'storyIdList%5B%5D=1&storyIdList%5B%5D=2',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(10, 'POST', '/story-batchChangeBranch-1-yes-story.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(15, 'POST', '/story-batchChangeBranch-1-yes-story.json', {
       data: 'storyIdList%5B%5D=1&storyIdList%5B%5D=2',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(11, 'POST', '/story-batchChangeStage-verified.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(16, 'POST', '/story-batchChangeStage-verified.json', {
       data: 'storyIdList%5B%5D=1&storyIdList%5B%5D=2',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(12, 'POST', '/story-batchAssignTo-story.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(17, 'POST', '/story-batchAssignTo-story.json', {
       data: 'storyIdList%5B%5D=1&storyIdList%5B%5D=2&assignedTo=me&comment=please+handle',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
@@ -1075,6 +1173,95 @@ describe('StoryApi, TestCaseApi and TestTaskApi', () => {
     });
   });
 
+  it('TestCaseApi uses 18.5 path parameters for batch change flows', async () => {
+    const http = createHttp([{}, {}, {}]);
+    const api = new TestCaseApi(http as never);
+
+    await api.batchChangeTestCaseBranch({ productId: 153, branchId: 2, caseIds: [58191, 58192] });
+    await api.batchChangeTestCaseModule({ productId: 153, moduleId: 10, caseIds: [58193] });
+    await api.batchChangeTestCaseType({ productId: 153, type: 'feature', result: 'performance', caseIds: [58194] });
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/testcase-batchChangeBranch-2.json', {
+      data: 'caseIDList%5B%5D=58191&caseIDList%5B%5D=58192&confirm=',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/testcase-batchChangeModule-10.json', {
+      data: 'caseIDList%5B%5D=58193',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/testcase-batchCaseTypeChange-performance.json', {
+      data: 'type=feature&caseIDList%5B%5D=58194',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
+  it('TestCaseApi uses 18.5 row fields for batch create and batch edit', async () => {
+    const http = createHttp([{}, {}]);
+    const api = new TestCaseApi(http as never);
+
+    await api.batchCreateTestCases({
+      productId: 153,
+      branch: 1,
+      moduleId: 66,
+      storyId: 10154,
+      cases: [{
+        title: '批量用例一',
+        type: 'feature',
+        pri: 2,
+        stage: ['unittest', 'feature'],
+        precondition: '前置条件',
+        keywords: '关键字',
+        scene: 3,
+        color: '#fff',
+        needReview: 1,
+        steps: [{ desc: '步骤一', expect: '预期一', type: 'step' }],
+      }],
+    });
+    await api.batchEditTestCases({
+      productId: 153,
+      branch: 1,
+      type: 'feature',
+      moduleId: 66,
+      cases: [{
+        caseId: 58191,
+        title: '更新后的用例',
+        type: 'performance',
+        pri: 3,
+        module: 99,
+        story: 10155,
+        branch: 2,
+        stage: ['feature'],
+        scene: 4,
+        status: 'normal',
+        color: '#000',
+        precondition: '新的前置',
+        keywords: '新的关键字',
+      }],
+    });
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/testcase-batchCreate-153-1-66-10154.json', {
+      data: 'title%5B0%5D=%E6%89%B9%E9%87%8F%E7%94%A8%E4%BE%8B%E4%B8%80&type%5B0%5D=feature&pri%5B0%5D=2&module%5B0%5D=66&story%5B0%5D=10154&branch%5B0%5D=1&scene%5B0%5D=3&color%5B0%5D=%23fff&precondition%5B0%5D=%E5%89%8D%E7%BD%AE%E6%9D%A1%E4%BB%B6&keywords%5B0%5D=%E5%85%B3%E9%94%AE%E5%AD%97&needReview%5B0%5D=1&stage%5B0%5D%5B%5D=unittest&stage%5B0%5D%5B%5D=feature&steps%5B0%5D%5B0%5D%5Bdesc%5D=%E6%AD%A5%E9%AA%A4%E4%B8%80&steps%5B0%5D%5B0%5D%5Bexpect%5D=%E9%A2%84%E6%9C%9F%E4%B8%80&steps%5B0%5D%5B0%5D%5Btype%5D=step',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/testcase-batchEdit-153-1-feature-66.json', {
+      data: 'caseIDList%5B%5D=58191&title%5B58191%5D=%E6%9B%B4%E6%96%B0%E5%90%8E%E7%9A%84%E7%94%A8%E4%BE%8B&types%5B58191%5D=performance&pris%5B58191%5D=3&modules%5B58191%5D=99&story%5B58191%5D=10155&scene%5B58191%5D=4&statuses%5B58191%5D=normal&color%5B58191%5D=%23000&precondition%5B58191%5D=%E6%96%B0%E7%9A%84%E5%89%8D%E7%BD%AE&keywords%5B58191%5D=%E6%96%B0%E7%9A%84%E5%85%B3%E9%94%AE%E5%AD%97&branches%5B58191%5D=2&stages%5B58191%5D%5B%5D=feature',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
+  it('TestCaseApi uses caseIDList for batch delete and rejects unsupported batch assign', async () => {
+    const http = createHttp([{}]);
+    const api = new TestCaseApi(http as never);
+
+    await api.batchDeleteTestCases({ productId: 153, caseIds: [58191, 58192] });
+    await expect(api.batchAssignTestCases({ productId: 153, caseIds: [58191], assignedTo: 'qa' })).rejects.toThrow('禅道 18.5 不支持 testcase/batchAssignTo');
+
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/testcase-batchDelete-153.json', {
+      data: 'caseIDList%5B%5D=58191&caseIDList%5B%5D=58192',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
   it('TestTaskApi maps productID to product on create', async () => {
     const http = createHttp([{ testtasks: [] }, { id: 1 }, {}, {}, {}, {}, {}, {}]);
     const api = new TestTaskApi(http as never);
@@ -1165,6 +1352,57 @@ describe('StoryApi, TestCaseApi and TestTaskApi', () => {
     await expect(api.createTestTask({ project: 1, productID: 4, name: 'ok', build: '   ', begin: '2026-01-01', end: '2026-01-02' })).rejects.toThrow('build 不能为空');
     await expect(api.createTestTask({ project: 1, productID: 4, name: 'ok', build: 2, begin: '   ', end: '2026-01-02' })).rejects.toThrow('begin 不能为空');
     expect(http.request).not.toHaveBeenCalled();
+    expect(http.legacyRequest).not.toHaveBeenCalled();
+  });
+
+  it('TestTaskApi executes 18.5 short legacy testtask write flows', async () => {
+    const http = createHttp([{}, {}, {}, {}, {}, {}, {}]);
+    const api = new TestTaskApi(http as never);
+
+    await api.unlinkCase(7, 'yes');
+    await api.batchUnlinkCases({ taskID: 5, caseIDList: [11, 12] });
+    await api.runCase({ runID: 9, result: 'pass', comment: ' ok ', assignedTo: ' qa ' });
+    await api.batchRunTestCases({ productID: 153, from: 'testtask', taskID: 5, caseIDList: [11, 12], results: { '11': { result: 'pass', comment: 'a' }, '12': { result: 'fail', comment: 'b' } } });
+    await api.batchAssignTestTasks({ taskID: 5, caseIDList: [11, 12], assignedTo: 'qa', comment: ' please ' });
+    await api.importTestTaskUnitResult({ productID: 153, execution: 2140, build: 5648, owner: ' qa ', members: [' qa1 ', ' qa2 '], frame: ' ztf ', projectID: 1772 });
+    await api.linkCase({ taskID: 5, type: 'all', param: 0, caseIDList: [11, 12] });
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'GET', '/testtask-unlinkCase-7-yes.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/testtask-batchUnlinkCases-5.json', {
+      data: 'caseIDList%5B%5D=11&caseIDList%5B%5D=12',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/testtask-runCase-0.json?runID=9', {
+      data: 'result=pass&comment=+ok+&assignedTo=+qa+',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'POST', '/testtask-batchRun-0.json?productID=153&from=testtask&taskID=5', {
+      data: expect.stringContaining('caseIDList%5B%5D=11'),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'POST', '/testtask-batchAssign-5.json', {
+      data: 'caseIDList%5B%5D=11&caseIDList%5B%5D=12&assignedTo=qa&comment=+please+',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(6, 'POST', '/testtask-importUnitResult-153.json', {
+      data: 'execution=2140&build=5648&owner=+qa+&members%5B%5D=+qa1+&members%5B%5D=+qa2+&frame=+ztf+&projectID=1772',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(7, 'POST', '/testtask-linkCase-5-all-0.json', {
+      data: 'caseIDList%5B%5D=11&caseIDList%5B%5D=12',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
+  it('TestTaskApi rejects empty batch inputs for unlink/assign/run', async () => {
+    const http = createHttp();
+    const api = new TestTaskApi(http as never);
+
+    await expect(api.batchUnlinkCases({ taskID: 5, caseIDList: [] })).rejects.toThrow('caseIDList');
+    await expect(api.batchRunTestCases({ productID: 153, caseIDList: [], results: {} })).rejects.toThrow('caseIDList');
+    await expect(api.batchRunTestCases({ productID: 153, caseIDList: [1], results: {} as never })).rejects.toThrow('results');
+    await expect(api.batchAssignTestTasks({ taskID: 5, caseIDList: [], assignedTo: 'qa' })).rejects.toThrow('caseIDList');
+    await expect(api.runCase({ result: 'pass' } as never)).rejects.toThrow('runID');
     expect(http.legacyRequest).not.toHaveBeenCalled();
   });
 });
@@ -1460,22 +1698,40 @@ describe('ExecutionApi', () => {
 
     expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/executions/1', { params: { fields: 'dynamics' } });
     expect(http.request).toHaveBeenNthCalledWith(5, 'GET', '/executions/1/bugs', { params: { page: 1, limit: 2, status: 'active' } });
-    expect(http.request).toHaveBeenNthCalledWith(10, 'POST', '/executions/1/putoff', { data: { days: 2 } });
     expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/execution-edit-1.json', {
       data: 'name=n',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/execution-start-1-execution.json', {
+      data: 'comment=s',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/execution-close-1-execution.json', {
+      data: 'comment=c',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/execution-suspend-1-execution.json', {
+      data: '',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/execution-activate-1-execution.json', {
+      data: '',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/execution-putoff-1-execution.json', {
+      data: 'days=2',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
   });
 
-  it('calls confirmStoryChange and computeBurn legacy endpoints', async () => {
-    const http = createHttp([{}, {}]);
+  it('rejects unsupported execution confirmStoryChange and unsafe computeBurn endpoints', async () => {
+    const http = createHttp();
     const api = new ExecutionApi(http as never);
 
-    await api.confirmStoryChange(1);
-    await api.computeBurn(2);
+    await expect(api.confirmStoryChange(1)).rejects.toThrow('禅道 18.5 不支持 execution/confirmStoryChange');
+    await expect(api.computeBurn(2)).rejects.toThrow('execution/computeBurn 不接收 executionId');
 
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'GET', '/execution-confirmStoryChange-1.json');
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'GET', '/execution-computeBurn-2.json');
+    expect(http.legacyRequest).not.toHaveBeenCalled();
   });
 
   it('trims execution write strings before sending requests', async () => {
@@ -1493,21 +1749,98 @@ describe('ExecutionApi', () => {
       data: 'name=%E8%BF%AD%E4%BB%A3%E4%B8%80&PO=po&teamMembers%5B%5D=dev&teamMembers%5B%5D=qa&whitelist%5B%5D=u1&whitelist%5B%5D=u2',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.request).toHaveBeenNthCalledWith(1, 'POST', '/executions/1/start', {
-      data: { comment: 'start', realBegan: '2026-06-05' },
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/execution-start-1-execution.json', {
+      data: 'comment=start&realBegan=2026-06-05',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.request).toHaveBeenNthCalledWith(2, 'POST', '/executions/1/close', {
-      data: { comment: 'close', realEnd: '2026-06-06' },
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/execution-close-1-execution.json', {
+      data: 'comment=close&realEnd=2026-06-06',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.request).toHaveBeenNthCalledWith(3, 'POST', '/executions/1/suspend', {
-      data: { comment: 'suspend' },
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/execution-suspend-1-execution.json', {
+      data: 'comment=suspend',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.request).toHaveBeenNthCalledWith(4, 'POST', '/executions/1/activate', {
-      data: { comment: 'activate' },
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/execution-activate-1-execution.json', {
+      data: 'comment=activate',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.request).toHaveBeenNthCalledWith(5, 'POST', '/executions/1/putoff', {
-      data: { days: 2, comment: 'later' },
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/execution-putoff-1-execution.json', {
+      data: 'days=2&comment=later',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
+  });
+
+  it('ExecutionApi executes supported 18.5 short legacy write flows and now calls computeCfd', async () => {
+    const http = createHttp([{}, {}, {}, {}, {}, {}, {}]);
+    const api = new ExecutionApi(http as never);
+
+    await api.computeCfd(2140);
+    await api.linkStoriesToExecution({ executionId: 2140, storyIds: [11, 12], productId: 153, branch: 1 });
+    await api.unlinkStoryFromExecution(2140, 11);
+    await api.batchUnlinkStoriesFromExecution({ executionId: 2140, storyIds: [11, 12] });
+    await api.batchChangeExecutionStatus({ executionIds: [2140, 2141], status: ' doing ', projectId: 1772 });
+    await api.unlinkMemberFromExecution(2140, 99);
+    await api.deleteExecution(2140);
+    await api.storyEstimate({ executionId: 2140, storyId: 11, accounts: ['dev1', 'dev2'], estimates: [4, 6], average: 5, round: 0 });
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/execution-computeCFD-yes-2140.json', {
+      data: '',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/execution-linkStory-2140.json', {
+      data: 'stories%5B%5D=11&stories%5B%5D=12&products%5B11%5D=153&products%5B12%5D=153&branch=1',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'GET', '/execution-unlinkStory-2140-11-yes.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'POST', '/execution-batchUnlinkStory-2140.json', {
+      data: 'storyIdList%5B%5D=11&storyIdList%5B%5D=12',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'POST', '/execution-batchChangeStatus-doing-1772.json', {
+      data: 'executionIdList%5B%5D=2140&executionIdList%5B%5D=2141&status=doing',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(6, 'GET', '/execution-unlinkMember-2140-99-yes.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(7, 'GET', '/execution-delete-2140-yes.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(8, 'POST', '/execution-storyEstimate-2140-11-0.json', {
+      data: 'account%5B%5D=dev1&account%5B%5D=dev2&estimate%5B%5D=4&estimate%5B%5D=6&average=5',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
+  it('ExecutionApi rejects empty or invalid batch write inputs before sending requests', async () => {
+    const http = createHttp();
+    const api = new ExecutionApi(http as never);
+
+    await expect(api.linkStoriesToExecution({ executionId: 1, storyIds: [] })).rejects.toThrow('storyIds 至少需要 1 项');
+    await expect(api.batchUnlinkStoriesFromExecution({ executionId: 1, storyIds: [] })).rejects.toThrow('storyIds 至少需要 1 项');
+    await expect(api.batchChangeExecutionStatus({ executionIds: [1], status: '   ' })).rejects.toThrow('status 不能为空');
+    await expect(api.batchEditExecutions({ executionIds: [] })).rejects.toThrow('executionIds 至少需要 1 项');
+    expect(http.legacyRequest).not.toHaveBeenCalled();
+  });
+
+  it('ExecutionApi executes 18.5 create/batchEdit/kanban legacy flows', async () => {
+    const http = createHttp([{}, {}, {}, {}, {}]);
+    const api = new ExecutionApi(http as never);
+
+    await api.createExecution({ project: 1772, name: '迭代', begin: '2026-06-01', end: '2026-06-30', code: 'I26', PO: 'po', teamMembers: ['dev1', 'dev2'] });
+    await api.batchEditExecutions({ executionIds: [2140, 2141], names: { '2140': '迭代A' }, POs: { '2140': 'po', '2141': 'po' } });
+    await api.getExecutionKanban(2140, { browseType: 'task', orderBy: 'id_desc' });
+    await api.getExecutionTaskKanban(2140, { browseType: 'all' });
+    await api.getAllExecutionKanban();
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/execution-create-1772.json', {
+      data: 'name=%E8%BF%AD%E4%BB%A3&begin=2026-06-01&end=2026-06-30&code=I26&PO=po&teamMembers=dev1%2Cdev2',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/execution-batchEdit-0.json', {
+      data: 'executionIDList%5B%5D=2140&executionIDList%5B%5D=2141&names%5B2140%5D=%E8%BF%AD%E4%BB%A3A&POs%5B2140%5D=po&POs%5B2141%5D=po',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'GET', '/execution-kanban-2140-task-id_desc.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'GET', '/execution-taskKanban-2140-all.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'GET', '/execution-executionKanban.json');
   });
 
   it('builds daily bug stats from paged bugs and tasks', async () => {
@@ -1566,6 +1899,101 @@ describe('ExecutionApi', () => {
     expect(result).toMatchObject({ source: 'client-paginated', items: [{ id: 1, title: '线上登录失败', module: '云镜' }], total: 1, scanned: 2, matched: 1 });
     expect(http.request).toHaveBeenCalledWith('GET', '/executions/9/bugs', {
       params: { page: 1, limit: 100, status: 'all' },
+    });
+  });
+
+  it('ExecutionApi routes addMember to manageMembers with array fields', async () => {
+    const http = createHttp([{}]);
+    const api = new ExecutionApi(http as never);
+
+    await api.addMember({
+      executionId: 2140,
+      accounts: ['dev1', 'dev2'],
+      roles: ['developer', 'tester'],
+      days: ['5', '5'],
+      hours: ['8', '7'],
+      limited: ['no', 'yes'],
+    });
+
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/execution-manageMembers-2140.json', {
+      data: 'accounts%5B%5D=dev1&accounts%5B%5D=dev2&roles%5B%5D=developer&roles%5B%5D=tester&days%5B%5D=5&days%5B%5D=5&hours%5B%5D=8&hours%5B%5D=7&limited%5B%5D=no&limited%5B%5D=yes',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
+  it('ExecutionApi importBugToExecution posts per-bug row data and fixFirst posts estimate', async () => {
+    const http = createHttp([{}, {}]);
+    const api = new ExecutionApi(http as never);
+
+    await api.importBugToExecution({
+      executionId: 2140,
+      bugs: [
+        { bugId: 84362, pri: 1, estimate: 4, estStarted: '2026-06-01', deadline: '2026-06-02', assignedTo: 'dev' },
+        { bugId: 84363, pri: 2, estimate: 6 },
+      ],
+    });
+    await api.fixFirst({ executionId: 2140, estimate: 8, withLeft: 'yes' });
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/execution-importBug-2140.json', {
+      data: 'import%5B84362%5D=84362&pri%5B84362%5D=1&estimate%5B84362%5D=4&estStarted%5B84362%5D=2026-06-01&deadline%5B84362%5D=2026-06-02&assignedTo%5B84362%5D=dev&import%5B84363%5D=84363&pri%5B84363%5D=2&estimate%5B84363%5D=6',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/execution-fixFirst-2140.json', {
+      data: 'estimate=8&withLeft=yes',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
+  it('ExecutionApi updateOrder and storySort submit comma-joined ids and orderBy', async () => {
+    const http = createHttp([{}, {}]);
+    const api = new ExecutionApi(http as never);
+
+    await api.updateOrder({ executionIds: [2140, 2141, 2142], orderBy: ' order_desc ' });
+    await api.storySort({ executionId: 2140, storyIds: [10154, 10155], orderBy: ' order_asc ' });
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/execution-updateOrder.json', {
+      data: 'executions=2140%2C2141%2C2142&orderBy=order_desc',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/execution-storySort-2140.json', {
+      data: 'storys=10154%2C10155&orderBy=order_asc',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
+  it('ExecutionApi getExecutionAll uses query string and never path-injects executionId', async () => {
+    const http = createHttp([{}]);
+    const api = new ExecutionApi(http as never);
+
+    await api.executionAll({ status: ' doing ', orderBy: ' order_desc ', productId: 153, limit: 50 });
+
+    expect(http.legacyRequest).toHaveBeenCalledWith('GET', '/execution-all.json?status=doing&orderBy=order_desc&productID=153&recPerPage=50');
+  });
+
+  it('ExecutionApi throws on controllers that do not exist in 18.5 and rejects unsafe computeExecutionBurn', async () => {
+    const http = createHttp();
+    const api = new ExecutionApi(http as never);
+
+    await expect(api.computeExecutionBurn(2140, '2026-06-05')).rejects.toThrow('execution/computeBurn 不接收 executionId');
+    await expect(api.linkBugToExecution(2140, 84362, 153)).rejects.toThrow('execution 模块无 linkBug 控制器');
+    await expect(api.unlinkBugFromExecution(2140, 84362)).rejects.toThrow('execution 模块无 unlinkBug 控制器');
+    await expect(api.executionTrack(2140)).rejects.toThrow('execution 模块无 track 控制器');
+    await expect(api.executionStoryTasks(2140, 10154)).rejects.toThrow('execution 模块无 storyTasks 控制器');
+    await expect(api.addWhitelist({ executionId: 2140, accounts: ['u1'] })).rejects.toThrow('execution/addWhitelist 不接收 POST');
+    await expect(api.batchImportBugsToExecution({ executionId: 2140, bugIds: [84362] })).rejects.toThrow('execution 模块无 batchImportBug 控制器');
+
+    expect(http.legacyRequest).not.toHaveBeenCalled();
+  });
+
+  it('ExecutionApi linkStoryToExecutionSingle reuses linkStory URL with per-story products', async () => {
+    const http = createHttp([{}]);
+    const api = new ExecutionApi(http as never);
+
+    await api.linkStoryToExecutionSingle(2140, 10154, 153, 0);
+
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/execution-linkStory-2140.json', {
+      data: 'stories%5B%5D=10154&products%5B10154%5D=153&branch=0',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   });
 });

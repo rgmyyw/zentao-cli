@@ -43,8 +43,8 @@ describe('runCli', () => {
     await runCli(['who', 'am', 'i']);
 
     expect(getMyProfile).toHaveBeenCalledWith();
-    expect(getMyTasks).toHaveBeenCalledWith({ status: 'all', limit: 100 });
-    expect(getMyBugs).toHaveBeenCalledWith({ limit: 100 });
+    expect(getMyTasks).toHaveBeenCalledWith({ status: 'all', limit: 100, scan: false });
+    expect(getMyBugs).toHaveBeenCalledWith({ limit: 100, scan: false });
     expect(write).toHaveBeenCalledWith(expect.stringContaining('李小明'));
     expect(write).toHaveBeenCalledWith(expect.stringContaining('你现在是 青铜 · 研发 工程师'));
     expect(write).toHaveBeenCalledWith(expect.stringContaining('账号：me'));

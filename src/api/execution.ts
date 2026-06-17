@@ -144,6 +144,95 @@ export class ExecutionApi {
     });
   }
 
+  async createExecution(input: { project: number; name: string; code?: string; begin: string; end: string; days?: number; lifetime?: string; desc?: string; PO?: string; PM?: string; QD?: string; RD?: string; acl?: string; whitelist?: string[]; teamMembers?: string[]; products?: number[]; plans?: number[] }): Promise<unknown> {
+    const formData: Record<string, unknown> = {
+      name: input.name,
+      begin: input.begin,
+      end: input.end,
+    };
+    if (input.code !== undefined) formData.code = input.code;
+    if (input.days !== undefined) formData.days = input.days;
+    if (input.lifetime !== undefined) formData.lifetime = input.lifetime;
+    if (input.desc !== undefined) formData.desc = input.desc;
+    if (input.PO !== undefined) formData.PO = input.PO;
+    if (input.PM !== undefined) formData.PM = input.PM;
+    if (input.QD !== undefined) formData.QD = input.QD;
+    if (input.RD !== undefined) formData.RD = input.RD;
+    if (input.acl !== undefined) formData.acl = input.acl;
+    if (input.whitelist && input.whitelist.length > 0) formData.whitelist = input.whitelist.join(',');
+    if (input.teamMembers && input.teamMembers.length > 0) formData.teamMembers = input.teamMembers.join(',');
+    if (input.products && input.products.length > 0) formData.products = input.products.join(',');
+    if (input.plans && input.plans.length > 0) formData.plans = input.plans.join(',');
+    return this.http.legacyRequest('POST', `/execution-create-${input.project}.json`, {
+      data: toFormUrlEncoded(formData),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async batchEditExecutions(input: {
+    executionIds: number[];
+    names?: Record<string, string>;
+    dayses?: Record<string, number>;
+    descs?: Record<string, string>;
+    begins?: Record<string, string>;
+    ends?: Record<string, string>;
+    lifetimes?: Record<string, string>;
+    POs?: Record<string, string>;
+    PMs?: Record<string, string>;
+    QDs?: Record<string, string>;
+    RDs?: Record<string, string>;
+  }): Promise<unknown> {
+    if (!Array.isArray(input.executionIds) || input.executionIds.length === 0) {
+      throw new Error('executionIds 至少需要 1 项');
+    }
+    const params = new URLSearchParams();
+    for (const id of input.executionIds) params.append('executionIDList[]', String(id));
+    this.appendIdMap(params, 'names', input.names);
+    this.appendIdMap(params, 'dayses', input.dayses);
+    this.appendIdMap(params, 'descs', input.descs);
+    this.appendIdMap(params, 'begins', input.begins);
+    this.appendIdMap(params, 'ends', input.ends);
+    this.appendIdMap(params, 'lifetimes', input.lifetimes);
+    this.appendIdMap(params, 'POs', input.POs);
+    this.appendIdMap(params, 'PMs', input.PMs);
+    this.appendIdMap(params, 'QDs', input.QDs);
+    this.appendIdMap(params, 'RDs', input.RDs);
+    return this.http.legacyRequest('POST', '/execution-batchEdit-0.json', {
+      data: params.toString(),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  private appendIdMap(params: URLSearchParams, field: string, values?: Record<string, string | number>): void {
+    if (!values) return;
+    for (const [id, value] of Object.entries(values)) {
+      if (value === undefined || value === null) continue;
+      params.append(`${field}[${id}]`, String(value));
+    }
+  }
+
+  async getExecutionKanban(executionId: number, input: { browseType?: string; orderBy?: string; groupBy?: string } = {}): Promise<unknown> {
+    const params: string[] = [];
+    if (input.browseType) params.push(input.browseType);
+    if (input.orderBy) params.push(input.orderBy);
+    if (input.groupBy) params.push(input.groupBy);
+    const tail = params.length > 0 ? `-${params.join('-')}` : '';
+    return this.http.legacyRequest('GET', `/execution-kanban-${executionId}${tail}.json`);
+  }
+
+  async getExecutionTaskKanban(executionId: number, input: { browseType?: string; orderBy?: string; groupBy?: string } = {}): Promise<unknown> {
+    const params: string[] = [];
+    if (input.browseType) params.push(input.browseType);
+    if (input.orderBy) params.push(input.orderBy);
+    if (input.groupBy) params.push(input.groupBy);
+    const tail = params.length > 0 ? `-${params.join('-')}` : '';
+    return this.http.legacyRequest('GET', `/execution-taskKanban-${executionId}${tail}.json`);
+  }
+
+  async getAllExecutionKanban(): Promise<unknown> {
+    return this.http.legacyRequest('GET', '/execution-executionKanban.json');
+  }
+
   async getExecutionDailyBugStats(executionId: number, input: ExecutionDailyBugStatsInput = {}): Promise<unknown> {
     const normalizedInput = {
       ...input,
@@ -216,23 +305,42 @@ export class ExecutionApi {
   }
 
   async startExecution(executionId: number, payload: ExecutionActionInput = {}): Promise<unknown> {
-    return this.http.request('POST', `/executions/${executionId}/start`, { data: this.normalizeExecutionAction(payload) });
+    /**
+     * 禅道 18.5 REST v1 `/executions/{id}/start` action 路由不存在。
+     * 旧版 execution::start($executionID, $from='execution') 走 `.json` 控制器。
+     */
+    return this.http.legacyRequest('POST', `/execution-start-${executionId}-execution.json`, {
+      data: toFormUrlEncoded(this.normalizeExecutionAction(payload) as Record<string, unknown>),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
   }
 
   async closeExecution(executionId: number, payload: ExecutionActionInput = {}): Promise<unknown> {
-    return this.http.request('POST', `/executions/${executionId}/close`, { data: this.normalizeExecutionAction(payload) });
+    return this.http.legacyRequest('POST', `/execution-close-${executionId}-execution.json`, {
+      data: toFormUrlEncoded(this.normalizeExecutionAction(payload) as Record<string, unknown>),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
   }
 
   async suspendExecution(executionId: number, payload: ExecutionActionInput = {}): Promise<unknown> {
-    return this.http.request('POST', `/executions/${executionId}/suspend`, { data: this.normalizeExecutionAction(payload) });
+    return this.http.legacyRequest('POST', `/execution-suspend-${executionId}-execution.json`, {
+      data: toFormUrlEncoded(this.normalizeExecutionAction(payload) as Record<string, unknown>),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
   }
 
   async activateExecution(executionId: number, payload: ExecutionActionInput = {}): Promise<unknown> {
-    return this.http.request('POST', `/executions/${executionId}/activate`, { data: this.normalizeExecutionAction(payload) });
+    return this.http.legacyRequest('POST', `/execution-activate-${executionId}-execution.json`, {
+      data: toFormUrlEncoded(this.normalizeExecutionAction(payload) as Record<string, unknown>),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
   }
 
   async putoffExecution(executionId: number, payload: PutoffExecutionInput): Promise<unknown> {
-    return this.http.request('POST', `/executions/${executionId}/putoff`, { data: this.normalizePutoffExecution(payload) });
+    return this.http.legacyRequest('POST', `/execution-putoff-${executionId}-execution.json`, {
+      data: toFormUrlEncoded(this.normalizePutoffExecution(payload) as unknown as Record<string, unknown>),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
   }
 
   private normalizeExecutionUpdate(update: UpdateExecutionInput): UpdateExecutionInput {
@@ -574,11 +682,317 @@ export class ExecutionApi {
   }
 
   async confirmStoryChange(executionId: number): Promise<unknown> {
-    return this.http.legacyRequest('GET', `/execution-confirmStoryChange-${executionId}.json`);
+    void executionId;
+    throw new Error('禅道 18.5 不支持 execution/confirmStoryChange');
+  }
+
+  async computeCfd(executionId: number): Promise<unknown> {
+    /**
+     * 禅道 18.5 execution::computeCFD($reload='no', $executionID=0) 接收 executionID。
+     * 走 `computeCFD-yes-${executionID}.json` 触发刷新并 js::reload。
+     */
+    return this.http.legacyRequest('POST', `/execution-computeCFD-yes-${executionId}.json`, {
+      data: toFormUrlEncoded({}),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async linkStoriesToExecution(input: { executionId: number; storyIds: number[]; productId?: number; branch?: number }): Promise<unknown> {
+    if (!Array.isArray(input.storyIds) || input.storyIds.length === 0) {
+      throw new Error('storyIds 至少需要 1 项');
+    }
+    /**
+     * 禅道 18.5 execution::linkStory 模型读 `products[storyID]` 给每条 story 关联 product。
+     * 单 productId 输入时，编码为每条 story 的 products[storyId] = productId。
+     */
+    const params = new URLSearchParams();
+    for (const storyId of input.storyIds) params.append('stories[]', String(storyId));
+    if (input.productId !== undefined) {
+      for (const storyId of input.storyIds) {
+        params.append(`products[${storyId}]`, String(input.productId));
+      }
+    }
+    if (input.branch !== undefined) params.append('branch', String(input.branch));
+    return this.http.legacyRequest('POST', `/execution-linkStory-${input.executionId}.json`, {
+      data: params.toString(),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async unlinkStoryFromExecution(executionId: number, storyId: number): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/execution-unlinkStory-${executionId}-${storyId}-yes.json`);
+  }
+
+  async batchUnlinkStoriesFromExecution(input: { executionId: number; storyIds: number[] }): Promise<unknown> {
+    if (!Array.isArray(input.storyIds) || input.storyIds.length === 0) {
+      throw new Error('storyIds 至少需要 1 项');
+    }
+    return this.http.legacyRequest('POST', `/execution-batchUnlinkStory-${input.executionId}.json`, {
+      data: toFormUrlEncoded({ storyIdList: input.storyIds }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async batchChangeExecutionStatus(input: { executionIds: number[]; status: string; projectId?: number }): Promise<unknown> {
+    if (!Array.isArray(input.executionIds) || input.executionIds.length === 0) {
+      throw new Error('executionIds 至少需要 1 项');
+    }
+    const status = this.normalizeOptionalText(input.status);
+    if (!status) throw new Error('status 不能为空');
+    const formData: Record<string, unknown> = { executionIdList: input.executionIds };
+    /**
+     * 禅道 18.5 execution::batchChangeStatus($status, $projectID=0) 第一段位是 status。
+     * PATH_INFO 必传，formData 中也带 status 兼容 GET 重定向。
+     */
+    return this.http.legacyRequest('POST', `/execution-batchChangeStatus-${status}-${input.projectId ?? 0}.json`, {
+      data: toFormUrlEncoded({ ...formData, status }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async unlinkMemberFromExecution(executionId: number, userId: number): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/execution-unlinkMember-${executionId}-${userId}-yes.json`);
+  }
+
+  async deleteExecution(executionId: number): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/execution-delete-${executionId}-yes.json`);
+  }
+
+  async storyEstimate(input: { executionId: number; storyId: number; accounts: string[]; estimates: number[]; average: number; round?: number }): Promise<unknown> {
+    if (!Array.isArray(input.accounts) || input.accounts.length === 0) {
+      throw new Error('accounts 至少需要 1 项');
+    }
+    if (!Array.isArray(input.estimates) || input.estimates.length !== input.accounts.length) {
+      throw new Error('estimates 必须与 accounts 等长');
+    }
+    if (typeof input.average !== 'number' || Number.isNaN(input.average)) {
+      throw new Error('average 必须是数字');
+    }
+    const round = input.round ?? 0;
+    /**
+     * 禅道 18.5 story::saveEstimateInfo 读 `account[]` + `estimate[]` + `average`。
+     * 使用 URLSearchParams 直接编码数组下标对齐 PHP $_POST。
+     */
+    const params = new URLSearchParams();
+    for (const account of input.accounts) params.append('account[]', account);
+    for (const estimate of input.estimates) params.append('estimate[]', String(estimate));
+    params.append('average', String(input.average));
+    return this.http.legacyRequest('POST', `/execution-storyEstimate-${input.executionId}-${input.storyId}-${round}.json`, {
+      data: params.toString(),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async manageMembers(executionId: number): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/execution-manageMembers-${executionId}.json`);
+  }
+
+  async addMember(input: { executionId: number; accounts: string[]; roles?: string[]; hours?: string[]; days?: string[]; limited?: string[]; realnames?: string[] }): Promise<unknown> {
+    if (!Array.isArray(input.accounts) || input.accounts.length === 0) {
+      throw new Error('accounts 至少需要 1 项');
+    }
+    /**
+     * 禅道 18.5 execution::addMember 控制器不存在。
+     * 真实写入走 execution::manageMembers 模型，POST 字段是数组下标对齐 PHP $_POST：
+     * accounts[] / roles[] / days[] / hours[] / limited[]（按 accounts 下标一一对应）。
+     */
+    const params = new URLSearchParams();
+    for (const account of input.accounts) params.append('accounts[]', account);
+    for (const role of input.roles ?? []) params.append('roles[]', role);
+    for (const days of input.days ?? []) params.append('days[]', String(days));
+    for (const hours of input.hours ?? []) params.append('hours[]', String(hours));
+    for (const limited of input.limited ?? []) params.append('limited[]', limited);
+    for (const realname of input.realnames ?? []) params.append('realnames[]', realname);
+    return this.http.legacyRequest('POST', `/execution-manageMembers-${input.executionId}.json`, {
+      data: params.toString(),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async unlinkBugFromExecution(_executionId: number, _bugId: number): Promise<unknown> {
+    /**
+     * 禅道 18.5 execution 模块无 unlinkBug 控制器，Bug 解绑通过 task::unlinkBug 或直接编辑 Bug 实现。
+     * 为避免假成功，API 层显式不支持。
+     */
+    throw new Error('禅道 18.5 execution 模块无 unlinkBug 控制器');
+  }
+
+  async executionStoryTasks(_executionId: number, _storyId: number): Promise<unknown> {
+    /**
+     * 禅道 18.5 execution 模块无 storyTasks 控制器。
+     * 需求下的任务列表走 `/executions/{id}/tasks?story={storyId}`。
+     */
+    throw new Error('禅道 18.5 execution 模块无 storyTasks 控制器，请使用 /executions/{id}/tasks?story=...');
+  }
+
+  async executionStoryKanban(executionId: number): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/execution-storyKanban-${executionId}.json`);
+  }
+
+  async executionAll(input: { status?: string; orderBy?: string; limit?: number; productId?: number }): Promise<unknown> {
+    const params = new URLSearchParams();
+    const status = this.normalizeOptionalText(input.status) ?? 'undone';
+    const orderBy = this.normalizeOptionalText(input.orderBy) ?? 'order_asc';
+    params.set('status', status);
+    params.set('orderBy', orderBy);
+    if (input.productId !== undefined) params.set('productID', String(input.productId));
+    if (input.limit !== undefined) params.set('recPerPage', String(input.limit));
+    /**
+     * 禅道 18.5 execution::all($status='undone', $orderBy='order_asc', $productID=0, ...) 路径不带 executionId。
+     * 之前把 executionId 拼到 $status 段位会污染 status；改走 query 参数对齐 PHP 控制器签名。
+     */
+    return this.http.legacyRequest('GET', `/execution-all.json?${params.toString()}`);
+  }
+
+  async executionTrack(_executionId: number): Promise<unknown> {
+    /**
+     * 禅道 18.5 execution 模块无 track 控制器。
+     * 执行相关的燃尽图 / 进度信息请通过 execution 详情或 task/story 维度动态拉取。
+     */
+    throw new Error('禅道 18.5 execution 模块无 track 控制器');
+  }
+
+  async importBugToExecution(input: { executionId: number; bugs: Array<{ bugId: number; pri: number; estimate: number; estStarted?: string; deadline?: string; assignedTo?: string }> }): Promise<unknown> {
+    if (!Array.isArray(input.bugs) || input.bugs.length === 0) {
+      throw new Error('bugs 至少需要 1 项');
+    }
+    /**
+     * 禅道 18.5 execution::importBug 模型读 `import[bugID]` / `pri[bugID]` / `estimate[bugID]` /
+     * `estStarted[bugID]` / `deadline[bugID]` / `assignedTo[bugID]`。
+     * 没有 product/branch/keywords 这种单值字段，那种语义属于"搜索候选 Bug"而不是导入。
+     */
+    const params = new URLSearchParams();
+    for (const bug of input.bugs) {
+      params.append(`import[${bug.bugId}]`, String(bug.bugId));
+      params.append(`pri[${bug.bugId}]`, String(bug.pri));
+      params.append(`estimate[${bug.bugId}]`, String(bug.estimate));
+      if (bug.estStarted) params.append(`estStarted[${bug.bugId}]`, bug.estStarted);
+      if (bug.deadline) params.append(`deadline[${bug.bugId}]`, bug.deadline);
+      if (bug.assignedTo) params.append(`assignedTo[${bug.bugId}]`, bug.assignedTo);
+    }
+    return this.http.legacyRequest('POST', `/execution-importBug-${input.executionId}.json`, {
+      data: params.toString(),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
   }
 
   async computeBurn(executionId: number): Promise<unknown> {
-    return this.http.legacyRequest('GET', `/execution-computeBurn-${executionId}.json`);
+    void executionId;
+    throw new Error('禅道 18.5 execution/computeBurn 不接收 executionId，CLI 无法安全指定执行上下文');
+  }
+
+  async computeExecutionBurn(_executionId: number, _date?: string): Promise<unknown> {
+    /**
+     * 禅道 18.5 execution::computeBurn($reload='no') 不接收 executionID。
+     * CLI 无法通过 URL 安全指定要重算的执行上下文，与 computeBurn 一样显式不支持。
+     */
+    throw new Error('禅道 18.5 execution/computeBurn 不接收 executionId，CLI 无法安全指定执行上下文');
+  }
+
+  async confirmExecutionStoryChange(input: { executionId: number; storyId: number; status: string; comment?: string }): Promise<unknown> {
+    void input;
+    throw new Error('禅道 18.5 不支持 execution/confirmStoryChange，请使用 task/testcase 对应的 confirmStoryChange 能力');
+  }
+
+  async linkBugToExecution(_executionId: number, _bugId: number, _productId?: number): Promise<unknown> {
+    /**
+     * 禅道 18.5 execution 模块无 linkBug 控制器，Bug 关联到执行通过 importBug 或 convertBugToTask 实现。
+     * 为避免假成功，API 层显式不支持。
+     */
+    throw new Error('禅道 18.5 execution 模块无 linkBug 控制器');
+  }
+
+  async linkStoryToExecutionSingle(executionId: number, storyId: number, productId?: number, branch?: number): Promise<unknown> {
+    /**
+     * 禅道 18.5 execution::linkStory 模型读 `products[storyID]`，没有 `/execution-linkStory-{id}-{story}.json` 这种路径。
+     * 与 linkStoriesToExecution 复用同一条控制器，提交 stories[]=storyId 与 products[storyId]=productId。
+     */
+    const params = new URLSearchParams();
+    params.append('stories[]', String(storyId));
+    if (productId !== undefined) {
+      params.append(`products[${storyId}]`, String(productId));
+    }
+    if (branch !== undefined) params.append('branch', String(branch));
+    return this.http.legacyRequest('POST', `/execution-linkStory-${executionId}.json`, {
+      data: params.toString(),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async batchImportBugsToExecution(_input: { executionId: number; bugIds: number[]; productId?: number }): Promise<unknown> {
+    /**
+     * 禅道 18.5 execution 模块无 batchImportBug 控制器。
+     * 批量导入 Bug 通过 importBug 控制器按行提交（import[bugID] 数组），见 importBugToExecution。
+     * 为避免假成功，API 层显式不支持。
+     */
+    throw new Error('禅道 18.5 execution 模块无 batchImportBug 控制器，请使用 importBugToExecution');
+  }
+
+  async addWhitelist(_input: { executionId: number; deptId?: number; copyId?: number; accounts: string[] }): Promise<unknown> {
+    /**
+     * 禅道 18.5 execution::addWhitelist 只 fetch personnel::addWhitelist 页面，
+     * 真实写入在 personnel::addWhitelist（objectType=sprint），CLI 难以安全拼出 objectID/dept/copyID/module 段位。
+     * 为避免假成功，API 层显式不支持。
+     */
+    throw new Error('禅道 18.5 execution/addWhitelist 不接收 POST，请使用 personnel/addWhitelist 流程');
+  }
+
+  async unbindWhitelist(id: number): Promise<unknown> {
+    return this.http.legacyRequest('GET', `/execution-unbindWhitelist-${id}-yes.json`);
+  }
+
+  async fixFirst(input: { executionId: number; estimate: number; withLeft?: 'yes' | 'no' }): Promise<unknown> {
+    /**
+     * 禅道 18.5 execution::fixFirst 模型在空 body 下 `is_numeric($data->estimate)` 校验失败。
+     * estimate 是必填数字；withLeft=yes 时用 estimate 覆盖 left，否则保留原 burn.left。
+     */
+    if (typeof input.estimate !== 'number' || Number.isNaN(input.estimate)) {
+      throw new Error('estimate 必须是数字');
+    }
+    const formData: Record<string, unknown> = { estimate: input.estimate };
+    if (input.withLeft) formData.withLeft = input.withLeft;
+    return this.http.legacyRequest('POST', `/execution-fixFirst-${input.executionId}.json`, {
+      data: toFormUrlEncoded(formData),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async updateOrder(input: { executionIds: number[]; orderBy: string }): Promise<unknown> {
+    if (!Array.isArray(input.executionIds) || input.executionIds.length === 0) {
+      throw new Error('executionIds 至少需要 1 项');
+    }
+    const orderBy = this.normalizeOptionalText(input.orderBy) ?? 'order_asc';
+    /**
+     * 禅道 18.5 execution::updateOrder 控制器读 `executions` 逗号字符串与 `orderBy`。
+     * 不是 `id/order` 数组下标。
+     */
+    const formData: Record<string, unknown> = {
+      executions: input.executionIds.join(','),
+      orderBy,
+    };
+    return this.http.legacyRequest('POST', `/execution-updateOrder.json`, {
+      data: toFormUrlEncoded(formData),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  }
+
+  async storySort(input: { executionId: number; storyIds: number[]; orderBy: string }): Promise<unknown> {
+    if (!Array.isArray(input.storyIds) || input.storyIds.length === 0) {
+      throw new Error('storyIds 至少需要 1 项');
+    }
+    const orderBy = this.normalizeOptionalText(input.orderBy) ?? 'order_asc';
+    /**
+     * 禅道 18.5 execution::storySort 控制器读 `storys` 逗号字符串与 `orderBy`。
+     * 不是 `id/order` 数组下标。
+     */
+    const formData: Record<string, unknown> = {
+      storys: input.storyIds.join(','),
+      orderBy,
+    };
+    return this.http.legacyRequest('POST', `/execution-storySort-${input.executionId}.json`, {
+      data: toFormUrlEncoded(formData),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
   }
 
   private toString(value: unknown): string {

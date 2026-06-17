@@ -77,6 +77,14 @@
 | 执行 Bug | `getExecutionBugs` | `zentao getExecutionBugs --executionId <executionId> --limit 100` | 查迭代下 Bug；可加 `--status`。 |
 | 执行构建 | `getExecutionBuilds` | `zentao getExecutionBuilds --executionId <executionId>` | 查迭代关联构建。 |
 | 每日迭代统计 | `getExecutionDailyBugStats` | `zentao getExecutionDailyBugStats --executionId <executionId> --iterationName <name>` | 输出 Bug、任务、参与人员和风险明细报告。 |
+| 重新计算燃烧 | `computeCfd` | `zentao computeCfd --executionId <executionId> --confirm true` | 按 18.5 `execution/computeCFD` 刷新 CFD 图表。 |
+| 关联迭代需求 | `linkStoriesToExecution` | `zentao linkStoriesToExecution --executionId <executionId> --storyIds <id1> --storyIds <id2> --confirm true` | 按 18.5 `execution/linkStory` 页面把需求关联到迭代。 |
+| 移除迭代需求 | `unlinkStoryFromExecution` | `zentao unlinkStoryFromExecution --executionId <executionId> --storyId <storyId> --confirm true` | 按 18.5 `execution/unlinkStory` 移除单个需求。 |
+| 批量移除迭代需求 | `batchUnlinkStoriesFromExecution` | `zentao batchUnlinkStoriesFromExecution --executionId <executionId> --storyIds <id1> --storyIds <id2> --confirm true` | 按 18.5 `execution/batchUnlinkStory` 批量移除需求。 |
+| 批量修改迭代状态 | `batchChangeExecutionStatus` | `zentao batchChangeExecutionStatus --executionIds <id1> --executionIds <id2> --status doing --projectId <projectId> --confirm true` | 按 18.5 `execution/batchChangeStatus` 批量设置迭代状态。 |
+| 移除迭代成员 | `unlinkMemberFromExecution` | `zentao unlinkMemberFromExecution --executionId <executionId> --userId <userId> --confirm true` | 按 18.5 `execution/unlinkMember` 移除团队成员。 |
+| 删除迭代 | `deleteExecution` | `zentao deleteExecution --executionId <executionId> --confirm true` | 按 18.5 `execution/delete` 旧版确认删除迭代。 |
+| 评估迭代需求 | `storyEstimate` | `zentao storyEstimate --executionId <executionId> --storyId <storyId> --estimate <hours> --round 0 --confirm true` | 按 18.5 `execution/storyEstimate` 评估需求工时。 |
 
 不要用 `getDevelopmentContext --executionId ...` 查执行；`getDevelopmentContext` 只支持 `story/bug`。
 

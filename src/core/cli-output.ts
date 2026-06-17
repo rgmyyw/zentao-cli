@@ -206,6 +206,7 @@ interface PersonalListStats {
   total: number;
   items: Array<Record<string, unknown>>;
   scanned?: number;
+  partial?: boolean;
   products: string[];
   sprints: string[];
   statusCounts: Record<string, number>;
@@ -216,8 +217,8 @@ async function loadWhoamiStats(): Promise<WhoamiStats> {
   const warnings: string[] = [];
 
   const [tasksResult, bugsResult] = await Promise.allSettled([
-    api.task?.getMyTasks?.({ status: 'all', limit: 100 }),
-    api.bug?.getMyBugs?.({ limit: 100 }),
+    api.task?.getMyTasks?.({ status: 'all', limit: 100, scan: false }),
+    api.bug?.getMyBugs?.({ limit: 100, scan: false }),
   ]);
 
   if (tasksResult.status === 'rejected') warnings.push(`任务统计暂不可用：${formatErrorMessage(tasksResult.reason)}`);
@@ -280,8 +281,8 @@ function formatWhoami(profile: Record<string, unknown>, stats: WhoamiStats): str
   lines.push(
     '',
     '工作概览：',
-    `  - 任务：${taskTotal} 个${formatStatusSummary(stats.tasks?.statusCounts)}`,
-    `  - Bug：${bugTotal} 个${formatStatusSummary(stats.bugs?.statusCounts)}`,
+    `  - 任务：${formatCountWithPartial(taskTotal, stats.tasks?.partial)} 个${formatStatusSummary(stats.tasks?.statusCounts)}`,
+    `  - Bug：${formatCountWithPartial(bugTotal, stats.bugs?.partial)} 个${formatStatusSummary(stats.bugs?.statusCounts)}`,
     `  - 参与项目：${formatNamePreview(projectNames, '暂无可识别项目')}`,
     `  - 参与产品：${formatNamePreview(productNames, '暂无可识别产品')}`,
     `  - 参与 Sprint / 执行：${formatNamePreview(sprintNames, '暂无可识别执行')}`,
@@ -308,6 +309,7 @@ function summarizePersonalList(value: unknown, productKeys: string[], sprintKeys
   return {
     total: toNonNegativeNumber(record.total) ?? items.length,
     scanned: toNonNegativeNumber(record.scanned),
+    partial: record.partial === true,
     items,
     products: collectUniqueFieldValues(items, productKeys),
     sprints: collectUniqueFieldValues(items, sprintKeys),
@@ -376,6 +378,10 @@ function formatStatusSummary(statusCounts?: Record<string, number>): string {
     .map(([status, count]) => `${translateStatus(status)} ${count}`);
 
   return `（${parts.join('，')}）`;
+}
+
+function formatCountWithPartial(count: number, partial?: boolean): string {
+  return partial && count > 0 ? `${count}+` : String(count);
 }
 
 function translateStatus(status: string): string {

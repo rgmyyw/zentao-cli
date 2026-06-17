@@ -1,6 +1,6 @@
 {
   "name": "@cloudglab/zentao-cli",
-  "version": "0.1.28",
+  "version": "0.1.29",
   "description": "ZenTao CLI rebuilt for ZenTao 18.5 REST v1 API",
   "repository": {
     "type": "git",
@@ -29,6 +29,7 @@
     "lint": "oxlint src",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",
+    "coverage": "node scripts/coverage.mjs",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "release:smoke-query": "node scripts/release-query-smoke.mjs",
     "prepare": "lefthook install"

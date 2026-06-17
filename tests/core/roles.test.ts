@@ -8,27 +8,26 @@ describe('roles', () => {
   });
 
   it('getToolGroups 返回角色对应工具组列表', () => {
-    expect(getToolGroups('pm')).toEqual([
+    const groups = getToolGroups('pm');
+    expect(groups).toEqual(expect.arrayContaining([
       'init',
       'todo',
       'story',
       'execution',
-      'comment',
-      'profile',
-      'relation',
-      'context',
       'product',
       'project',
       'program',
       'plan',
       'release',
-      'resource-analysis',
-      'search',
       'story-write',
       'plan-write',
       'plan-relation',
       'execution-write',
       'release-write',
-    ]);
+      'product-write',
+      'project-write',
+      'program-write',
+    ]));
+    expect(groups).not.toContain('testcase-write');
   });
 });

@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.29 - 2026-06-17
+
+### 修复
+
+- 按照本地 `zentaopms-18.5` 源码逐条复核最近几次新增的旧页面链路，修正一批 18.5 下原本会提交错字段、打错路径或命中不存在控制器的写操作。
+- 修复产品线维护链路：`manageProductLine` 现已按页面真实字段提交 `modules[id]` / `modules[]` / `programs[id]` / `programs[]`，兼容已有项与新增项混合提交。
+- 修复测试用例批量操作链路：
+  - `updateTestCaseOrder` 改为提交真实 `scenes` / `orderBy` 字段。
+  - `batchChangeTestCaseBranch` / `batchChangeTestCaseModule` / `batchChangeTestCaseType` 改为使用 18.5 控制器要求的路径段与 `caseIDList[]`。
+  - `batchCreateTestCases` / `batchEditTestCases` 改为按行提交 `title[i]`、`type[i]`、`stage[i][]`、`steps[i][j][...]` 以及 `title[id]`、`types[id]`、`stages[id][]` 等真实模型字段。
+  - `batchDeleteTestCases` 统一改为 `caseIDList[]`。
+- 修复任务批量操作链路：
+  - `batchChangeTaskModule` 改为走真实 `task-batchChangeModule-{moduleId}.json`。
+  - `batchEditTasks` 改为按任务 ID 提交 `taskIDList[]`、`names[id]`、`types[id]`、`pris[id]`、`estStarteds[id]`、`deadlines[id]` 等真实表单字段。
+  - `batchCloseTasks` 在服务端返回 `skipTaskIdList` 确认链接时会自动继续跟进，避免只关闭一部分任务后静默漏掉剩余任务。
+- 修复 Bug / 待办 / 需求相关旧页面链路：
+  - `batchCloseBugs` 在 `releaseId` 非空时同时提交 `unlinkBugs[]`，避免 18.5 控制器覆盖 `bugIDList` 后拿不到待关闭 Bug。
+  - `batchCreateTodos` / `batchEditTodos` 改为按 `names[i]`、`types[i]`、`assignedTos[i]`、`todoIDList[id]`、`dates[id]` 等真实页面字段提交。
+  - `batchToTaskStories` 改为真正按行提交批量转任务表单，而不再只打开页面前半段。
+- 修复执行模块大量 18.5 兼容问题：
+  - `startExecution` / `closeExecution` / `suspendExecution` / `activateExecution` / `putoffExecution` 改为真实 legacy action 路径。
+  - `computeCfd` 改为调用真实 `execution-computeCFD-yes-{executionId}.json`；`computeBurn` / `computeExecutionBurn` 保持显式拒绝，避免在 18.5 下错误注入 `executionId`。
+  - `linkStoriesToExecution` / `linkStoryToExecutionSingle` 改为提交 `products[storyId]`。
+  - `batchEditExecutions`、`storyEstimate`、`updateOrder`、`storySort`、`batchChangeExecutionStatus` 等全部改为提交 18.5 控制器真实字段。
+  - 对 `batchImportBugsToExecution`、`linkBugToExecution`、`unlinkBugFromExecution`、`executionTrack`、`executionStoryTasks`、`addExecutionWhitelist` 等 18.5 不存在或无法安全构造的入口改为明确报错，避免误调用 404/错链路。
+- 修复多处工具层 schema / 描述与真实链路不一致的问题：把一批原本误导性的扁平参数改为 JSON 行数组或 map 结构，并在 18.5 不支持的入口上直接写明“确认执行时会报错”。
+
+### 新增
+
+- 新增 `pnpm coverage` / `scripts/coverage.mjs`，用于统计 CLI 对禅道 18.5 控制器入口的覆盖率，并输出模块缺口。
+- 新增 `src/tools/phase3c.ts`，继续补全开发态 / 覆盖率相关工具入口与命令分组。
+
+### 文档
+
+- 更新 Skill 参考命令清单与开发覆盖率参考文档，补齐批量操作、执行链路和覆盖率维护说明。
+- 更新 README，补充 18.5 写操作兼容说明、批量操作示例和发布前校验说明。
+
+### 测试
+
+- 扩充 API 回归测试，覆盖 task / testcase / todo / story / execution / bug 等旧页面兼容路径修正。
+- 新增执行模块兼容测试，校验真实 legacy 路由、数组字段、按 ID 索引字段以及不支持入口的显式报错。
+
 ## 0.1.28 - 2026-06-15
 
 ### 修复
