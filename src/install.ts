@@ -10,6 +10,7 @@ import type { ZentaoConfig } from './types/common.js';
 
 const PACKAGE_NAME = '@cloudglab/zentao-cli';
 const GIT_SKILL_SOURCE = 'cloudglab/zentao-cli';
+const GLOBAL_SKILL_AGENT = 'universal';
 
 type SkillSource = 'local' | 'git' | 'npm';
 
@@ -103,7 +104,7 @@ function renderBanner(): string {
 }
 
 function createSkillAddArgs(source: string): string[] {
-  return ['-y', 'skills', 'add', source, '--yes'];
+  return ['-y', 'skills', 'add', source, '--global', '--agent', GLOBAL_SKILL_AGENT, '--yes'];
 }
 
 function createSkillRemoveArgs(global = false): string[] {

@@ -12,6 +12,10 @@ export function registerTestTaskTools(server: CliRegistry): void {
       limit: z.number().int().positive().max(100).optional(),
     },
     async (input) => jsonResult(await getApi().testtask.getTestTasks(input)),
+    {
+      costHint: 'low',
+      nextBestTools: ['getTestTaskDetail', 'getProductTestCases', 'getProductBugs'],
+    },
   );
 
   server.tool(
@@ -20,5 +24,9 @@ export function registerTestTaskTools(server: CliRegistry): void {
       testTaskId: z.number().int().positive(),
     },
     async ({ testTaskId }) => jsonResult(await getApi().testtask.getTestTaskDetail(testTaskId)),
+    {
+      costHint: 'low',
+      nextBestTools: ['getTestTasks', 'getComments', 'getProductTestCases'],
+    },
   );
 }

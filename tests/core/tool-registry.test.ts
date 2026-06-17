@@ -965,12 +965,16 @@ describe('registerTools', () => {
   it('dispatches registered read tools to their API methods', async () => {
     const registry = new InMemoryCliRegistry();
     const api = {
-      bug: { getMyBugs: vi.fn(async () => ({ name: 'getMyBugs' })), getProductBugs: vi.fn(async () => ({ name: 'getProductBugs' })), getBugDetail: vi.fn(async () => ({ name: 'getBugDetail' })) },
+      bug: { getMyBugs: vi.fn(async () => ({ name: 'getMyBugs' })), getProductBugs: vi.fn(async () => ({ name: 'getProductBugs' })), getBugDetail: vi.fn(async () => ({ name: 'getBugDetail' })), getBugSnapshot: vi.fn(async () => ({ name: 'getBugSnapshot' })) },
       build: { getProjectBuilds: vi.fn(async () => ({ name: 'getProjectBuilds' })), getBuildDetail: vi.fn(async () => ({ name: 'getBuildDetail' })) },
       comment: { getComments: vi.fn(async () => ({ name: 'getComments' })) },
-      developmentContext: { getDevelopmentContext: vi.fn(async () => ({ name: 'getDevelopmentContext' })) },
+      developmentContext: {
+        getDevelopmentContext: vi.fn(async () => ({ name: 'getDevelopmentContext' })),
+        getDevelopmentContextSnapshot: vi.fn(async () => ({ name: 'getDevelopmentContextSnapshot' })),
+      },
       execution: {
         getExecutionDetail: vi.fn(async () => ({ name: 'getExecutionDetail' })),
+        getExecutionSnapshot: vi.fn(async () => ({ name: 'getExecutionSnapshot' })),
         getExecutionDynamic: vi.fn(async () => ({ name: 'getExecutionDynamic' })),
         getProjectExecutions: vi.fn(async () => ({ name: 'getProjectExecutions' })),
         getExecutionBuilds: vi.fn(async () => ({ name: 'getExecutionBuilds' })),
@@ -1004,9 +1008,9 @@ describe('registerTools', () => {
     await registerTools(registry, 'full');
 
     const calls: Array<[string, Record<string, unknown>]> = [
-      ['getMyBugs', { productId: 1 }], ['getProductBugs', { productId: 1 }], ['getBugDetail', { bugId: 1 }],
+      ['getMyBugs', { productId: 1 }], ['getProductBugs', { productId: 1 }], ['getBugDetail', { bugId: 1 }], ['getBugSnapshot', { bugId: 1 }],
       ['getProjectBuilds', { projectId: 1 }], ['getBuildDetail', { buildId: 1 }], ['getComments', { objectType: 'bug', objectID: 1 }],
-      ['getDevelopmentContext', { entityType: 'story', entityId: 1 }], ['getExecutionDetail', { executionId: 1 }], ['getExecutionDynamic', { executionId: 1 }],
+      ['getDevelopmentContext', { entityType: 'story', entityId: 1 }], ['getDevelopmentContextSnapshot', { entityType: 'story', entityId: 1 }], ['getExecutionDetail', { executionId: 1 }], ['getExecutionSnapshot', { executionId: 1 }], ['getExecutionDynamic', { executionId: 1 }],
       ['getProjectExecutions', { projectId: 1 }], ['getExecutionBuilds', { executionId: 1 }], ['getExecutionBugs', { executionId: 1, page: 1, limit: 2, status: 'active' }],
       ['getExecutionDailyBugStats', { executionId: 1, iterationName: 'i', date: 'today' }], ['getProductPlans', { productId: 1 }], ['getPlanDetail', { planId: 1 }],
       ['getProducts', {}], ['getProductDetail', { productId: 1 }], ['getPrograms', { order: 'id_desc' }], ['getProgramDetail', { programId: 1 }],

@@ -3,9 +3,11 @@ import { runCli } from '../src/cli.js';
 import { setApi } from '../src/core/api-provider.js';
 import { CLI_VERSION } from '../src/version.js';
 import * as installModule from '../src/install.js';
+import { setGlobalOutputMode } from '../src/tools/shared.js';
 
 describe('runCli', () => {
   afterEach(() => {
+    setGlobalOutputMode('compact');
     vi.restoreAllMocks();
   });
 
@@ -102,6 +104,95 @@ describe('runCli', () => {
     expect(write).toHaveBeenCalledWith(expect.stringContaining('--executionId <number> （必填）'));
   });
 
+  it('supports output mode flags', async () => {
+    const getBugDetail = vi.fn(async () => ({
+      id: 1,
+      title: '登录失败',
+      steps: 'a'.repeat(700),
+      actions: [{ id: 1, actor: 'qa1', action: 'opened', date: '2026-06-01' }],
+    }));
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    setApi({ bug: { getBugDetail } } as never);
+
+    await runCli(['--output', 'normal', 'getBugDetail', '--bugId', '1']);
+    expect(JSON.parse(String(write.mock.calls.at(-1)?.[0]))).toMatchObject({ id: 1, meta: { requestCount: 0 } });
+
+    write.mockClear();
+    await runCli(['--output=verbose', 'getBugDetail', '--bugId', '1']);
+    expect(JSON.parse(String(write.mock.calls.at(-1)?.[0]))).toMatchObject({ id: 1, steps: expect.any(String) });
+  });
+
+  it('prints help metadata when available', async () => {
+    const getBugDetail = vi.fn();
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    setApi({ bug: { getBugDetail } } as never);
+
+    await runCli(['help', 'getBugSnapshot']);
+
+    expect(getBugDetail).not.toHaveBeenCalled();
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('预估成本'));
+  });
+
+  it('prints help metadata for common read tools', async () => {
+    const getMyTasks = vi.fn();
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    setApi({ task: { getMyTasks } } as never);
+
+    await runCli(['help', 'getMyTasks']);
+
+    expect(getMyTasks).not.toHaveBeenCalled();
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('预估成本：low'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('下一步：getTaskDetail、getMyTaskStatistics、getMyWeeklyActivity'));
+  });
+
+  it('prints help metadata for cross-group read tools', async () => {
+    const searchStories = vi.fn();
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    setApi({ search: { searchStories } } as never);
+
+    await runCli(['help', 'searchStories']);
+
+    expect(searchStories).not.toHaveBeenCalled();
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('预估成本：medium'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('下一步：getStoryDetail、getDevelopmentContextSnapshot、searchStoriesByProductName'));
+  });
+
+  it('prints help metadata for execution read tools', async () => {
+    const getExecutionDetail = vi.fn();
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    setApi({ execution: { getExecutionDetail } } as never);
+
+    await runCli(['help', 'getExecutionBugs']);
+
+    expect(getExecutionDetail).not.toHaveBeenCalled();
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('预估成本：medium'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('下一步：getBugSnapshot、getExecutionSnapshot、getExecutionDetail'));
+  });
+
+  it('prints help metadata for phase3c read tools', async () => {
+    const getProductTrack = vi.fn();
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    setApi({ product: { getProductTrack } } as never);
+
+    await runCli(['help', 'getProductDashboard']);
+
+    expect(getProductTrack).not.toHaveBeenCalled();
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('预估成本：medium'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('下一步：getProductRoadmap、getProductDynamic、getProductTrack'));
+  });
+
+  it('prints help metadata for relation read tools', async () => {
+    const getBugRelatedStory = vi.fn();
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    setApi({ relation: { getBugRelatedStory } } as never);
+
+    await runCli(['help', 'getStoryRelatedBugs']);
+
+    expect(getBugRelatedStory).not.toHaveBeenCalled();
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('预估成本：low'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('下一步：getStoryDetail、getDevelopmentContextSnapshot、getBugSnapshot'));
+  });
+
   it('prints target command help when help command also includes help flag', async () => {
     const getExecutionDetail = vi.fn();
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
@@ -134,7 +225,7 @@ describe('runCli', () => {
     await runCli(['execution-bug-2130.html']);
 
     expect(getExecutionBugs).toHaveBeenCalledWith(2130, { limit: 100 });
-    expect(write).toHaveBeenCalledWith(`${JSON.stringify({ items: [{ id: 1 }] }, null, 2)}\n`);
+    expect(JSON.parse(String(write.mock.calls.at(-1)?.[0]))).toMatchObject({ items: [{ id: 1 }], meta: { requestCount: 0 } });
   });
 
   it('maps full legacy page urls to detail commands', async () => {
@@ -145,7 +236,7 @@ describe('runCli', () => {
     await runCli(['https://zentao.example.com/zentao/bug-view-84362.html?tid=1#app=qa']);
 
     expect(getBugDetail).toHaveBeenCalledWith(84362);
-    expect(write).toHaveBeenCalledWith(`${JSON.stringify({ id: 84362 }, null, 2)}\n`);
+    expect(JSON.parse(String(write.mock.calls.at(-1)?.[0]))).toMatchObject({ id: 84362, meta: { requestCount: 0 } });
   });
 
   it('maps windows-style legacy page paths to structured commands', async () => {
@@ -156,7 +247,7 @@ describe('runCli', () => {
     await runCli(['C:\\zentao\\bug-view-84362.html']);
 
     expect(getBugDetail).toHaveBeenCalledWith(84362);
-    expect(write).toHaveBeenCalledWith(`${JSON.stringify({ id: 84362 }, null, 2)}\n`);
+    expect(JSON.parse(String(write.mock.calls.at(-1)?.[0]))).toMatchObject({ id: 84362, meta: { requestCount: 0 } });
   });
 
   it.each([
@@ -262,7 +353,7 @@ describe('runCli', () => {
     await runCli(['--role=qa', 'getMyBugs', '--limit', '5']);
 
     expect(getMyBugs).toHaveBeenCalledWith({ limit: 5 });
-    expect(write).toHaveBeenCalledWith(`${JSON.stringify({ items: [{ id: 2 }] }, null, 2)}\n`);
+    expect(JSON.parse(String(write.mock.calls.at(-1)?.[0]))).toMatchObject({ items: [{ id: 2 }], meta: { requestCount: 0 } });
   });
 
   it('rejects invalid inline role syntax', async () => {
@@ -277,7 +368,7 @@ describe('runCli', () => {
     await runCli(['-r=qa', 'getMyBugs', '--limit', '6']);
 
     expect(getMyBugs).toHaveBeenCalledWith({ limit: 6 });
-    expect(write).toHaveBeenCalledWith(`${JSON.stringify({ items: [{ id: 3 }] }, null, 2)}\n`);
+    expect(JSON.parse(String(write.mock.calls.at(-1)?.[0]))).toMatchObject({ items: [{ id: 3 }], meta: { requestCount: 0 } });
   });
 
   it('does not treat command arguments named like role as top-level role flags', async () => {

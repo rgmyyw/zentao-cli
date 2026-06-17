@@ -9,7 +9,9 @@ import {
   type ChangelogOptions,
 } from './core/cli-output.js';
 import { buildRegistryForCommand, getAvailableCommandNames } from './core/manifest.js';
+import { getRequestCount, getLastRequestDurationMs } from './core/http-metrics.js';
 import { runInstallCommand, runUninstallCommand, runUpdateCommand } from './install.js';
+import { setGlobalOutputMode, type OutputMode } from './tools/shared.js';
 import type { Role } from './types/common.js';
 import { runDailyUpdateProbe } from './update-probe.js';
 import { CLI_VERSION } from './version.js';
@@ -19,7 +21,8 @@ const VALID_ROLES = new Set<Role>(['full', 'dev', 'pm', 'qa']);
 const BUILTIN_COMMAND_NAMES = ['help', 'list', 'version', 'changelog', 'install', 'uninstall', 'remove', 'update', 'upgrade'];
 
 export async function runCli(rawArgs: string[]): Promise<void> {
-  const { role, commandName, commandArgs } = parseCliArgs(rawArgs);
+  const { role, commandName, commandArgs, outputMode } = parseCliArgs(rawArgs);
+  setGlobalOutputMode(outputMode);
   const registeredCommandNames = await getAvailableCommandNames(role);
   const commandNames = [...BUILTIN_COMMAND_NAMES, ...registeredCommandNames]
     .sort((left, right) => left.localeCompare(right));
@@ -57,7 +60,7 @@ export async function runCli(rawArgs: string[]): Promise<void> {
     if (!targetCommandDef) {
       throw new Error(`未找到命令: ${targetCommandName}`);
     }
-    printCommandHelp(targetCommandDef.name, targetCommandDef.schema);
+    printCommandHelp(targetCommandDef.name, targetCommandDef.schema, targetCommandDef.metadata);
     return;
   }
 
@@ -134,16 +137,32 @@ export async function runCli(rawArgs: string[]): Promise<void> {
   }
 
   if (hasHelpFlag(commandArgs)) {
-    printCommandHelp(command.name, command.schema);
+    printCommandHelp(command.name, command.schema, command.metadata);
     return;
   }
 
   await runDailyUpdateProbe(commandName);
 
+  const requestCountBefore = getRequestCount();
   const input = parseCommandInput(command.schema, commandArgs);
   const result = await command.handler(input);
   const text = result.content[0]?.text ?? '';
-  process.stdout.write(`${await formatCommandOutput(command.name, text)}\n`);
+  process.stdout.write(`${await formatCommandOutput(command.name, appendCommandMeta(text, requestCountBefore))}\n`);
+}
+
+function appendCommandMeta(text: string, requestCountBefore: number): string {
+  try {
+    const payload = JSON.parse(text) as Record<string, unknown>;
+    const requestCountAfter = getRequestCount();
+    payload.meta = {
+      ...(typeof payload.meta === 'object' && payload.meta !== null ? payload.meta as Record<string, unknown> : {}),
+      requestCount: Math.max(requestCountAfter - requestCountBefore, 0),
+      durationMs: getLastRequestDurationMs(),
+    };
+    return JSON.stringify(payload);
+  } catch {
+    return text;
+  }
 }
 
 function parseListOptions(args: string[]): { raw: boolean } {
@@ -206,9 +225,10 @@ function parseChangelogOptions(args: string[]): ChangelogOptions {
   return options;
 }
 
-function parseCliArgs(rawArgs: string[]): { role: Role; commandName?: string; commandArgs: string[] } {
+function parseCliArgs(rawArgs: string[]): { role: Role; commandName?: string; commandArgs: string[]; outputMode: OutputMode } {
   const args = [...rawArgs];
   let role: Role = 'full';
+  let outputMode: OutputMode = 'compact';
 
   const inlineRoleArg = args[0];
   if (inlineRoleArg?.startsWith('--role=') || inlineRoleArg?.startsWith('-r=')) {
@@ -233,6 +253,23 @@ function parseCliArgs(rawArgs: string[]): { role: Role; commandName?: string; co
     role = args.shift() as Role;
   }
 
+  const inlineOutputArgIndex = args.findIndex((arg) => arg.startsWith('--output='));
+  if (inlineOutputArgIndex >= 0) {
+    const value = args[inlineOutputArgIndex].slice('--output='.length) as OutputMode;
+    assertOutputMode(value);
+    outputMode = value;
+    args.splice(inlineOutputArgIndex, 1);
+  }
+
+  const outputArgIndex = args.findIndex((arg) => arg === '--output');
+  if (outputArgIndex >= 0) {
+    const value = args[outputArgIndex + 1] as OutputMode | undefined;
+    if (!value) throw new Error('--output 需要一个值');
+    assertOutputMode(value);
+    outputMode = value;
+    args.splice(outputArgIndex, 2);
+  }
+
   const normalized = normalizeCommandInput(args.shift(), args);
   let commandName = normalized.commandName;
   if (normalized.consumedArgs > 0) {
@@ -242,7 +279,13 @@ function parseCliArgs(rawArgs: string[]): { role: Role; commandName?: string; co
     args.unshift(...normalized.prependedArgs);
   }
 
-  return { role, commandName, commandArgs: args };
+  return { role, commandName, commandArgs: args, outputMode };
+}
+
+function assertOutputMode(value: string): asserts value is OutputMode {
+  if (!['compact', 'normal', 'verbose'].includes(value)) {
+    throw new Error(`无效 output: ${value}`);
+  }
 }
 
 function normalizeCommandInput(

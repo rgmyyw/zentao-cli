@@ -16,6 +16,16 @@ export function registerExecutionTools(server: CliRegistry): void {
       executionId: z.number().int().positive(),
     },
     async ({ executionId }) => jsonResult(await getApi().execution.getExecutionDetail(executionId)),
+    { costHint: 'low', nextBestTools: ['getExecutionSnapshot', 'getExecutionBugs', 'getExecutionDynamic'] },
+  );
+
+  server.tool(
+    'getExecutionSnapshot',
+    {
+      executionId: z.number().int().positive(),
+    },
+    async ({ executionId }) => jsonResult(await getApi().execution.getExecutionSnapshot(executionId)),
+    { costHint: 'medium', nextBestTools: ['getExecutionDetail', 'getExecutionBugs', 'getExecutionDynamic'] },
   );
 
   server.tool(
@@ -24,6 +34,7 @@ export function registerExecutionTools(server: CliRegistry): void {
       executionId: z.number().int().positive(),
     },
     async ({ executionId }) => jsonResult(await getApi().execution.getExecutionDynamic(executionId)),
+    { costHint: 'low', nextBestTools: ['getExecutionSnapshot', 'getExecutionDetail', 'getExecutionBugs'] },
   );
 
   server.tool(
@@ -32,6 +43,7 @@ export function registerExecutionTools(server: CliRegistry): void {
       projectId: z.number().int().positive(),
     },
     async ({ projectId }) => jsonResult(await getApi().execution.getProjectExecutions(projectId)),
+    { costHint: 'low', nextBestTools: ['getExecutionDetail', 'getExecutionSnapshot', 'getProjectDetail'] },
   );
 
   server.tool(
@@ -40,6 +52,7 @@ export function registerExecutionTools(server: CliRegistry): void {
       executionId: z.number().int().positive(),
     },
     async ({ executionId }) => jsonResult(await getApi().execution.getExecutionBuilds(executionId)),
+    { costHint: 'low', nextBestTools: ['getExecutionSnapshot', 'getBuildDetail', 'getExecutionDetail'] },
   );
 
   server.tool(
@@ -54,6 +67,7 @@ export function registerExecutionTools(server: CliRegistry): void {
       moduleId: z.number().int().positive().optional().describe('可选。按执行 Bug 的模块 ID 过滤。'),
     },
     async ({ executionId, page, limit, status, search, module, moduleId }) => jsonResult(await getApi().execution.getExecutionBugs(executionId, { page, limit, status, search, module, moduleId })),
+    { costHint: 'medium', nextBestTools: ['getBugSnapshot', 'getExecutionSnapshot', 'getExecutionDetail'] },
   );
 
   server.tool(
@@ -64,6 +78,7 @@ export function registerExecutionTools(server: CliRegistry): void {
       date: optionalTrimmedText.describe('统计日期，默认今天。支持 today/今天/yesterday/昨天/YYYY-MM-DD。'),
     },
     async ({ executionId, iterationName, date }) => jsonResult(await getApi().execution.getExecutionDailyBugStats(executionId, { iterationName, date })),
+    { costHint: 'medium', nextBestTools: ['getExecutionSnapshot', 'getExecutionBugs', 'getExecutionDynamic'] },
   );
 
   server.tool(
@@ -100,6 +115,7 @@ export function registerExecutionTools(server: CliRegistry): void {
       executionId: z.number().int().positive().describe('执行 ID。对齐禅道 18.5 execution/manageMembers 页面按钮'),
     },
     async ({ executionId }) => jsonResult(await getApi().execution.manageMembers(executionId)),
+    { costHint: 'low', nextBestTools: ['getExecutionDetail', 'getProjectExecutions', 'getExecutionSnapshot'] },
   );
 
   server.tool(
@@ -112,6 +128,7 @@ export function registerExecutionTools(server: CliRegistry): void {
     },
     async ({ status, orderBy, limit, productId }) =>
       jsonResult(await getApi().execution.executionAll({ status, orderBy, limit, productId })),
+    { costHint: 'medium', nextBestTools: ['getProjectExecutions', 'getExecutionSnapshot', 'getExecutionDetail'] },
   );
 
   server.tool(
@@ -120,6 +137,7 @@ export function registerExecutionTools(server: CliRegistry): void {
       executionId: z.number().int().positive().describe('执行 ID。禅道 18.5 execution 模块无 track 控制器，确认执行时会显式报错'),
     },
     async ({ executionId }) => jsonResult(await getApi().execution.executionTrack(executionId)),
+    { costHint: 'medium', nextBestTools: ['getExecutionDetail', 'getExecutionSnapshot', 'getExecutionDynamic'] },
   );
 
   server.tool(
@@ -128,6 +146,7 @@ export function registerExecutionTools(server: CliRegistry): void {
       executionId: z.number().int().positive().describe('执行 ID。对齐禅道 18.5 execution/storyKanban 页面视图'),
     },
     async ({ executionId }) => jsonResult(await getApi().execution.executionStoryKanban(executionId)),
+    { costHint: 'medium', nextBestTools: ['getExecutionKanban', 'getExecutionDetail', 'getExecutionSnapshot'] },
   );
 
   server.tool(
@@ -137,6 +156,7 @@ export function registerExecutionTools(server: CliRegistry): void {
       storyId: z.number().int().positive().describe('需求 ID（不会被提交到不存在控制器）'),
     },
     async ({ executionId, storyId }) => jsonResult(await getApi().execution.executionStoryTasks(executionId, storyId)),
+    { costHint: 'medium', nextBestTools: ['getStoryDetail', 'getExecutionStoryKanban', 'getExecutionSnapshot'] },
   );
 
   server.tool(
@@ -148,6 +168,7 @@ export function registerExecutionTools(server: CliRegistry): void {
       groupBy: optionalTrimmedText.describe('分组方式，默认 default'),
     },
     async ({ executionId, browseType, orderBy, groupBy }) => jsonResult(await getApi().execution.getExecutionKanban(executionId, { browseType, orderBy, groupBy })),
+    { costHint: 'medium', nextBestTools: ['getExecutionTaskKanban', 'getExecutionSnapshot', 'getExecutionDetail'] },
   );
 
   server.tool(
@@ -159,6 +180,7 @@ export function registerExecutionTools(server: CliRegistry): void {
       groupBy: optionalTrimmedText.describe('分组方式，默认 default'),
     },
     async ({ executionId, browseType, orderBy, groupBy }) => jsonResult(await getApi().execution.getExecutionTaskKanban(executionId, { browseType, orderBy, groupBy })),
+    { costHint: 'medium', nextBestTools: ['getExecutionKanban', 'getExecutionSnapshot', 'getExecutionBugs'] },
   );
 
   server.tool(
@@ -167,5 +189,6 @@ export function registerExecutionTools(server: CliRegistry): void {
       executionId: z.number().int().positive().optional().describe('可选参数。禅道 18.5 execution/executionKanban 是全公司执行看板，无路径参数；本参数仅用于占位/未来的 from 过滤，不写入 URL'),
     },
     async () => jsonResult(await getApi().execution.getAllExecutionKanban()),
+    { costHint: 'medium', nextBestTools: ['getExecutionAll', 'getProjectExecutions', 'getExecutionSnapshot'] },
   );
 }

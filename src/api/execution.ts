@@ -54,6 +54,73 @@ export class ExecutionApi {
     return this.http.request<ZentaoExecution>('GET', `/executions/${executionId}`);
   }
 
+  async getExecutionSnapshot(executionId: number): Promise<unknown> {
+    const [detail, buildsResult, dynamicResult, bugs, tasks] = await Promise.all([
+      this.getExecutionDetail(executionId),
+      this.getExecutionBuilds(executionId) as Promise<{ items?: Array<Record<string, unknown>>; total?: number }>,
+      this.getExecutionDynamic(executionId) as Promise<{ dynamics?: Array<Record<string, unknown>>; total?: number }>,
+      this.getAllExecutionBugs(executionId),
+      this.getAllExecutionTasks(executionId),
+    ]);
+
+    const builds = Array.isArray(buildsResult.items) ? buildsResult.items : [];
+    const dynamics = Array.isArray(dynamicResult.dynamics) ? dynamicResult.dynamics : [];
+    const openBugs = bugs.filter((bug) => !['closed', 'resolved'].includes(this.toString(bug.status)));
+    const today = formatDate(new Date());
+    const overdueTasks = tasks.filter((task) => this.isOverdueUnfinishedTask(task, today));
+
+    return {
+      executionId,
+      focus: {
+        id: Number(detail.id),
+        name: this.toString(detail.name),
+        status: this.toString(detail.status),
+        project: Number(detail.project ?? detail.projectId ?? 0) || undefined,
+        begin: this.toString(detail.begin),
+        end: this.toString(detail.end),
+        PM: this.toString(detail.PM),
+        PO: this.toString(detail.PO),
+      },
+      summary: {
+        totalBugs: bugs.length,
+        openBugs: openBugs.length,
+        totalTasks: tasks.length,
+        overdueTasks: overdueTasks.length,
+        totalBuilds: Number(buildsResult.total ?? builds.length),
+        totalDynamics: Number(dynamicResult.total ?? dynamics.length),
+      },
+      builds: builds.slice(0, 5).map((build) => ({
+        id: Number(build.id ?? 0),
+        name: this.toString(build.name || build.title),
+        status: this.toString(build.status),
+        builder: this.toString(build.builder),
+        date: this.toString(build.date || build.createdDate),
+      })),
+      bugHighlights: openBugs.slice(0, 10).map((bug) => ({
+        id: Number(bug.id),
+        title: this.toString(bug.title),
+        status: this.toString(bug.status),
+        severity: this.toString(bug.severity),
+        assignedTo: this.toString(bug.assignedTo),
+      })),
+      taskHighlights: overdueTasks.slice(0, 10).map((task) => ({
+        id: Number(task.id),
+        name: this.toString(task.name),
+        status: this.toString(task.status),
+        assignedTo: this.toString(task.assignedTo),
+        deadline: toDateOnly(task.deadline),
+      })),
+      recentDynamics: dynamics.slice(0, 10).map((item) => ({
+        id: Number(item.id ?? 0),
+        actor: this.toString(item.actor || item.account || item.realname),
+        action: this.toString(item.action || item.actionLabel),
+        date: this.toString(item.date),
+        objectType: this.toString(item.objectType),
+        objectName: this.toString(item.objectName || item.objectLabel || item.name),
+      })),
+    };
+  }
+
   async getExecutionDynamic(executionId: number): Promise<unknown> {
     const response = await this.http.request<{ dynamics?: unknown[]; [key: string]: unknown }>('GET', `/executions/${executionId}`, {
       params: { fields: 'dynamics' },

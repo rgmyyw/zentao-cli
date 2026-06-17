@@ -69,6 +69,7 @@ export const commandToGroup: Record<string, string> = {
   "deleteBugViaForm": "bug",
   "exportBugs": "bug",
   "getBugDetail": "bug",
+  "getBugSnapshot": "bug",
   "getBugTrack": "bug",
   "getMyBugs": "bug",
   "getProductBugs": "bug",
@@ -90,6 +91,7 @@ export const commandToGroup: Record<string, string> = {
   "getExecutionExecutionKanban": "execution",
   "getExecutionKanban": "execution",
   "getExecutionManageMembers": "execution",
+  "getExecutionSnapshot": "execution",
   "getExecutionStoryKanban": "execution",
   "getExecutionStoryTasks": "execution",
   "getExecutionTaskKanban": "execution",
@@ -106,6 +108,7 @@ export const commandToGroup: Record<string, string> = {
   "getBugRelatedStory": "relation",
   "getStoryRelatedBugs": "relation",
   "getDevelopmentContext": "context",
+  "getDevelopmentContextSnapshot": "context",
   "getProductDetail": "product",
   "getProducts": "product",
   "manageProductLine": "product",
@@ -382,6 +385,7 @@ export const groupCommands: Record<string, string[]> = {
     "deleteBugViaForm",
     "exportBugs",
     "getBugDetail",
+    "getBugSnapshot",
     "getBugTrack",
     "getMyBugs",
     "getProductBugs",
@@ -407,6 +411,7 @@ export const groupCommands: Record<string, string[]> = {
     "getExecutionExecutionKanban",
     "getExecutionKanban",
     "getExecutionManageMembers",
+    "getExecutionSnapshot",
     "getExecutionStoryKanban",
     "getExecutionStoryTasks",
     "getExecutionTaskKanban",
@@ -432,7 +437,8 @@ export const groupCommands: Record<string, string[]> = {
     "getStoryRelatedBugs"
   ],
   "context": [
-    "getDevelopmentContext"
+    "getDevelopmentContext",
+    "getDevelopmentContextSnapshot"
   ],
   "product": [
     "getProductDetail",

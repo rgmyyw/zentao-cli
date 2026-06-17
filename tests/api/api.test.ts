@@ -744,6 +744,47 @@ describe('BugApi', () => {
     });
   });
 
+  it('builds compact bug snapshots', async () => {
+    const http = createHttp([{
+      id: 7,
+      title: '登录失败',
+      status: 'active',
+      severity: 2,
+      pri: 1,
+      type: 'codeerror',
+      product: 153,
+      module: 66,
+      project: 1772,
+      execution: 2140,
+      story: 10154,
+      task: 79922,
+      assignedTo: 'dev1',
+      openedBy: 'qa1',
+      resolvedBy: '',
+      openedDate: '2026-06-01',
+      deadline: '2026-06-20',
+      steps: `复现步骤${'a'.repeat(600)}`,
+      keywords: '登录',
+      actions: [
+        { id: 1, actor: 'qa1', action: 'opened', date: '2026-06-01', comment: '创建' },
+        { id: 2, actor: 'dev1', action: 'assigned', date: '2026-06-02', extra: 'ignored' },
+      ],
+    }]);
+
+    const result = await new BugApi(http as never).getBugSnapshot(7);
+
+    expect(result).toMatchObject({
+      bugId: 7,
+      focus: { id: 7, title: '登录失败', status: 'active', severity: 2, assignedTo: 'dev1', story: 10154, task: 79922 },
+      lifecycle: { openedDate: '2026-06-01', deadline: '2026-06-20' },
+      text: { keywords: '登录' },
+      actions: [{ id: 1, actor: 'qa1', action: 'opened', date: '2026-06-01', comment: '创建' }, { id: 2, actor: 'dev1', action: 'assigned', date: '2026-06-02' }],
+      summary: { hasStory: true, hasTask: true, actionCount: 2, actionsShown: 2 },
+    });
+    expect(String((result as { text: { steps: string } }).text.steps).length).toBeLessThanOrEqual(501);
+    expect(http.request).toHaveBeenCalledWith('GET', '/bugs/7');
+  });
+
   it('resolves bug with default fixed build and validates duplicate bug', async () => {
     const http = createHttp([{}]);
     const api = new BugApi(http as never);
@@ -1568,6 +1609,34 @@ describe('RelationApi and DevelopmentContextApi', () => {
     await expect(api.getDevelopmentContext({ entityType: 'story', entityId: 1, productId: 3 })).resolves.toMatchObject({ entityType: 'story', summary: { relatedBugsCount: 1, testCasesCount: 1 } });
     await expect(api.getDevelopmentContext({ entityType: 'bug', entityId: 2 })).resolves.toMatchObject({ entityType: 'bug', summary: { hasRelatedStory: true } });
   });
+
+  it('builds compact development context snapshots for stories and bugs', async () => {
+    const bugApi = {
+      getBugDetail: vi.fn(async () => ({ id: 2, title: '登录失败', status: 'active', severity: '2', assignedTo: 'dev1', resolvedBy: '' })),
+    };
+    const storyApi = {
+      getStoryDetail: vi.fn(async () => ({ id: 1, title: '登录能力', status: 'active', stage: 'developing', assignedTo: 'pm1', openedBy: 'pm1', cases: [{ id: 10, title: 'case1', status: 'normal' }] })),
+    };
+    const relationApi = {
+      getStoryRelatedBugs: vi.fn(async () => ({ bugs: [{ id: 2, title: '登录失败', status: 'active', severity: '2', assignedTo: 'dev1' }] })),
+      getBugRelatedStory: vi.fn(async () => ({ id: 1, title: '登录能力', status: 'active', stage: 'developing', assignedTo: 'pm1' })),
+    };
+    const api = new DevelopmentContextApi(bugApi as never, storyApi as never, relationApi as never);
+
+    await expect(api.getDevelopmentContextSnapshot({ entityType: 'story', entityId: 1, productId: 3 })).resolves.toMatchObject({
+      entityType: 'story',
+      focus: { id: 1, title: '登录能力' },
+      relatedBugs: [{ id: 2, title: '登录失败' }],
+      testCases: [{ id: 10, title: 'case1' }],
+      summary: { relatedBugsShown: 1, testCasesShown: 1 },
+    });
+    await expect(api.getDevelopmentContextSnapshot({ entityType: 'bug', entityId: 2 })).resolves.toMatchObject({
+      entityType: 'bug',
+      focus: { id: 2, title: '登录失败' },
+      relatedStory: { id: 1, title: '登录能力' },
+      summary: { hasRelatedStory: true },
+    });
+  });
 });
 
 describe('SearchApi', () => {
@@ -1722,6 +1791,33 @@ describe('ExecutionApi', () => {
       data: 'days=2',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
+  });
+
+  it('builds compact execution snapshots', async () => {
+    const http = createHttp([
+      { id: 9, name: '迭代A', status: 'doing', project: 1772, begin: '2026-06-01', end: '2026-06-30', PM: 'pm1', PO: 'po1' },
+      { builds: [{ id: 101, name: 'build-101', status: 'success', builder: 'dev1', date: '2026-06-18' }], total: 1 },
+      { dynamics: [{ id: 201, actor: 'dev1', action: 'resolved', date: '2026-06-18', objectType: 'bug', objectName: '登录失败' }] },
+      { bugs: [{ id: 1, title: '登录失败', status: 'active', severity: 2, assignedTo: 'dev1' }], total: 1 },
+      { tasks: [{ id: 2, name: '修复登录', status: 'doing', assignedTo: 'dev1', deadline: '2026-06-01' }], total: 1 },
+    ]);
+
+    const result = await new ExecutionApi(http as never).getExecutionSnapshot(9) as Record<string, unknown>;
+
+    expect(result).toMatchObject({
+      executionId: 9,
+      focus: { id: 9, name: '迭代A', status: 'doing', project: 1772 },
+      summary: { totalBugs: 1, openBugs: 1, totalTasks: 1, totalBuilds: 1, totalDynamics: 1 },
+      builds: [{ id: 101, name: 'build-101', status: 'success', builder: 'dev1', date: '2026-06-18' }],
+      bugHighlights: [{ id: 1, title: '登录失败', status: 'active', severity: '2', assignedTo: 'dev1' }],
+      taskHighlights: [{ id: 2, name: '修复登录', status: 'doing', assignedTo: 'dev1', deadline: '2026-06-01' }],
+      recentDynamics: [{ id: 201, actor: 'dev1', action: 'resolved', objectType: 'bug', objectName: '登录失败' }],
+    });
+    expect(http.request).toHaveBeenNthCalledWith(1, 'GET', '/executions/9');
+    expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/executions/9/builds');
+    expect(http.request).toHaveBeenNthCalledWith(3, 'GET', '/executions/9', { params: { fields: 'dynamics' } });
+    expect(http.request).toHaveBeenNthCalledWith(4, 'GET', '/executions/9/bugs', { params: { page: 1, limit: 100, status: undefined } });
+    expect(http.request).toHaveBeenNthCalledWith(5, 'GET', '/executions/9/tasks', { params: { page: 1, limit: 100 } });
   });
 
   it('rejects unsupported execution confirmStoryChange and unsafe computeBurn endpoints', async () => {

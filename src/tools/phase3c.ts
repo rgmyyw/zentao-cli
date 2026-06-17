@@ -82,27 +82,45 @@ export function registerProductWriteTools(server: CliRegistry): void {
     status: optionalTrimmedText,
     orderBy: optionalTrimmedText,
     limit: z.number().int().positive().optional(),
-  }, async ({ status, orderBy, limit }) => jsonResult(await getApi().product.getProductAll({ status, orderBy, limit })));
+  }, async ({ status, orderBy, limit }) => jsonResult(await getApi().product.getProductAll({ status, orderBy, limit })), {
+    costHint: 'medium',
+    nextBestTools: ['getProductDetail', 'getProductTrack', 'getProducts'],
+  });
 
   server.tool('getProductTrack', {
     productId: z.number().int().positive(),
-  }, async ({ productId }) => jsonResult(await getApi().product.getProductTrack(productId)));
+  }, async ({ productId }) => jsonResult(await getApi().product.getProductTrack(productId)), {
+    costHint: 'medium',
+    nextBestTools: ['getProductDetail', 'getProductDynamic', 'getProductDashboard'],
+  });
 
   server.tool('getProductWhitelist', {
     productId: z.number().int().positive(),
-  }, async ({ productId }) => jsonResult(await getApi().product.getProductWhitelist(productId)));
+  }, async ({ productId }) => jsonResult(await getApi().product.getProductWhitelist(productId)), {
+    costHint: 'low',
+    nextBestTools: ['getProductDetail', 'getProductTrack', 'getProductDashboard'],
+  });
 
   server.tool('getProductDashboard', {
     productId: z.number().int().positive(),
-  }, async ({ productId }) => jsonResult(await getApi().product.getProductDashboard(productId)));
+  }, async ({ productId }) => jsonResult(await getApi().product.getProductDashboard(productId)), {
+    costHint: 'medium',
+    nextBestTools: ['getProductRoadmap', 'getProductDynamic', 'getProductTrack'],
+  });
 
   server.tool('getProductRoadmap', {
     productId: z.number().int().positive(),
-  }, async ({ productId }) => jsonResult(await getApi().product.getProductRoadmap(productId)));
+  }, async ({ productId }) => jsonResult(await getApi().product.getProductRoadmap(productId)), {
+    costHint: 'medium',
+    nextBestTools: ['getProductDashboard', 'getProductTrack', 'getProductDynamic'],
+  });
 
   server.tool('getProductDynamic', {
     productId: z.number().int().positive(),
-  }, async ({ productId }) => jsonResult(await getApi().product.getProductDynamic(productId)));
+  }, async ({ productId }) => jsonResult(await getApi().product.getProductDynamic(productId)), {
+    costHint: 'medium',
+    nextBestTools: ['getProductTrack', 'getProductDashboard', 'getComments'],
+  });
 
   server.tool('exportProducts', {
     productId: z.number().int().positive(),
@@ -218,28 +236,46 @@ export function registerProjectWriteTools(server: CliRegistry): void {
 
   server.tool('getProjectTeam', {
     projectId: z.number().int().positive(),
-  }, async ({ projectId }) => jsonResult(await getApi().project.getProjectTeam(projectId)));
+  }, async ({ projectId }) => jsonResult(await getApi().project.getProjectTeam(projectId)), {
+    costHint: 'low',
+    nextBestTools: ['getProjectDetail', 'getProjectManageMembers', 'getProjectGroup'],
+  });
 
   server.tool('getProjectGroup', {
     projectId: z.number().int().positive(),
-  }, async ({ projectId }) => jsonResult(await getApi().project.getProjectGroup(projectId)));
+  }, async ({ projectId }) => jsonResult(await getApi().project.getProjectGroup(projectId)), {
+    costHint: 'low',
+    nextBestTools: ['getProjectTeam', 'getProjectManageMembers', 'getProjectWhitelist'],
+  });
 
   server.tool('getProjectManageMembers', {
     projectId: z.number().int().positive(),
-  }, async ({ projectId }) => jsonResult(await getApi().project.manageProjectMembers(projectId)));
+  }, async ({ projectId }) => jsonResult(await getApi().project.manageProjectMembers(projectId)), {
+    costHint: 'low',
+    nextBestTools: ['getProjectTeam', 'getProjectGroup', 'getProjectDetail'],
+  });
 
   server.tool('getProjectWhitelist', {
     projectId: z.number().int().positive(),
-  }, async ({ projectId }) => jsonResult(await getApi().project.getProjectWhitelist(projectId)));
+  }, async ({ projectId }) => jsonResult(await getApi().project.getProjectWhitelist(projectId)), {
+    costHint: 'low',
+    nextBestTools: ['getProjectDetail', 'getProjectManageMembers', 'getProjectGroup'],
+  });
 
   server.tool('getProjectDynamic', {
     projectId: z.number().int().positive(),
-  }, async ({ projectId }) => jsonResult(await getApi().project.getProjectDynamic(projectId)));
+  }, async ({ projectId }) => jsonResult(await getApi().project.getProjectDynamic(projectId)), {
+    costHint: 'medium',
+    nextBestTools: ['getProjectDetail', 'getProjectExecutions', 'getComments'],
+  });
 
   server.tool('getProjectLinkedProducts', {
     projectId: z.number().int().positive(),
     from: optionalTrimmedText.describe('来源标识，默认 project。禅道 18.5 project/manageProducts 路径 {projectID}-{from} 段'),
-  }, async ({ projectId, from }) => jsonResult(await getApi().project.getProjectLinkedProducts(projectId, from ?? 'project')));
+  }, async ({ projectId, from }) => jsonResult(await getApi().project.getProjectLinkedProducts(projectId, from ?? 'project')), {
+    costHint: 'low',
+    nextBestTools: ['getProjectDetail', 'getProducts', 'getProductDetail'],
+  });
 
   server.tool('createProjectGroup', {
     projectId: z.number().int().positive().describe('项目 ID，对齐禅道 18.5 project/createGroup 路径 {projectID} 段'),
@@ -374,13 +410,22 @@ export function registerProgramWriteTools(server: CliRegistry): void {
     status: optionalTrimmedText,
     orderBy: optionalTrimmedText,
     limit: z.number().int().positive().optional(),
-  }, async ({ status, orderBy, limit }) => jsonResult(await getApi().program.getProgramAll({ status, orderBy, limit })));
+  }, async ({ status, orderBy, limit }) => jsonResult(await getApi().program.getProgramAll({ status, orderBy, limit })), {
+    costHint: 'medium',
+    nextBestTools: ['getPrograms', 'getProgramDetail', 'getProgramTrack'],
+  });
 
   server.tool('getProgramTrack', {
     programId: z.number().int().positive(),
-  }, async ({ programId }) => jsonResult(await getApi().program.getProgramTrack(programId)));
+  }, async ({ programId }) => jsonResult(await getApi().program.getProgramTrack(programId)), {
+    costHint: 'medium',
+    nextBestTools: ['getProgramDetail', 'getProgramStakeholders', 'getProgramAll'],
+  });
 
   server.tool('getProgramStakeholders', {
     programId: z.number().int().positive(),
-  }, async ({ programId }) => jsonResult(await getApi().program.getProgramStakeholders(programId)));
+  }, async ({ programId }) => jsonResult(await getApi().program.getProgramStakeholders(programId)), {
+    costHint: 'low',
+    nextBestTools: ['getProgramDetail', 'getProgramTrack', 'getPrograms'],
+  });
 }

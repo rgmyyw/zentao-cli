@@ -8,17 +8,19 @@
 
 ## 这版补了什么
 
-- 按禅道 **18.5** 本地源码重新校准了一批写操作链路，重点覆盖任务、执行、测试用例、需求、待办和 Bug 的批量操作。
-- 一批原本只是“看起来有命令、实际会打错页面字段 / 控制器”的入口，现在要么改成真实可用链路，要么在 18.5 下直接明确报“不支持”，避免误写线上数据。
-- 新增覆盖率统计脚本 `pnpm coverage`，可以快速看到 CLI 对 18.5 控制器入口的覆盖比例和剩余缺口。
+- 默认 JSON 输出现在更适合 AI / 脚本消费：支持全局 `--output compact|normal|verbose`，并在命令结果里统一附带 `meta.requestCount`、`meta.durationMs`。
+- 新增 3 个短链路快照命令：`getBugSnapshot`、`getDevelopmentContextSnapshot`、`getExecutionSnapshot`，把常见“先查详情再查关联列表”的多跳查询压成一步。
+- `zentao help <command>` 现在会显示 `预估成本` 和 `下一步` 推荐命令，便于 Agent 自动选择更便宜、链路更短的调用方案。
+- HTTP 读取链路补了轻量缓存和网络重试，常见 GET 查询在短时间内重复调用时会直接命中缓存，并通过 `cacheHit` 标记告知调用方。
+- `zentao install` / `zentao update` 安装 skill 时统一改为非交互全局 agent 安装，更适合脚本、CI 和 Agent 环境。
 
 ### 典型变化
 
-- **批量任务编辑**：`batchEditTasks` 改成按任务行 JSON 数组提交，和 18.5 页面 `taskIDList[]`、`names[id]`、`types[id]`、`pris[id]` 等字段一致。
-- **批量测试用例创建 / 编辑**：`batchCreateTestCases`、`batchEditTestCases` 改成按行字段提交，支持 `stage[]`、步骤数组和按 case ID 索引字段。
-- **执行模块**：修正了 `startExecution` / `closeExecution` / `activateExecution` 等状态动作路径，`computeCfd` 已可用；对 18.5 不存在的 controller 会直接报错，不再静默打错链路。
-- **批量关闭任务**：遇到 18.5 返回 `skipTaskIdList` 的确认链接时，CLI 会自动继续执行，避免只关闭部分任务。
-- **产品线维护**：`manageProductLine` 现支持已有项与新增项混合提交，按真实 `modules[...]` / `programs[...]` 页面字段编码。
+- **输出模式**：`zentao --output compact getBugDetail --bugId 123` 会自动裁剪长步骤、长列表；`--output verbose` 可保留完整原始字段。
+- **执行快照**：`zentao getExecutionSnapshot --executionId 2140` 会一次返回执行 focus、构建摘要、未关闭 Bug、逾期任务和最近动态。
+- **开发上下文快照**：`zentao getDevelopmentContextSnapshot --entityType story --entityId 10154 --productId 153` 会直接返回需求 focus、关联 Bug、测试用例和摘要。
+- **命令帮助增强**：`zentao help getExecutionBugs` 会显示 `预估成本：medium` 和建议继续调用的 `getBugSnapshot` / `getExecutionSnapshot` / `getExecutionDetail`。
+- **安装更新体验**：skill 安装统一走非交互 `--global --agent universal --yes`，减少交互式安装卡住的问题。
 
 ## 版本要求
 
@@ -134,7 +136,21 @@ https://cloudglab.github.io/zentao-cli/
 ```bash
 npx -y @cloudglab/zentao-cli@latest --help
 npx -y @cloudglab/zentao-cli@latest --role qa getMyTasks --status all --limit 20
+npx -y @cloudglab/zentao-cli@latest --output normal getExecutionSnapshot --executionId 2140
 ```
+
+### AI / 脚本推荐读法
+
+```bash
+zentao --output compact getBugSnapshot --bugId 84362
+zentao --output normal getDevelopmentContextSnapshot --entityType story --entityId 10154 --productId 153
+zentao --output normal getExecutionSnapshot --executionId 2140
+zentao help getExecutionBugs
+```
+
+- `compact`：默认模式，优先少返回，适合 Agent 首轮探测。
+- `normal`：保留 `source`、`page`、`total`、`scanned`、`durationMs`、`cacheHit` 等常用元信息。
+- `verbose`：保留原始 JSON，全字段排查时使用。
 
 ### 批量写操作示例
 
@@ -176,7 +192,7 @@ zentao whoami
 默认一键安装会使用 CLI 包内自带 skill。手动从 GitHub 仓库安装：
 
 ```bash
-npx -y skills add -g cloudglab/zentao-cli
+npx -y skills add cloudglab/zentao-cli --global --agent universal --yes
 ```
 
 如果只能访问 npm，不能 clone `.git` 仓库：
@@ -184,7 +200,7 @@ npx -y skills add -g cloudglab/zentao-cli
 ```bash
 npm pack @cloudglab/zentao-cli@latest
 tar -xzf cloudglab-zentao-cli-*.tgz
-npx -y skills add -g ./package
+npx -y skills add ./package --global --agent universal --yes
 ```
 
 Skill / Agent 里推荐优先调用本地命令：

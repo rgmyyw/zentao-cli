@@ -9,12 +9,18 @@ export function registerSearchTools(server: CliRegistry): void {
     productId: z.number().int().positive().optional(),
     limit: z.number().int().positive().max(100).optional().default(20),
     deepSearch: z.boolean().optional().default(false),
-  }, async (input) => jsonResult(await getApi().search.searchStories(input)));
+  }, async (input) => jsonResult(await getApi().search.searchStories(input)), {
+    costHint: 'medium',
+    nextBestTools: ['getStoryDetail', 'getDevelopmentContextSnapshot', 'searchStoriesByProductName'],
+  });
 
   server.tool('searchStoriesByProductName', {
     productName: z.string().trim().min(1),
     keyword: z.string().trim().min(1),
     limit: z.number().int().positive().max(100).optional().default(10),
     deepSearch: z.boolean().optional().default(false),
-  }, async ({ productName, keyword, limit, deepSearch }) => jsonResult(await getApi().search.searchStoriesByProductName(productName, keyword, { limit, deepSearch })));
+  }, async ({ productName, keyword, limit, deepSearch }) => jsonResult(await getApi().search.searchStoriesByProductName(productName, keyword, { limit, deepSearch })), {
+    costHint: 'medium',
+    nextBestTools: ['searchStories', 'getProductStories', 'getStoryDetail'],
+  });
 }

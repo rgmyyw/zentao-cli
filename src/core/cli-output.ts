@@ -134,6 +134,7 @@ function describeCommand(commandName: string): string {
     getMyBugs: '查看指派给我的 Bug',
     getProductBugs: '查看产品 Bug',
     getBugDetail: '查看 Bug 详情',
+    getBugSnapshot: '查看 Bug 快照',
     resolveBug: '解决 Bug',
     getStoryDetail: '查看需求详情',
     getProductStories: '查看产品需求',
@@ -142,6 +143,7 @@ function describeCommand(commandName: string): string {
     updateStory: '更新需求字段',
     changeStory: '变更需求',
     getExecutionDetail: '查看执行详情',
+    getExecutionSnapshot: '查看执行快照',
     getProjectExecutions: '查看项目执行列表',
     getExecutionBugs: '查看执行 Bug 列表',
     getExecutionBuilds: '查看执行构建列表',
@@ -170,6 +172,7 @@ function describeCommand(commandName: string): string {
     addComment: '添加对象评论',
     search: '搜索禅道对象',
     getDevelopmentContext: '查看需求 / Bug 开发上下文',
+    getDevelopmentContextSnapshot: '查看需求 / Bug 开发快照',
     getStoryRelatedBugs: '查看需求关联 Bug',
     getBugRelatedStory: '查看 Bug 关联需求',
     createTaskFromStory: '从需求创建任务',
@@ -478,7 +481,7 @@ function formatErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function printCommandHelp(commandName: string, schema: ZodRawShape): void {
+export function printCommandHelp(commandName: string, schema: ZodRawShape, metadata?: { costHint?: string; nextBestTools?: string[] }): void {
   const entries = Object.entries(schema);
   const lines = [
     `zentao ${commandName}`,
@@ -497,6 +500,15 @@ export function printCommandHelp(commandName: string, schema: ZodRawShape): void
     lines.push('参数：', ...entries.map(formatParameterHelp), '');
   } else {
     lines.push('参数：', '  此命令无参数。', '');
+  }
+
+  const costHint = metadata?.costHint;
+  const nextBestTools = metadata?.nextBestTools ?? [];
+  if (costHint || nextBestTools.length > 0) {
+    lines.push('提示：');
+    if (costHint) lines.push(`  预估成本：${costHint}`);
+    if (nextBestTools.length > 0) lines.push(`  下一步：${nextBestTools.join('、')}`);
+    lines.push('');
   }
 
   process.stdout.write(lines.join('\n'));
@@ -581,6 +593,9 @@ export function getBuiltinCommandHelp(commandName: string): string | undefined {
       '  --cli-only （可选）：只安装 CLI，不安装 skill。',
       '  --skill-only （可选）：只安装 skill，不安装 CLI。',
       '',
+      '说明：',
+      '  skill 默认按全局模式安装，并固定使用 --agent universal，避免自动探测到 PromptScript 后触发 global 限制。',
+      '',
     ].join('\n'),
     update: [
       'zentao update',
@@ -599,6 +614,9 @@ export function getBuiltinCommandHelp(commandName: string): string | undefined {
       '  --skip-config-check （可选）：更新后跳过禅道配置校验。',
       '  --cli-only （可选）：只更新 CLI，不更新 skill。',
       '  --skill-only （可选）：只更新 skill，不更新 CLI。',
+      '',
+      '说明：',
+      '  skill 默认按全局模式更新，并固定使用 --agent universal，避免自动探测到 PromptScript 后触发 global 限制。',
       '',
     ].join('\n'),
     uninstall: [

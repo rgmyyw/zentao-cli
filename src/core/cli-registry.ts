@@ -4,10 +4,16 @@ import type { JsonContentResult } from '../types/common.js';
 export type CliHandler<TInput extends Record<string, unknown> = Record<string, unknown>> =
   (input: TInput) => Promise<JsonContentResult> | JsonContentResult;
 
+export interface CliCommandMetadata {
+  costHint?: 'low' | 'medium' | 'high';
+  nextBestTools?: string[];
+}
+
 export interface CliCommandDefinition {
   name: string;
   schema: ZodRawShape;
   handler: CliHandler;
+  metadata?: CliCommandMetadata;
 }
 
 export interface CliRegistry {
@@ -15,6 +21,7 @@ export interface CliRegistry {
     name: string,
     schema: TShape,
     handler: CliHandler<z.infer<z.ZodObject<TShape>>>,
+    metadata?: CliCommandMetadata,
   ): void;
   listCommands(): CliCommandDefinition[];
 }
@@ -26,8 +33,9 @@ export class InMemoryCliRegistry implements CliRegistry {
     name: string,
     schema: TShape,
     handler: CliHandler<z.infer<z.ZodObject<TShape>>>,
+    metadata?: CliCommandMetadata,
   ): void {
-    this.commands.set(name, { name, schema, handler: handler as CliHandler });
+    this.commands.set(name, { name, schema, handler: handler as CliHandler, metadata });
   }
 
   getCommand(name: string): CliCommandDefinition | undefined {

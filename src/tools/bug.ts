@@ -42,6 +42,15 @@ export function registerBugTools(server: CliRegistry): void {
   );
 
   server.tool(
+    'getBugSnapshot',
+    {
+      bugId: z.number().int().positive(),
+    },
+    async ({ bugId }) => jsonResult(await getApi().bug.getBugSnapshot(bugId)),
+    { costHint: 'low', nextBestTools: ['getBugDetail', 'getBugRelatedStory', 'getDevelopmentContextSnapshot'] },
+  );
+
+  server.tool(
     'resolveBug',
     {
       bugId: z.number().int().positive(),

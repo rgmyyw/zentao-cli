@@ -26,6 +26,7 @@ export function registerTaskTools(server: CliRegistry): void {
       limit: z.number().int().positive().max(100).optional(),
     },
     async (input) => jsonResult(await getApi().task.getMyTasks(input)),
+    { costHint: 'low', nextBestTools: ['getTaskDetail', 'getMyTaskStatistics', 'getMyWeeklyActivity'] },
   );
 
   server.tool(
@@ -34,6 +35,7 @@ export function registerTaskTools(server: CliRegistry): void {
       taskId: z.number().int().positive(),
     },
     async ({ taskId }) => jsonResult(await getApi().task.getTaskDetail(taskId)),
+    { costHint: 'low', nextBestTools: ['getComments', 'getMyTasks', 'getExecutionSnapshot'] },
   );
 
   server.tool(

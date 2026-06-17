@@ -11,6 +11,7 @@ export function registerProjectTools(server: CliRegistry): void {
       limit: z.number().int().positive().max(100).optional(),
     },
     async (input) => jsonResult(await getApi().project.getProjects(input)),
+    { costHint: 'low', nextBestTools: ['getProjectDetail', 'getProjectExecutions', 'getProjectBuilds'] },
   );
 
   server.tool(
@@ -19,5 +20,6 @@ export function registerProjectTools(server: CliRegistry): void {
       projectId: z.number().int().positive(),
     },
     async ({ projectId }) => jsonResult(await getApi().project.getProjectDetail(projectId)),
+    { costHint: 'low', nextBestTools: ['getProjectExecutions', 'getProjectBuilds', 'getProjectReleases'] },
   );
 }

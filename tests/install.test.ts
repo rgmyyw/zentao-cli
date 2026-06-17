@@ -95,7 +95,7 @@ describe('install command', () => {
       { command: 'npm', args: ['root', '-g'] },
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
       { command: 'npm', args: ['root', '-g'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', expectedSkillPath, '--yes'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', expectedSkillPath, '--global', '--agent', 'universal', '--yes'] },
     ]);
   });
 
@@ -110,7 +110,7 @@ describe('install command', () => {
       { command: 'npm', args: ['root', '-g'] },
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
       { command: 'npm', args: ['root', '-g'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', path.join('/usr/local/lib/node_modules', '@cloudglab/zentao-cli', 'skills', 'zentao-cli'), '--yes'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', path.join('/usr/local/lib/node_modules', '@cloudglab/zentao-cli', 'skills', 'zentao-cli'), '--global', '--agent', 'universal', '--yes'] },
     ]);
   });
 
@@ -136,7 +136,7 @@ describe('install command', () => {
 
     expect(commandCalls).toEqual([
       { command: 'npm', args: ['root', '-g'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', path.join('/usr/local/lib/node_modules', '@cloudglab/zentao-cli', 'skills', 'zentao-cli'), '--yes'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', path.join('/usr/local/lib/node_modules', '@cloudglab/zentao-cli', 'skills', 'zentao-cli'), '--global', '--agent', 'universal', '--yes'] },
     ]);
   });
 
@@ -155,8 +155,8 @@ describe('install command', () => {
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
       { command: 'npm', args: ['pack', '@cloudglab/zentao-cli@latest', '--pack-destination', '/tmp/zentao-cli-skill-abc', '--silent'] },
       { command: 'tar', args: ['-xzf', '/tmp/zentao-cli-skill-abc/cloudglab-zentao-cli-0.1.5.tgz', '-C', '/tmp/zentao-cli-skill-abc'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', '/tmp/zentao-cli-skill-abc/package', '--yes'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', path.resolve('./local-skill'), '--yes'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', '/tmp/zentao-cli-skill-abc/package', '--global', '--agent', 'universal', '--yes'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', path.resolve('./local-skill'), '--global', '--agent', 'universal', '--yes'] },
     ]);
   });
 
@@ -171,10 +171,10 @@ describe('install command', () => {
     expect(commandCalls).toEqual([
       { command: 'npm', args: ['root', '-g'] },
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', 'cloudglab/zentao-cli', '--yes'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', 'cloudglab/zentao-cli', '--global', '--agent', 'universal', '--yes'] },
       { command: 'npm', args: ['root', '-g'] },
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', 'cloudglab/zentao-cli', '--yes'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', 'cloudglab/zentao-cli', '--global', '--agent', 'universal', '--yes'] },
     ]);
   });
 
@@ -214,7 +214,7 @@ describe('install command', () => {
     expect(commandCalls).toEqual([
       { command: 'npm', args: ['root', '-g'] },
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', 'cloudglab/zentao-cli', '--yes'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', 'cloudglab/zentao-cli', '--global', '--agent', 'universal', '--yes'] },
     ]);
   });
 
@@ -230,7 +230,7 @@ describe('install command', () => {
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
       { command: 'npm', args: ['pack', '@cloudglab/zentao-cli@latest', '--pack-destination', '/tmp/zentao-cli-skill-abc', '--silent'] },
       { command: 'tar', args: ['-xzf', '/tmp/zentao-cli-skill-abc/cloudglab-zentao-cli-0.1.5.tgz', '-C', '/tmp/zentao-cli-skill-abc'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', '/tmp/zentao-cli-skill-abc/package', '--yes'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', '/tmp/zentao-cli-skill-abc/package', '--global', '--agent', 'universal', '--yes'] },
     ]);
   });
 
@@ -304,7 +304,7 @@ describe('install command', () => {
     const expectedSkillPath = path.join('/usr/local/lib/node_modules', '@cloudglab/zentao-cli', 'skills', 'zentao-cli');
     mockSpawn(
       new Map([['npm root -g', '/usr/local/lib/node_modules\n']]),
-      new Map([[`npx -y skills add ${expectedSkillPath} --yes`, 'npm error code ENOTEMPTY\n']]),
+      new Map([[`npx -y skills add ${expectedSkillPath} --global --agent universal --yes`, 'npm error code ENOTEMPTY\n']]),
     );
     mockInstallDependencies({ npxCacheEntries: ['83f3ca18e531c9ec'], cloudglabEntries: ['zentao-cli', '.zentao-cli-TQ1BDOEL'] });
     const { runUpdateCommand } = await import('../src/install.js');
@@ -316,8 +316,8 @@ describe('install command', () => {
       { command: 'npm', args: ['root', '-g'] },
       { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
       { command: 'npm', args: ['root', '-g'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', expectedSkillPath, '--yes'] },
-      { command: 'npx', args: ['-y', 'skills', 'add', expectedSkillPath, '--yes'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', expectedSkillPath, '--global', '--agent', 'universal', '--yes'] },
+      { command: 'npx', args: ['-y', 'skills', 'add', expectedSkillPath, '--global', '--agent', 'universal', '--yes'] },
     ]);
     expect(rmCalls).toContain(path.join('/home/me', '.npm', '_npx', '83f3ca18e531c9ec'));
   });

@@ -7,12 +7,13 @@ describe('InMemoryCliRegistry', () => {
     const registry = new InMemoryCliRegistry();
     const handler = vi.fn(() => ({ content: [{ type: 'text' as const, text: 'ok' }] }));
 
-    registry.tool('beta', { id: z.number() }, handler);
+    registry.tool('beta', { id: z.number() }, handler, { costHint: 'low', nextBestTools: ['alpha'] });
     registry.tool('alpha', { name: z.string() }, handler);
 
     expect(registry.getCommand('beta')?.name).toBe('beta');
     expect(registry.getCommand('missing')).toBeUndefined();
     expect(registry.listCommands().map((command) => command.name)).toEqual(['alpha', 'beta']);
+    expect(registry.getCommand('beta')?.metadata).toMatchObject({ costHint: 'low', nextBestTools: ['alpha'] });
   });
 });
 

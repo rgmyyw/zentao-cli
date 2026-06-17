@@ -165,4 +165,20 @@ describe('ZentaoHttpClient', () => {
       headers: { Token: 'new' },
     }));
   });
+
+  it('caches GET requests and marks cache hits', async () => {
+    const axiosMock = mockAxios();
+    const client = {
+      post: vi.fn(async () => ({ data: { token: 'token' } })),
+      request: vi.fn(async () => ({ data: { ok: true } })),
+    };
+    axiosMock.create.mockReturnValue(client);
+    const { ZentaoHttpClient } = await import('../../src/core/http.js');
+    const http = new ZentaoHttpClient(config);
+
+    await expect(http.request('GET', '/tasks', { params: { page: 1 } })).resolves.toMatchObject({ ok: true });
+    await expect(http.request('GET', '/tasks', { params: { page: 1 } })).resolves.toMatchObject({ ok: true, cacheHit: true });
+
+    expect(client.request).toHaveBeenCalledOnce();
+  });
 });

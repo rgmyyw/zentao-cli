@@ -5,11 +5,17 @@ import { previewOrAssertWriteAllowed } from '../core/write-guard.js';
 import { jsonResult, optionalTrimmedText, runWithPreview } from './shared.js';
 
 export function registerTodoTools(server: CliRegistry): void {
-  server.tool('getMyTodos', {}, async () => jsonResult(await getApi().todo.getTodos()));
+  server.tool('getMyTodos', {}, async () => jsonResult(await getApi().todo.getTodos()), {
+    costHint: 'low',
+    nextBestTools: ['getTodoDetail', 'getMyTasks', 'getMyWeeklyActivity'],
+  });
 
   server.tool('getTodoDetail', {
     todoId: z.number().int().positive(),
-  }, async ({ todoId }) => jsonResult(await getApi().todo.getTodoDetail(todoId)));
+  }, async ({ todoId }) => jsonResult(await getApi().todo.getTodoDetail(todoId)), {
+    costHint: 'low',
+    nextBestTools: ['getMyTodos', 'getComments', 'getMyTasks'],
+  });
 
   server.tool('createTodo', {
     name: z.string().trim().min(1),

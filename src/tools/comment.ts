@@ -14,6 +14,7 @@ export function registerCommentTools(server: CliRegistry): void {
       objectID: z.number().int().positive(),
     },
     async ({ objectType, objectID }) => jsonResult(await getApi().comment.getComments(objectType, objectID)),
+    { costHint: 'low', nextBestTools: ['getBugDetail', 'getTaskDetail', 'getStoryDetail'] },
   );
 
   server.tool(

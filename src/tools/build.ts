@@ -5,8 +5,14 @@ import { previewOrAssertWriteAllowed } from '../core/write-guard.js';
 import { jsonResult, runWithPreview } from './shared.js';
 
 export function registerBuildTools(server: CliRegistry): void {
-  server.tool('getProjectBuilds', { projectId: z.number().int().positive() }, async ({ projectId }) => jsonResult(await getApi().build.getProjectBuilds(projectId)));
-  server.tool('getBuildDetail', { buildId: z.number().int().positive() }, async ({ buildId }) => jsonResult(await getApi().build.getBuildDetail(buildId)));
+  server.tool('getProjectBuilds', { projectId: z.number().int().positive() }, async ({ projectId }) => jsonResult(await getApi().build.getProjectBuilds(projectId)), {
+    costHint: 'low',
+    nextBestTools: ['getBuildDetail', 'getProjectReleases', 'getProjectExecutions'],
+  });
+  server.tool('getBuildDetail', { buildId: z.number().int().positive() }, async ({ buildId }) => jsonResult(await getApi().build.getBuildDetail(buildId)), {
+    costHint: 'low',
+    nextBestTools: ['getProjectBuilds', 'getComments', 'getProjectReleases'],
+  });
 
   server.tool(
     'notifyBuildBug',

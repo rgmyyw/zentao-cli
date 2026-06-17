@@ -4,7 +4,7 @@ import { getApi } from '../core/api-provider.js';
 import { jsonResult, optionalTrimmedText } from './shared.js';
 
 export function registerStatisticsTools(server: CliRegistry): void {
-  server.tool('getMyTaskStatistics', {}, async () => jsonResult(await getApi().statistics.getMyTaskStatistics()));
+  server.tool('getMyTaskStatistics', {}, async () => jsonResult(await getApi().statistics.getMyTaskStatistics()), { costHint: 'low', nextBestTools: ['getMyTasks', 'getMyWeeklyActivity', 'getExecutionSnapshot'] });
 
   server.tool(
     'getMyBugStatistics',
@@ -12,6 +12,7 @@ export function registerStatisticsTools(server: CliRegistry): void {
       productId: z.number().int().positive().optional().describe('可选。禅道产品 ID。不传时统计跨所有产品指派给我的 Bug；传入时收窄到指定产品。'),
     },
     async ({ productId }) => jsonResult(await getApi().statistics.getMyBugStatistics(productId)),
+    { costHint: 'low', nextBestTools: ['getMyBugs', 'getProductBugs', 'getBugSnapshot'] },
   );
 
   server.tool(
@@ -25,5 +26,6 @@ export function registerStatisticsTools(server: CliRegistry): void {
       days: z.number().int().positive().optional().describe('最近 N 天，例如 3 表示最近3天。优先于 week，低于 dateRange 和 startDate/endDate。'),
     },
     async ({ account, week, dateRange, startDate, endDate, days }) => jsonResult(await getApi().statistics.getMyWeeklyActivity({ account, week, dateRange, startDate, endDate, days })),
+    { costHint: 'medium', nextBestTools: ['getMyTasks', 'getMyBugs', 'getExecutionSnapshot'] },
   );
 }

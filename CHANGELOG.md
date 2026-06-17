@@ -2,6 +2,46 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.30 - 2026-06-18
+
+### 新增
+
+- 新增 3 个面向 AI / 脚本短链路消费的快照命令：
+  - `getBugSnapshot`：聚合 Bug 关键信息、生命周期字段、裁剪后的复现步骤和最近动作。
+  - `getDevelopmentContextSnapshot`：聚合需求 / Bug 的开发上下文，返回 focus、关联 Bug / 需求和摘要。
+  - `getExecutionSnapshot`：聚合执行详情、构建、动态、未关闭 Bug 和逾期任务，减少“先查详情再查列表”的往返次数。
+- 新增 `src/core/http-metrics.ts`，统一记录命令执行期间的请求次数和最近一次请求耗时，供 CLI 输出层透出。
+
+### 变更
+
+- CLI 新增全局输出模式 `--output compact|normal|verbose`：
+  - `compact` 默认裁剪长文本、长列表，降低 AI / 脚本消费成本。
+  - `normal` 在紧凑输出基础上保留常用分页和来源元信息。
+  - `verbose` 保留原始 JSON 输出，便于排查完整字段。
+- 所有 JSON 命令输出统一追加 `meta.requestCount` 和 `meta.durationMs`，便于 Agent 判断链路成本和慢请求。
+- HTTP 读取链路增强：
+  - REST / legacy / download 请求统一记录耗时。
+  - 401 失效后继续保留一次自动重试。
+  - 对 `ECONNRESET`、`ETIMEDOUT`、`EAI_AGAIN`、`socket hang up`、`timeout` 等网络类错误增加一次自动重试。
+  - REST `GET` 请求新增 15 秒 TTL 的轻量缓存，命中时返回 `cacheHit: true`。
+- `help` 输出新增命令级提示：
+  - `预估成本`（`low` / `medium` / `high`）
+  - `下一步` 推荐命令（`nextBestTools`）
+- 为高价值只读命令批量补齐 `costHint` 和 `nextBestTools`，覆盖 task / bug / story / product / project / plan / execution / build / release / testcase / testtask / search / profile / todo / relation / phase3c / program 等主要查询入口。
+- `zentao install` / `zentao update` 内部安装 skill 时，统一改为非交互的全局 agent 安装参数：`skills add <source> --global --agent universal --yes`，避免旧交互式行为阻塞自动化环境。
+
+### 文档
+
+- 更新 README，补充输出模式、快照命令、帮助提示增强和新的 skill 安装命令示例。
+- README 的“这版补了什么”改为聚焦 AI 友好输出、短链路命令和安装更新体验增强。
+
+### 测试
+
+- 新增 snapshot API 测试，覆盖 `getBugSnapshot`、`getDevelopmentContextSnapshot`、`getExecutionSnapshot`。
+- 新增 CLI 测试，覆盖 `--output normal|verbose`、`help` 中的 `预估成本` / `下一步` 展示。
+- 新增 HTTP 缓存测试，校验重复 GET 只发一次请求并返回 `cacheHit: true`。
+- 新增 registry / tool-registry 测试，校验 `CliCommandMetadata` 存储与 snapshot 工具派发。
+
 ## 0.1.29 - 2026-06-17
 
 ### 修复

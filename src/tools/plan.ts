@@ -12,9 +12,9 @@ export function registerPlanTools(server: CliRegistry): void {
     status: optionalTrimmedText,
     query: optionalTrimmedText.describe('禅道 18.5 REST v1 支持的计划搜索关键字'),
     order: optionalTrimmedText.describe('排序字段，例如 id_desc'),
-  }, async (input) => jsonResult(await getApi().plan.getProductPlans(input)));
+  }, async (input) => jsonResult(await getApi().plan.getProductPlans(input)), { costHint: 'low', nextBestTools: ['getPlanDetail', 'getProductStories', 'getProductBugs'] });
 
-  server.tool('getPlanDetail', { planId: z.number().int().positive() }, async ({ planId }) => jsonResult(await getApi().plan.getPlanDetail(planId)));
+  server.tool('getPlanDetail', { planId: z.number().int().positive() }, async ({ planId }) => jsonResult(await getApi().plan.getPlanDetail(planId)), { costHint: 'low', nextBestTools: ['getProductPlans', 'getProductStories', 'getProductBugs'] });
 
   server.tool('startPlan', {
     planId: z.number().int().positive(),

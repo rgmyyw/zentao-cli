@@ -19,6 +19,7 @@ export function registerResourceAnalysisTools(server: CliRegistry): void {
       ...resourceInput,
     },
     async ({ bugId, ...input }) => jsonResult(await getApi().resourceAnalysis.analyzeObjectResources({ objectType: 'bug', objectID: bugId, ...input })),
+    { costHint: 'high', nextBestTools: ['getBugSnapshot', 'getBugDetail', 'getComments'] },
   );
 
   server.tool(
@@ -28,5 +29,6 @@ export function registerResourceAnalysisTools(server: CliRegistry): void {
       ...resourceInput,
     },
     async ({ taskId, ...input }) => jsonResult(await getApi().resourceAnalysis.analyzeObjectResources({ objectType: 'task', objectID: taskId, ...input })),
+    { costHint: 'high', nextBestTools: ['getTaskDetail', 'getComments', 'getMyTasks'] },
   );
 }

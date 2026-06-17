@@ -15,6 +15,10 @@ export function registerTestCaseTools(server: CliRegistry): void {
       moduleId: z.number().int().positive().optional(),
     },
     async (input) => jsonResult(await getApi().testcase.getProductTestCases(input)),
+    {
+      costHint: 'low',
+      nextBestTools: ['getTestCaseDetail', 'getTestTasks', 'getProductStories'],
+    },
   );
 
   server.tool(
@@ -23,6 +27,10 @@ export function registerTestCaseTools(server: CliRegistry): void {
       testCaseId: z.number().int().positive(),
     },
     async ({ testCaseId }) => jsonResult(await getApi().testcase.getTestCaseDetail(testCaseId)),
+    {
+      costHint: 'low',
+      nextBestTools: ['getProductTestCases', 'getComments', 'getBugSnapshot'],
+    },
   );
 
   server.tool(

@@ -5,8 +5,14 @@ import { previewOrAssertWriteAllowed } from '../core/write-guard.js';
 import { jsonResult, runWithPreview } from './shared.js';
 
 export function registerReleaseTools(server: CliRegistry): void {
-  server.tool('getProjectReleases', { projectId: z.number().int().positive() }, async ({ projectId }) => jsonResult(await getApi().release.getProjectReleases(projectId)));
-  server.tool('getReleaseDetail', { releaseId: z.number().int().positive() }, async ({ releaseId }) => jsonResult(await getApi().release.getReleaseDetail(releaseId)));
+  server.tool('getProjectReleases', { projectId: z.number().int().positive() }, async ({ projectId }) => jsonResult(await getApi().release.getProjectReleases(projectId)), {
+    costHint: 'low',
+    nextBestTools: ['getReleaseDetail', 'getProjectBuilds', 'getProjectDetail'],
+  });
+  server.tool('getReleaseDetail', { releaseId: z.number().int().positive() }, async ({ releaseId }) => jsonResult(await getApi().release.getReleaseDetail(releaseId)), {
+    costHint: 'low',
+    nextBestTools: ['getProjectReleases', 'getBuildDetail', 'getComments'],
+  });
 }
 
 export function registerReleaseWriteTools(server: CliRegistry): void {

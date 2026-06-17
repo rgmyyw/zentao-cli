@@ -3,6 +3,7 @@ import https from 'node:https';
 import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios';
 import { ZentaoAuth } from './auth.js';
 import type { ZentaoConfig } from '../types/common.js';
+import { recordRequestFinished, recordRequestStarted } from './http-metrics.js';
 import { sanitizeJsonLikeResponse } from '../utils/json.js';
 
 export interface HttpError extends Error {
@@ -13,8 +14,7 @@ export interface HttpError extends Error {
 export class ZentaoHttpClient {
   private readonly client: AxiosInstance;
   private readonly auth: ZentaoAuth;
-  private requestCount = 0;
-
+  private readonly responseCache = new Map<string, { expiresAt: number; value: unknown }>();
   constructor(private readonly config: ZentaoConfig) {
     this.client = axios.create({
       baseURL: config.apiBaseUrl || `${config.url}/zentao/api.php/${config.apiVersion}`,
@@ -27,14 +27,6 @@ export class ZentaoHttpClient {
 
   get username(): string {
     return this.config.username;
-  }
-
-  getRequestCount(): number {
-    return this.requestCount;
-  }
-
-  resetRequestCount(): void {
-    this.requestCount = 0;
   }
 
   async getToken(): Promise<string> {
@@ -69,7 +61,8 @@ export class ZentaoHttpClient {
   private async downloadLegacyWithRetry(pathOrUrl: string, retried: boolean): Promise<{ data: Buffer; contentType?: string; fileName?: string }> {
     const token = await this.auth.getToken();
     const url = this.resolveLegacyUrl(pathOrUrl);
-    this.requestCount += 1;
+    recordRequestStarted();
+    const startedAt = Date.now();
 
     try {
       const response = await axios.request<ArrayBuffer>({
@@ -79,6 +72,7 @@ export class ZentaoHttpClient {
         responseType: 'arraybuffer',
         headers: { Token: token },
       });
+      recordRequestFinished(Date.now() - startedAt);
 
       return {
         data: Buffer.from(response.data),
@@ -86,9 +80,10 @@ export class ZentaoHttpClient {
         fileName: getFileNameFromDisposition(response.headers['content-disposition']),
       };
     } catch (error) {
+      recordRequestFinished(Date.now() - startedAt);
       if (axios.isAxiosError(error)) {
-        if (!retried && error.response?.status === 401) {
-          this.auth.clearToken();
+        if (!retried && (error.response?.status === 401 || isRetryableNetworkError(error))) {
+          if (error.response?.status === 401) this.auth.clearToken();
           return this.downloadLegacyWithRetry(pathOrUrl, true);
         }
 
@@ -96,14 +91,16 @@ export class ZentaoHttpClient {
         const message = Buffer.isBuffer(data) ? data.toString('utf8').slice(0, 500) : JSON.stringify(data ?? error.message);
         throw createHttpError(`旧版资源下载失败: ${error.response?.status ?? 'NO_STATUS'} - ${message}`, error.response?.status, data);
       }
-      throw error;
+
+      throw createHttpError(`旧版资源下载失败: ${String(error)}`, undefined, { path: pathOrUrl });
     }
   }
 
   private async legacyRequestWithRetry<T = unknown>(method: string, path: string, options: AxiosRequestConfig, retried: boolean): Promise<T> {
     const token = await this.auth.getToken();
     const baseURL = this.getLegacyBaseURL();
-    this.requestCount += 1;
+    recordRequestStarted();
+    const startedAt = Date.now();
 
     try {
       const response = await axios.request({
@@ -117,12 +114,14 @@ export class ZentaoHttpClient {
           Token: token,
         },
       });
+      recordRequestFinished(Date.now() - startedAt);
 
       return normalizeResponseData(response.data) as T;
     } catch (error) {
+      recordRequestFinished(Date.now() - startedAt);
       if (axios.isAxiosError(error)) {
-        if (!retried && error.response?.status === 401) {
-          this.auth.clearToken();
+        if (!retried && (error.response?.status === 401 || isRetryableNetworkError(error))) {
+          if (error.response?.status === 401) this.auth.clearToken();
           return this.legacyRequestWithRetry<T>(method, path, options, true);
         }
 
@@ -130,13 +129,18 @@ export class ZentaoHttpClient {
         const message = typeof data === 'string' ? data.slice(0, 500) : JSON.stringify(data ?? error.message);
         throw createHttpError(`旧版页面请求失败: ${error.response?.status ?? 'NO_STATUS'} - ${message}`, error.response?.status, data);
       }
-      throw error;
+
+      throw createHttpError(`旧版页面请求失败: ${String(error)}`, undefined, { path });
     }
   }
 
   private async requestWithRetry<T = unknown>(method: string, url: string, options: AxiosRequestConfig, retried: boolean): Promise<T> {
+    const cacheKey = this.getCacheKey(method, url, options);
+    const cached = this.readCache<T>(cacheKey);
+    if (cached !== undefined) return cached;
     const token = await this.auth.getToken();
-    this.requestCount += 1;
+    recordRequestStarted();
+    const startedAt = Date.now();
 
     try {
       const response = await this.client.request({
@@ -148,12 +152,15 @@ export class ZentaoHttpClient {
           Token: token,
         },
       });
-
-      return normalizeResponseData(response.data) as T;
+      recordRequestFinished(Date.now() - startedAt);
+      const normalized = normalizeResponseData(response.data) as T;
+      this.writeCache(cacheKey, method, normalized);
+      return normalized;
     } catch (error) {
+      recordRequestFinished(Date.now() - startedAt);
       if (axios.isAxiosError(error)) {
-        if (!retried && error.response?.status === 401) {
-          this.auth.clearToken();
+        if (!retried && (error.response?.status === 401 || isRetryableNetworkError(error))) {
+          if (error.response?.status === 401) this.auth.clearToken();
           return this.requestWithRetry<T>(method, url, options, true);
         }
 
@@ -161,8 +168,30 @@ export class ZentaoHttpClient {
         const message = typeof data === 'string' ? data : JSON.stringify(data ?? error.message);
         throw createHttpError(`请求失败: ${error.response?.status ?? 'NO_STATUS'} - ${message}`, error.response?.status, data);
       }
-      throw error;
+
+      throw createHttpError(`请求失败: ${String(error)}`, undefined, { url });
     }
+  }
+
+  private getCacheKey(method: string, url: string, options: AxiosRequestConfig): string | undefined {
+    if (method.toUpperCase() !== 'GET') return undefined;
+    return JSON.stringify({ method: method.toUpperCase(), url, params: options.params ?? null, data: options.data ?? null });
+  }
+
+  private readCache<T>(key: string | undefined): T | undefined {
+    if (!key) return undefined;
+    const cached = this.responseCache.get(key);
+    if (!cached) return undefined;
+    if (cached.expiresAt <= Date.now()) {
+      this.responseCache.delete(key);
+      return undefined;
+    }
+    return attachCacheMeta(cached.value) as T;
+  }
+
+  private writeCache(key: string | undefined, method: string, value: unknown): void {
+    if (!key || method.toUpperCase() !== 'GET') return;
+    this.responseCache.set(key, { expiresAt: Date.now() + 15_000, value });
   }
 }
 
@@ -172,11 +201,23 @@ function normalizeResponseData(data: unknown): unknown {
   return sanitizeJsonLikeResponse(data);
 }
 
+function attachCacheMeta(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  return {
+    ...(value as Record<string, unknown>),
+    cacheHit: true,
+  };
+}
+
 function createHttpError(message: string, statusCode?: number, responseBody?: unknown): HttpError {
   const error = new Error(message) as HttpError;
   error.statusCode = statusCode;
   error.responseBody = responseBody;
   return error;
+}
+
+function isRetryableNetworkError(error: { code?: string; message?: string }): boolean {
+  return ['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN'].includes(error.code ?? '') || /timeout|socket hang up|network/i.test(error.message ?? '');
 }
 
 function getHeaderString(value: unknown): string | undefined {

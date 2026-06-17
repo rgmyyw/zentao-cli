@@ -220,6 +220,30 @@ export class BugApi {
     return this.http.request<ZentaoBug>('GET', `/bugs/${bugId}`);
   }
 
+  async getBugSnapshot(bugId: number): Promise<unknown> {
+    const bug = await this.getBugDetail(bugId);
+    const actions = this.asArrayOfRecords(bug.actions).slice(0, 8).map((action) => this.pickFields(action, ['id', 'actor', 'action', 'date', 'comment']));
+
+    return {
+      bugId,
+      focus: this.pickFields(bug as unknown as Record<string, unknown>, [
+        'id', 'title', 'status', 'severity', 'pri', 'type', 'product', 'module', 'project', 'execution', 'plan', 'story', 'task', 'assignedTo', 'openedBy', 'resolvedBy', 'resolution', 'resolvedBuild', 'closedBy',
+      ]),
+      lifecycle: this.pickFields(bug as unknown as Record<string, unknown>, ['openedDate', 'assignedDate', 'resolvedDate', 'closedDate', 'deadline', 'lastEditedDate', 'activatedCount']),
+      text: {
+        steps: this.compactText(bug.steps),
+        keywords: bug.keywords,
+      },
+      actions,
+      summary: {
+        hasStory: this.hasLinkedId(bug.story),
+        hasTask: this.hasLinkedId(bug.task),
+        actionCount: this.asArrayOfRecords(bug.actions).length,
+        actionsShown: actions.length,
+      },
+    };
+  }
+
   async updateBug(bugId: number, update: Record<string, unknown>): Promise<unknown> {
     const current = await this.getBugDetail(bugId);
     const preserved = this.pickBugEditDefaults(current);
@@ -508,6 +532,29 @@ export class BugApi {
       openedBuild,
       assignedTo,
     };
+  }
+
+  private pickFields(record: Record<string, unknown>, fields: string[]): Record<string, unknown> {
+    const picked: Record<string, unknown> = {};
+    for (const field of fields) {
+      if (record[field] !== undefined && record[field] !== null && record[field] !== '') picked[field] = record[field];
+    }
+    return picked;
+  }
+
+  private compactText(value: unknown, maxLength = 500): unknown {
+    if (typeof value !== 'string') return value;
+    const text = value.trim();
+    return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
+  }
+
+  private asArrayOfRecords(value: unknown): Array<Record<string, unknown>> {
+    if (!Array.isArray(value)) return [];
+    return value.filter((item): item is Record<string, unknown> => !!item && typeof item === 'object' && !Array.isArray(item));
+  }
+
+  private hasLinkedId(value: unknown): boolean {
+    return value !== undefined && value !== null && value !== '' && value !== 0 && value !== '0';
   }
 
   private normalizeBugQueryParams<T extends PaginationInput & {

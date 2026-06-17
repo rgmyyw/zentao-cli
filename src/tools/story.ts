@@ -13,6 +13,7 @@ export function registerStoryTools(server: CliRegistry): void {
       limit: z.number().int().positive().max(100).optional(),
     },
     async (input) => jsonResult(await getApi().story.getProductStories(input)),
+    { costHint: 'low', nextBestTools: ['getStoryDetail', 'getDevelopmentContextSnapshot', 'getProductPlans'] },
   );
 
   server.tool(
@@ -21,6 +22,7 @@ export function registerStoryTools(server: CliRegistry): void {
       storyId: z.number().int().positive(),
     },
     async ({ storyId }) => jsonResult(await getApi().story.getStoryDetail(storyId)),
+    { costHint: 'low', nextBestTools: ['getStoryRelatedBugs', 'getDevelopmentContextSnapshot', 'getProductStories'] },
   );
 
   server.tool(
