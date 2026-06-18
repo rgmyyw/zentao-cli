@@ -1,4 +1,5 @@
 import type { ZentaoHttpClient } from '../core/http.js';
+import { toClientPaginatedListResult } from '../core/list-result.js';
 import { toServerListResult } from '../core/list-result.js';
 import { toFormUrlEncoded } from '../utils/form.js';
 
@@ -49,15 +50,45 @@ export class ProgramApi {
   }
 
   async getProgramAll(input: { status?: string; orderBy?: string; limit?: number } = {}): Promise<unknown> {
-    return this.http.legacyRequest('GET', this.buildQueryString('/program-all-0.json', {
-      status: input.status,
-      orderBy: input.orderBy,
-      limit: input.limit,
-    }));
+    const response = await this.http.request('GET', '/programs', {
+      params: { order: this.normalizeOptionalString(input.orderBy) },
+    });
+    const list = toServerListResult<Record<string, unknown>>(response, ['programs']);
+    const normalizedStatus = this.normalizeOptionalString(input.status);
+    const filtered = normalizedStatus
+      ? list.items.filter((item) => this.normalizeOptionalString(String(item.status ?? '')) === normalizedStatus)
+      : list.items;
+    const paginated = toClientPaginatedListResult({ items: filtered }, ['items'], { limit: input.limit });
+    return {
+      ...paginated,
+      source: 'client-paginated',
+      itemKey: 'programs',
+    };
   }
 
   async getProgramTrack(programId: number): Promise<unknown> {
-    return this.http.legacyRequest('GET', `/program-track-${programId}.json`);
+    const [detail, stakeholders] = await Promise.all([
+      this.getProgramDetail(programId) as Promise<Record<string, unknown>>,
+      this.getProgramStakeholders(programId),
+    ]);
+    return {
+      source: 'program-detail-stakeholders-snapshot',
+      note: '当前实例缺少 program-track 旧版控制器，这里使用 program detail + stakeholder 做近似快照。',
+      id: detail.id,
+      name: detail.name,
+      status: detail.status,
+      PM: detail.PM,
+      PO: detail.PO,
+      QD: detail.QD,
+      RD: detail.RD,
+      acl: detail.acl,
+      stakeholders,
+      counts: {
+        products: this.toCount(detail.products),
+        projects: this.toCount(detail.projects),
+        children: this.toCount(detail.children),
+      },
+    };
   }
 
   async getProgramStakeholders(programId: number): Promise<unknown> {
@@ -213,5 +244,16 @@ export class ProgramApi {
     }
     const tail = qs.toString();
     return tail ? `${base}?${tail}` : base;
+  }
+
+  private toCount(value: unknown): number {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (Array.isArray(value)) return value.length;
+    if (value && typeof value === 'object') return Object.keys(value as Record<string, unknown>).length;
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return 0;
   }
 }

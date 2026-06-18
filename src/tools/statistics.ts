@@ -18,7 +18,7 @@ export function registerStatisticsTools(server: CliRegistry): void {
   server.tool(
     'getMyWeeklyActivity',
     {
-      account: z.string().trim().min(1).describe('禅道账号，例如 lixm1。'),
+      account: optionalTrimmedText.describe('可选。禅道账号，例如 lixm1；不传时默认使用当前登录账号。'),
       week: z.enum(['last', 'this']).optional().default('last').describe('统计哪一周：last=上周，this=本周。'),
       dateRange: optionalTrimmedText.describe('自然语言日期范围，例如：上周、本周、今天、昨天、最近3天、3天前、2026-05-28、2026-05-25到2026-05-29。传入后优先于 week。'),
       startDate: optionalTrimmedText.describe('开始日期，例如 2026-05-25。和 endDate 搭配时优先于 week。'),

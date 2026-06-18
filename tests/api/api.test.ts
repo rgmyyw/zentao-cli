@@ -220,6 +220,35 @@ describe('simple API wrappers', () => {
     });
   });
 
+  it('ProgramApi falls back to REST list/detail snapshots for program all/track', async () => {
+    const http = createHttp([
+      { programs: [{ id: 620, name: '全部产品线', status: 'normal' }, { id: 621, name: '关闭项目群', status: 'closed' }] },
+      { id: 620, name: '全部产品线', status: 'normal', products: 32, projects: 18, children: [] },
+      [{ account: 'lixm1', realname: '李晓明' }],
+    ]);
+    const api = new ProgramApi(http as never);
+
+    const all = await api.getProgramAll({ status: ' normal ', orderBy: ' id_desc ', limit: 10 }) as Record<string, unknown>;
+    const track = await api.getProgramTrack(620) as Record<string, unknown>;
+
+    expect(all).toMatchObject({
+      source: 'client-paginated',
+      total: 1,
+      itemKey: 'programs',
+      items: [{ id: 620, name: '全部产品线', status: 'normal' }],
+    });
+    expect(track).toMatchObject({
+      source: 'program-detail-stakeholders-snapshot',
+      id: 620,
+      name: '全部产品线',
+      status: 'normal',
+      counts: { products: 32, projects: 18, children: 0 },
+    });
+    expect(http.request).toHaveBeenNthCalledWith(1, 'GET', '/programs', { params: { order: 'id_desc' } });
+    expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/programs/620');
+    expect(http.legacyRequest).toHaveBeenCalledWith('GET', '/program-stakeholder-620.json');
+  });
+
   it('BuildApi strips project when creating build and links related objects', async () => {
     const http = createHttp([{ builds: [{ id: 1 }] }, { id: 1 }, { id: 2 }, { id: 2 }, {}, {}, {}, {}, {}, {}]);
     const api = new BuildApi(http as never);
@@ -2114,6 +2143,17 @@ describe('StatisticsApi', () => {
     const result = await api.getMyWeeklyActivity({ account: 'me', startDate: '2026-05-28', endDate: '2026-05-28' }) as Record<string, unknown>;
     expect(result).toMatchObject({ source: 'legacy-user-dynamic', totalActions: 1, summary: { resolvedBugs: 1, dedupedWorkItems: 1 } });
     expect(http.legacyRequest).toHaveBeenCalledWith('GET', expect.stringContaining('/my-dynamic-all-0-'));
+  });
+
+  it('defaults weekly activity account to current login user', async () => {
+    const taskApi = { getMyTasks: vi.fn() };
+    const bugApi = { getMyBugs: vi.fn() };
+    const http = createHttp([[{ objectType: 'bug', action: 'resolved', objectID: 1, objectName: 'b', originalDate: '2026-05-28 10:00:00' }]]);
+    const api = new StatisticsApi(taskApi as never, bugApi as never, http as never);
+
+    const result = await api.getMyWeeklyActivity({ week: 'this' }) as Record<string, unknown>;
+    expect(result).toMatchObject({ account: 'me', totalActions: 0, query: { week: 'this' } });
+    expect(http.legacyRequest).toHaveBeenCalledWith('GET', expect.stringContaining('/my-dynamic-thisWeek-0-'));
   });
 
   it('trims weekly activity account before resolving dynamic endpoint', async () => {

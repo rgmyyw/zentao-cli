@@ -1,5 +1,5 @@
 export function sanitizeJsonLikeResponse(data: unknown): unknown {
-  if (typeof data === 'object' && data !== null) return data;
+  if (typeof data === 'object' && data !== null) return unwrapEnvelope(data);
 
   if (typeof data !== 'string') {
     throw new Error(`响应格式不支持: ${typeof data}`);
@@ -13,13 +13,34 @@ export function sanitizeJsonLikeResponse(data: unknown): unknown {
     if (endIndex < 0) continue;
 
     try {
-      return JSON.parse(data.slice(index, endIndex + 1)) as unknown;
+      return unwrapEnvelope(JSON.parse(data.slice(index, endIndex + 1)) as unknown);
     } catch {
       continue;
     }
   }
 
   throw new Error(`响应中未找到 JSON: ${data.slice(0, 300)}`);
+}
+
+function unwrapEnvelope(data: unknown): unknown {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
+  const record = data as Record<string, unknown>;
+  const payload = record.data;
+  if (typeof payload === 'string' && payload.trim().startsWith('{')) {
+    try {
+      return sanitizeJsonLikeResponse(payload);
+    } catch {
+      return data;
+    }
+  }
+  if (typeof payload === 'string' && payload.trim().startsWith('[')) {
+    try {
+      return sanitizeJsonLikeResponse(payload);
+    } catch {
+      return data;
+    }
+  }
+  return data;
 }
 
 function findJsonEnd(text: string, startIndex: number): number {

@@ -719,8 +719,13 @@ describe('registerTools', () => {
       endDate: '2026-05-29',
       week: 'last',
     });
-
-    expect(() => parseCommandInput(getMyWeeklyActivityCommand!.schema, ['--account', '   '])).toThrow();
+    expect(parseCommandInput(getMyWeeklyActivityCommand!.schema, ['--week', 'this'])).toMatchObject({
+      week: 'this',
+    });
+    expect(parseCommandInput(getMyWeeklyActivityCommand!.schema, ['--account', '   '])).toMatchObject({
+      account: undefined,
+      week: 'last',
+    });
   });
 
   it('trims low-frequency read query strings in schemas', async () => {

@@ -241,6 +241,8 @@ pnpm release:smoke-query
 pnpm coverage
 ```
 
+`pnpm release:smoke-query` 现在会按命令检查返回内容（ID 命中、列表结构、统计计数、快照字段等），不再只校验退出码；可作为发布前和修复查询命令后的回归手段。
+
 ## 可以这样问
 
 下面这些自然语言请求可以交给 AI Skill / Agent 转成对应的 zentao-cli 命令。
@@ -374,9 +376,10 @@ zentao --role qa getMyTasks --status all --limit 100
 zentao --role qa getMyTasks --status wait --limit 50
 
 # 我的阶段性工作清单
+zentao --role qa getMyWeeklyActivity --week this
 zentao --role qa getMyWeeklyActivity --account some-account --week last
-zentao --role qa getMyWeeklyActivity --account some-account --dateRange 最近3天
-zentao --role qa getMyWeeklyActivity --account some-account --dateRange 2026-05-25到2026-05-29
+zentao --role qa getMyWeeklyActivity --dateRange 最近3天
+zentao --role qa getMyWeeklyActivity --dateRange 2026-05-25到2026-05-29
 
 # 执行 Bug / 构建 / 动态
 zentao help getExecutionDetail

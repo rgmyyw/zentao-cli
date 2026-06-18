@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.31 - 2026-06-18
+
+### 修复
+
+- 修复 `getMyWeeklyActivity` 把 `account` 设成必填、导致快捷入口文案 `zentao getMyWeeklyActivity --week this` 直接报 `account 不能为空` 的问题：命令 schema 改为可选，API 层在 `account` 缺省时默认回退到当前登录账号，并同步更新 README / skill 文档示例。
+
+### 变更
+
+- 查询 smoke 脚本 `pnpm release:smoke-query`（`scripts/release-query-smoke.mjs`）从“只校验退出码”升级为“按命令校验返回内容”：
+  - 补齐之前没真正验过的读命令：`getProductAll` / `getProductTrack` / `getProductWhitelist` / `getProductDashboard` / `getProductRoadmap` / `getProductDynamic`、`getProjectTeam` / `getProjectGroup` / `getProjectManageMembers` / `getProjectWhitelist` / `getProjectDynamic` / `getProjectLinkedProducts`、`getExecutionManageMembers` / `getExecutionAll` / `getExecutionStoryKanban` / `getExecutionKanban` / `getExecutionTaskKanban` / `getExecutionExecutionKanban`、`getReleaseDetail` / `getTodoDetail`（依赖前置查询得到的 ID）、`getProgramAll` / `getProgramTrack` / `getProgramStakeholders` 等。
+  - 为列表/详情/统计/关系/上下文类命令补充结构断言：必含字段、目标 ID 命中、列表数组、统计计数、关系/上下文快照等，避免“返回 200 但数据错”漏检。
+  - 自动跳过缺少 `ZENTAO_SMOKE_RELEASE_PROJECT_ID` / `TODO_ID` / `RELEASE_ID` 这类前置环境变量的项；不再因为权限/数据缺失而污染失败统计。
+- `getProgramAll` / `getProgramTrack` 在服务端缺少对应旧版控制器时，回退到 REST `/programs` + `/programs/{id}` + `program-stakeholder-{id}.json` 的稳定实现，不再因 `module program has no all/track method` 直接报错。
+- 旧版响应解析（`src/utils/json.ts:1`）增强对 `{"status":"success","data":"{...}"}` 这种二次 JSON 包裹的解包，让 `getProductAll` / `getExecutionAll` / `getProgramAll` 等命令直接返回结构化字段而不是双层字符串。
+
+### 文档
+
+- 同步 README / skill 参考：`getMyWeeklyActivity` 不再把 `--account` 写为例必填；查询 smoke 脚本可作为发布前 / 修复后的内容回归手段。
+
 ## 0.1.30 - 2026-06-18
 
 ### 新增

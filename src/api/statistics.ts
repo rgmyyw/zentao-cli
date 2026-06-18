@@ -47,7 +47,7 @@ export class StatisticsApi {
   }
 
   async getMyWeeklyActivity(input: ActivityQueryInput): Promise<unknown> {
-    const account = requireNonBlank(input.account, 'account 不能为空');
+    const account = requireNonBlank(input.account ?? this.http.username, 'account 不能为空');
     const range = this.resolveActivityRange(input);
     const response = await this.getUserDynamic(account, range.legacyPeriod, range.anchorTimestamp);
     const actions = this.extractActions(response);
@@ -371,7 +371,7 @@ interface ActivityItem {
 type ActivityOutputItem = Pick<ActivityItem, 'date' | 'time' | 'objectType' | 'objectID' | 'objectName' | 'action' | 'actionLabel' | 'comment'>;
 
 interface ActivityQueryInput {
-  account: string;
+  account?: string;
   week?: 'last' | 'this';
   dateRange?: string;
   startDate?: string;
