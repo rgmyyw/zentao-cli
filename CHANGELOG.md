@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.32 - 2026-06-22
+
+### 说明
+
+- 本次为版本同步发布，未引入新的命令、接口或行为差异；代码内容与 `v0.1.31` 保持一致。
+- 发布前重新执行 `pnpm check` 与 `pnpm release:smoke-query`，确认当前构建、类型、测试和固定查询回归仍可通过。
+
 ## 0.1.31 - 2026-06-18
 
 ### 修复

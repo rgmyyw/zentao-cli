@@ -8,19 +8,14 @@
 
 ## 这版补了什么
 
-- 默认 JSON 输出现在更适合 AI / 脚本消费：支持全局 `--output compact|normal|verbose`，并在命令结果里统一附带 `meta.requestCount`、`meta.durationMs`。
-- 新增 3 个短链路快照命令：`getBugSnapshot`、`getDevelopmentContextSnapshot`、`getExecutionSnapshot`，把常见“先查详情再查关联列表”的多跳查询压成一步。
-- `zentao help <command>` 现在会显示 `预估成本` 和 `下一步` 推荐命令，便于 Agent 自动选择更便宜、链路更短的调用方案。
-- HTTP 读取链路补了轻量缓存和网络重试，常见 GET 查询在短时间内重复调用时会直接命中缓存，并通过 `cacheHit` 标记告知调用方。
-- `zentao install` / `zentao update` 安装 skill 时统一改为非交互全局 agent 安装，更适合脚本、CI 和 Agent 环境。
+- `0.1.32` 是一次版本同步发布，没有新增命令；如果你已经在使用 `0.1.31`，本次升级后的命令行为保持不变。
+- `getMyWeeklyActivity` 继续支持直接使用 `zentao getMyWeeklyActivity --week this`，不需要再显式传 `--account`。
+- 发布前推荐继续执行 `pnpm check` 与 `pnpm release:smoke-query`；后者会按命令返回内容做校验，而不只是看退出码。
 
 ### 典型变化
 
-- **输出模式**：`zentao --output compact getBugDetail --bugId 123` 会自动裁剪长步骤、长列表；`--output verbose` 可保留完整原始字段。
-- **执行快照**：`zentao getExecutionSnapshot --executionId 2140` 会一次返回执行 focus、构建摘要、未关闭 Bug、逾期任务和最近动态。
-- **开发上下文快照**：`zentao getDevelopmentContextSnapshot --entityType story --entityId 10154 --productId 153` 会直接返回需求 focus、关联 Bug、测试用例和摘要。
-- **命令帮助增强**：`zentao help getExecutionBugs` 会显示 `预估成本：medium` 和建议继续调用的 `getBugSnapshot` / `getExecutionSnapshot` / `getExecutionDetail`。
-- **安装更新体验**：skill 安装统一走非交互 `--global --agent universal --yes`，减少交互式安装卡住的问题。
+- **周工作清单默认账号**：`zentao getMyWeeklyActivity --week this` 现在可以直接使用当前登录账号，不再要求额外传 `--account`。
+- **发布前查询回归**：`pnpm release:smoke-query` 会按命令检查返回内容，适合在发版前快速确认固定查询能力。
 
 ## 版本要求
 
