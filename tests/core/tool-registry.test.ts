@@ -22,6 +22,14 @@ describe('registerTools', () => {
     expect(registry.listCommands().map((command) => command.name).sort()).toEqual(Object.keys(commandToGroup).sort());
   });
 
+  it('registers url intent tool in full role', async () => {
+    const registry = new InMemoryCliRegistry();
+
+    await registerTools(registry, 'full');
+
+    expect(registry.getCommand('parseUrlIntent')).toBeDefined();
+  });
+
   it('filters commands by role', async () => {
     const registry = new InMemoryCliRegistry();
 

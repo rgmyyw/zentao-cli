@@ -105,6 +105,7 @@ export const commandToGroup: Record<string, string> = {
   "getMyBugStatistics": "statistics",
   "getMyTaskStatistics": "statistics",
   "getMyWeeklyActivity": "statistics",
+  "parseUrlIntent": "url-intent",
   "getBugRelatedStory": "relation",
   "getStoryRelatedBugs": "relation",
   "getDevelopmentContext": "context",
@@ -431,6 +432,9 @@ export const groupCommands: Record<string, string[]> = {
     "getMyBugStatistics",
     "getMyTaskStatistics",
     "getMyWeeklyActivity"
+  ],
+  "url-intent": [
+    "parseUrlIntent"
   ],
   "relation": [
     "getBugRelatedStory",

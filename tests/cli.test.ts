@@ -8,6 +8,7 @@ import { setGlobalOutputMode } from '../src/tools/shared.js';
 describe('runCli', () => {
   afterEach(() => {
     setGlobalOutputMode('compact');
+    delete process.env.ZENTAO_URL;
     vi.restoreAllMocks();
   });
 
@@ -145,6 +146,31 @@ describe('runCli', () => {
     expect(write).toHaveBeenCalledWith(expect.stringContaining('下一步：getTaskDetail、getMyTaskStatistics、getMyWeeklyActivity'));
   });
 
+  it('parses url intent through explicit command', async () => {
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    process.env.ZENTAO_URL = 'https://zentao.example.com';
+
+    await runCli(['parseUrlIntent', '--url', 'https://zentao.example.com/zentao/bug-view-84362.html']);
+
+    expect(JSON.parse(String(write.mock.calls.at(-1)?.[0]))).toMatchObject({
+      routeKind: 'bug-view',
+      primaryCommand: 'getBugDetail',
+      action: 'execute',
+      params: [{ name: 'bugId', value: 84362 }],
+    });
+  });
+
+  it('prints explain intent json for unsupported execution list pages', async () => {
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    await runCli(['execution-task-2130.html']);
+
+    expect(JSON.parse(String(write.mock.calls.at(-1)?.[0]))).toMatchObject({
+      routeKind: 'execution-task',
+      action: 'explain',
+    });
+  });
+
   it('prints help metadata for cross-group read tools', async () => {
     const searchStories = vi.fn();
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
@@ -231,6 +257,7 @@ describe('runCli', () => {
   it('maps full legacy page urls to detail commands', async () => {
     const getBugDetail = vi.fn(async () => ({ id: 84362 }));
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    process.env.ZENTAO_URL = 'https://zentao.example.com';
     setApi({ bug: { getBugDetail } } as never);
 
     await runCli(['https://zentao.example.com/zentao/bug-view-84362.html?tid=1#app=qa']);
@@ -248,6 +275,47 @@ describe('runCli', () => {
 
     expect(getBugDetail).toHaveBeenCalledWith(84362);
     expect(JSON.parse(String(write.mock.calls.at(-1)?.[0]))).toMatchObject({ id: 84362, meta: { requestCount: 0 } });
+  });
+
+  it.each([
+    {
+      name: 'program view',
+      args: ['program-view-620.html'],
+      apiKey: 'program',
+      method: 'getProgramDetail',
+      expectedId: 620,
+    },
+    {
+      name: 'todo view',
+      args: ['todo-view-2319.html'],
+      apiKey: 'todo',
+      method: 'getTodoDetail',
+      expectedId: 2319,
+    },
+  ])('maps $name legacy page file names to structured commands', async ({ args, apiKey, method, expectedId }) => {
+    const handler = vi.fn(async () => ({ id: expectedId }));
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    setApi({ [apiKey]: { [method]: handler } } as never);
+
+    await runCli(args);
+
+    expect(handler).toHaveBeenCalledWith(expectedId);
+    expect(JSON.parse(String(write.mock.calls.at(-1)?.[0]))).toMatchObject({ id: expectedId, meta: { requestCount: 0 } });
+  });
+
+  it.each([
+    'doc-view-12.html',
+    'job-view-18.html',
+    'user-profile-7.html',
+  ])('prints explain json for %s', async (legacyUrl) => {
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    await runCli([legacyUrl]);
+
+    expect(JSON.parse(String(write.mock.calls.at(-1)?.[0]))).toMatchObject({
+      action: 'explain',
+      matchedServer: true,
+    });
   });
 
   it.each([

@@ -8,14 +8,14 @@
 
 ## 这版补了什么
 
-- `0.1.32` 是一次版本同步发布，没有新增命令；如果你已经在使用 `0.1.31`，本次升级后的命令行为保持不变。
-- `getMyWeeklyActivity` 继续支持直接使用 `zentao getMyWeeklyActivity --week this`，不需要再显式传 `--account`。
-- 发布前推荐继续执行 `pnpm check` 与 `pnpm release:smoke-query`；后者会按命令返回内容做校验，而不只是看退出码。
+- `0.1.33` 新增 `parseUrlIntent`，可以把禅道浏览器页面 URL、legacy 页面文件名或本地路径直接解析成结构化 CLI 意图。
+- 直接把 URL 当首参传给 `zentao` 时，同站且安全的只读页面会自动跳到真实查询命令；跨实例 URL、无直连命令页面和写页面则返回说明 JSON，不会误执行写操作。
+- 本次还补齐了一批高价值页面规则：`program-view`、`todo-view`、`projectrelease-view` 可直达详情命令；`doc-view`、`job-view`、`user-profile` 会返回候选命令与说明。
 
 ### 典型变化
 
-- **周工作清单默认账号**：`zentao getMyWeeklyActivity --week this` 现在可以直接使用当前登录账号，不再要求额外传 `--account`。
-- **发布前查询回归**：`pnpm release:smoke-query` 会按命令检查返回内容，适合在发版前快速确认固定查询能力。
+- **先解析再执行**：`zentao parseUrlIntent --url "https://your-zentao.example.com/zentao/bug-view-84362.html"` 会告诉你该 URL 对应哪个命令、哪些参数、是否可自动执行。
+- **直接贴 URL**：`zentao program-view-620.html`、`zentao todo-view-2319.html` 现在可以直接跳到详情命令；`zentao doc-view-12.html` 会返回 explain JSON 和候选命令。
 
 ## 版本要求
 
@@ -142,6 +142,19 @@ zentao --output normal getDevelopmentContextSnapshot --entityType story --entity
 zentao --output normal getExecutionSnapshot --executionId 2140
 zentao help getExecutionBugs
 ```
+
+如果你手里只有浏览器页面 URL，也可以先让 CLI 做“意图解析”：
+
+```bash
+zentao parseUrlIntent --url "https://your-zentao.example.com/zentao/bug-view-84362.html"
+zentao parseUrlIntent --url "execution-task-2140.html"
+zentao parseUrlIntent --url "program-view-620.html"
+zentao parseUrlIntent --url "todo-view-2319.html"
+```
+
+- 同站且有直连读命令的页面，会返回 `primaryCommand`、语义化参数和 `action: "execute"`，例如 `program-view`、`todo-view`。
+- 无直连命令、跨实例 URL 或明显是写页面时，会返回 `action: "explain"` 和候选命令，不会自动执行写操作。
+- 直接把 URL 当首参传给 CLI 时，也会复用同一套解析逻辑；能安全执行时自动跳到对应读命令，不能直达时直接输出解析 JSON。
 
 - `compact`：默认模式，优先少返回，适合 Agent 首轮探测。
 - `normal`：保留 `source`、`page`、`total`、`scanned`、`durationMs`、`cacheHit` 等常用元信息。

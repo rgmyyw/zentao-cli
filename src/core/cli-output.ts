@@ -87,6 +87,7 @@ function buildCommandGroups(commandNames: string[]): CommandListGroup[] {
     { title: '测试 / 构建 / 发布', match: (name) => /Test|Case|Build|Release/.test(name), commands: [] },
     { title: '任务 / Bug / 需求', match: (name) => /Task|Bug|Story|Stories/.test(name), commands: [] },
     { title: '执行 / 项目 / 产品 / 计划', match: (name) => /Execution|Project|Product|Program|Plan/.test(name), commands: [] },
+    { title: 'URL / 意图解析', match: (name) => /UrlIntent|Url|Intent/.test(name), commands: [] },
     { title: '评论 / 动态 / 统计 / 搜索', match: (name) => /Comment|Dynamic|Statistic|Statistics|Activity|Search|Context|Related|Resource/.test(name), commands: [] },
     { title: '其他', match: () => true, commands: [] },
   ];
@@ -184,6 +185,7 @@ function describeCommand(commandName: string): string {
     getMyTaskStatistics: '统计我的任务',
     getMyBugStatistics: '统计我的 Bug',
     getMyWeeklyActivity: '生成我的阶段性工作清单',
+    parseUrlIntent: '解析禅道 URL / 页面文件名意图',
   };
 
   return descriptions[commandName] ?? '查看参数：zentao help ' + commandName;

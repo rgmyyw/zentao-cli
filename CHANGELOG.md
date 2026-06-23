@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.33 - 2026-06-23
+
+### 新增
+
+- 新增 `parseUrlIntent` 命令，可把禅道浏览器页面 URL、legacy 页面文件名或本地路径解析成结构化 CLI 意图，统一返回 `routeKind`、语义化参数、`primaryCommand`、`suggestedCommands`、`action` 与说明信息。
+- 新增独立 URL 意图解析核心 `src/core/url-intent.ts`，把原先散落在 `src/cli.ts` 的 legacy 页面正则规则统一收敛到规格表，便于后续继续扩展更多页面类型。
+
+### 变更
+
+- 直接把 URL / 页面文件名作为 CLI 首参传入时，现会复用同一套意图解析逻辑：
+  - 同站且存在安全只读直连命令时，自动改写并执行对应查询命令；
+  - 无直连命令、跨实例 URL 或明显是写页面时，直接返回 `action: "explain"` 的 JSON 说明，而不是误执行写操作。
+- `help <url>` 现已支持对可直达页面跳转到真实命令帮助，对无法自动执行的页面直接输出解析结果与候选命令。
+- URL 规则补齐了一批高价值详情页与说明页：
+  - 可自动执行：`execution-view`、`project-view`、`product-view`、`productplan-view`、`release-view`、`program-view`、`todo-view`、`projectrelease-view` 等；
+  - 只做说明：`execution-task`、`execution-story`、`doc-view`、`job-view`、`user-profile` 等。
+
+### 测试
+
+- 新增 `tests/url-intent.test.ts`，覆盖 URL 解析、跨实例降级、写页面降级和输入识别。
+- 扩展 `tests/cli.test.ts` 与 `tests/core/tool-registry.test.ts`，覆盖显式 `parseUrlIntent`、隐式首参 URL 执行/说明分流，以及新工具组注册。
+
 ## 0.1.32 - 2026-06-22
 
 ### 说明

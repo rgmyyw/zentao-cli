@@ -8,7 +8,7 @@ import type { ZentaoConfig } from '../types/common.js';
 const CONFIG_DIR = path.join(homedir(), '.zentao');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 
-function normalizeServerUrl(url: string): string {
+export function normalizeServerUrl(url: string): string {
   const trimmed = url.trim();
   const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 

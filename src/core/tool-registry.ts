@@ -19,6 +19,7 @@ export const groupLoaders: Record<ToolGroup, GroupLoader> = {
   comment: async () => (await import('../tools/comment.js')).registerCommentTools,
   profile: async () => (await import('../tools/profile.js')).registerProfileTools,
   statistics: async () => (await import('../tools/statistics.js')).registerStatisticsTools,
+  'url-intent': async () => (await import('../tools/url-intent.js')).registerUrlIntentTools,
   relation: async () => (await import('../tools/relation.js')).registerRelationTools,
   context: async () => (await import('../tools/context.js')).registerContextTools,
   product: async () => (await import('../tools/product.js')).registerProductTools,

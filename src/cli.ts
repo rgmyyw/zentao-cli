@@ -8,8 +8,10 @@ import {
   renderChangelog,
   type ChangelogOptions,
 } from './core/cli-output.js';
+import { loadConfig } from './core/config.js';
 import { buildRegistryForCommand, getAvailableCommandNames } from './core/manifest.js';
 import { getRequestCount, getLastRequestDurationMs } from './core/http-metrics.js';
+import { looksLikeUrlIntentInput, parseUrlIntent, resolveExecutableUrlIntent, type ParsedUrlIntent } from './core/url-intent.js';
 import { runInstallCommand, runUninstallCommand, runUpdateCommand } from './install.js';
 import { setGlobalOutputMode, type OutputMode } from './tools/shared.js';
 import type { Role } from './types/common.js';
@@ -21,7 +23,7 @@ const VALID_ROLES = new Set<Role>(['full', 'dev', 'pm', 'qa']);
 const BUILTIN_COMMAND_NAMES = ['help', 'list', 'version', 'changelog', 'install', 'uninstall', 'remove', 'update', 'upgrade'];
 
 export async function runCli(rawArgs: string[]): Promise<void> {
-  const { role, commandName, commandArgs, outputMode } = parseCliArgs(rawArgs);
+  const { role, commandName, commandArgs, outputMode, directIntent } = parseCliArgs(rawArgs);
   setGlobalOutputMode(outputMode);
   const registeredCommandNames = await getAvailableCommandNames(role);
   const commandNames = [...BUILTIN_COMMAND_NAMES, ...registeredCommandNames]
@@ -40,7 +42,11 @@ export async function runCli(rawArgs: string[]): Promise<void> {
       return;
     }
 
-    const normalizedTarget = normalizeCommandInput(helpTargets[0], helpTargets.slice(1));
+    const normalizedTarget = normalizeCommandInput(helpTargets[0], helpTargets.slice(1), role);
+    if (normalizedTarget.directIntent && normalizedTarget.directIntent.action !== 'execute') {
+      process.stdout.write(`${JSON.stringify(normalizedTarget.directIntent)}\n`);
+      return;
+    }
     const targetCommandName = normalizedTarget.commandName;
     if (!targetCommandName) {
       printHelp(role, registeredCommandNames);
@@ -127,6 +133,11 @@ export async function runCli(rawArgs: string[]): Promise<void> {
       return;
     }
     await runUninstallCommand(commandArgs);
+    return;
+  }
+
+  if (directIntent && directIntent.action !== 'execute') {
+    process.stdout.write(`${JSON.stringify(directIntent)}\n`);
     return;
   }
 
@@ -225,7 +236,7 @@ function parseChangelogOptions(args: string[]): ChangelogOptions {
   return options;
 }
 
-function parseCliArgs(rawArgs: string[]): { role: Role; commandName?: string; commandArgs: string[]; outputMode: OutputMode } {
+function parseCliArgs(rawArgs: string[]): { role: Role; commandName?: string; commandArgs: string[]; outputMode: OutputMode; directIntent?: ParsedUrlIntent } {
   const args = [...rawArgs];
   let role: Role = 'full';
   let outputMode: OutputMode = 'compact';
@@ -270,7 +281,7 @@ function parseCliArgs(rawArgs: string[]): { role: Role; commandName?: string; co
     args.splice(outputArgIndex, 2);
   }
 
-  const normalized = normalizeCommandInput(args.shift(), args);
+  const normalized = normalizeCommandInput(args.shift(), args, role);
   let commandName = normalized.commandName;
   if (normalized.consumedArgs > 0) {
     args.splice(0, normalized.consumedArgs);
@@ -279,7 +290,7 @@ function parseCliArgs(rawArgs: string[]): { role: Role; commandName?: string; co
     args.unshift(...normalized.prependedArgs);
   }
 
-  return { role, commandName, commandArgs: args, outputMode };
+  return { role, commandName, commandArgs: args, outputMode, directIntent: normalized.directIntent };
 }
 
 function assertOutputMode(value: string): asserts value is OutputMode {
@@ -291,14 +302,19 @@ function assertOutputMode(value: string): asserts value is OutputMode {
 function normalizeCommandInput(
   commandName?: string,
   args: string[] = [],
-): { commandName?: string; consumedArgs: number; prependedArgs: string[] } {
+  role?: Role,
+): { commandName?: string; consumedArgs: number; prependedArgs: string[]; directIntent?: ParsedUrlIntent } {
   const normalizedAlias = normalizeCommandAlias(commandName, args);
-  const shortcut = parseLegacyPageShortcut(normalizedAlias.commandName);
+  const directIntent = normalizedAlias.commandName && looksLikeUrlIntentInput(normalizedAlias.commandName)
+    ? parseUrlIntent(normalizedAlias.commandName, { serverUrl: loadConfig()?.url, role })
+    : undefined;
+  const executableIntent = directIntent ? resolveExecutableUrlIntent(directIntent) : undefined;
 
   return {
-    commandName: shortcut?.commandName ?? normalizedAlias.commandName,
+    commandName: executableIntent?.commandName ?? normalizedAlias.commandName,
     consumedArgs: normalizedAlias.consumedArgs,
-    prependedArgs: shortcut?.commandArgs ?? [],
+    prependedArgs: executableIntent?.commandArgs ?? [],
+    directIntent,
   };
 }
 
@@ -311,83 +327,6 @@ function normalizeCommandAlias(
   }
 
   return { commandName, consumedArgs: 0 };
-}
-
-function parseLegacyPageShortcut(input?: string): { commandName: string; commandArgs: string[] } | undefined {
-  const fileName = extractLegacyPageFileName(input);
-  if (!fileName) return undefined;
-
-  const mappings: Array<{ pattern: RegExp; commandName: string; buildArgs: (id: string) => string[] }> = [
-    {
-      pattern: /^execution-bug-(\d+)\.html$/i,
-      commandName: 'getExecutionBugs',
-      buildArgs: (id) => ['--executionId', id, '--limit', '100'],
-    },
-    {
-      pattern: /^execution-build-(\d+)\.html$/i,
-      commandName: 'getExecutionBuilds',
-      buildArgs: (id) => ['--executionId', id],
-    },
-    {
-      pattern: /^execution-dynamic-(\d+)\.html$/i,
-      commandName: 'getExecutionDynamic',
-      buildArgs: (id) => ['--executionId', id],
-    },
-    {
-      pattern: /^bug-view-(\d+)\.html$/i,
-      commandName: 'getBugDetail',
-      buildArgs: (id) => ['--bugId', id],
-    },
-    {
-      pattern: /^task-view-(\d+)\.html$/i,
-      commandName: 'getTaskDetail',
-      buildArgs: (id) => ['--taskId', id],
-    },
-    {
-      pattern: /^story-view-(\d+)\.html$/i,
-      commandName: 'getStoryDetail',
-      buildArgs: (id) => ['--storyId', id],
-    },
-    {
-      pattern: /^testcase-view-(\d+)\.html$/i,
-      commandName: 'getTestCaseDetail',
-      buildArgs: (id) => ['--testCaseId', id],
-    },
-    {
-      pattern: /^testtask-view-(\d+)\.html$/i,
-      commandName: 'getTestTaskDetail',
-      buildArgs: (id) => ['--testTaskId', id],
-    },
-    {
-      pattern: /^build-view-(\d+)\.html$/i,
-      commandName: 'getBuildDetail',
-      buildArgs: (id) => ['--buildId', id],
-    },
-  ];
-
-  for (const mapping of mappings) {
-    const matched = fileName.match(mapping.pattern);
-    if (matched) {
-      return { commandName: mapping.commandName, commandArgs: mapping.buildArgs(matched[1]) };
-    }
-  }
-
-  return undefined;
-}
-
-function extractLegacyPageFileName(input?: string): string | undefined {
-  if (!input) return undefined;
-
-  try {
-    if (/^[a-z]+:\/\//i.test(input)) {
-      const url = new URL(input);
-      const fromPath = url.pathname.split('/').filter(Boolean).pop();
-      return fromPath ?? undefined;
-    }
-  } catch {
-  }
-
-  return input.split(/[?#]/, 1)[0]?.split(/[\\/]/).filter(Boolean).pop();
 }
 
 function hasHelpFlag(args: string[]): boolean {
