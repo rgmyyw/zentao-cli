@@ -8,6 +8,12 @@
 
 ## 这版补了什么
 
+- `0.1.34` 重构 Skill 文档为 2 级索引：`SKILL.md` 主入口从 272 行精简到 90 行，通过分类总览 + Reference 跳转表指到二级目录；二级 `reference/` 覆盖 CLI 注册的全部 306 个命令，按场景聚合并拆分高频主链路与低频高级文档。
+- 新增 `reference/cheatsheet.md` 兜底速查、`reference/index.md` 分类总览、`reference/scenarios.md` 场景化组合（共 16 类典型用户意图 → 命令组合示例）。
+- 新增 `reference/<场景>-advanced.md` 系列（共 9 个文档 / 168 个低频命令）：`bug-advanced.md`、`task-advanced.md`、`story-advanced.md`、`execution-advanced.md`、`product-advanced.md`、`project-advanced.md`、`testcase-advanced.md`、`testtask-advanced.md`、`build-advanced.md`，覆盖批量 / 状态变更 / 管理员命令。
+- 新增 7 个独立辅助能力文档：`url-intent.md`、`comment.md`、`context.md`、`relation.md`、`search.md`、`resource-analysis.md`、`program.md`。
+- 新增 4 个持久化脚本：`scripts/extract-commands.mjs`、`scripts/check-coverage.mjs`、`scripts/gen-cheatsheet.mjs`、`scripts/gen-advanced.mjs`，可在 CI 中重跑验证 reference 覆盖 vs CLI 注册命令 diff = 0。
+- 删除旧的 `reference/commands.md`、`reference/overview.md`、`reference/dev-coverage.md`，能力并入新的二级目录结构。
 - `0.1.33` 新增 `parseUrlIntent`，可以把禅道浏览器页面 URL、legacy 页面文件名或本地路径直接解析成结构化 CLI 意图。
 - 直接把 URL 当首参传给 `zentao` 时，同站且安全的只读页面会自动跳到真实查询命令；跨实例 URL、无直连命令页面和写页面则返回说明 JSON，不会误执行写操作。
 - 本次还补齐了一批高价值页面规则：`program-view`、`todo-view`、`projectrelease-view` 可直达详情命令；`doc-view`、`job-view`、`user-profile` 会返回候选命令与说明。
@@ -16,6 +22,7 @@
 
 - **先解析再执行**：`zentao parseUrlIntent --url "https://your-zentao.example.com/zentao/bug-view-84362.html"` 会告诉你该 URL 对应哪个命令、哪些参数、是否可自动执行。
 - **直接贴 URL**：`zentao program-view-620.html`、`zentao todo-view-2319.html` 现在可以直接跳到详情命令；`zentao doc-view-12.html` 会返回 explain JSON 和候选命令。
+- **Skill 文档 2 级索引**：进 skill 后先看 `SKILL.md` 的 Reference 路由表，按场景跳到 `reference/<场景>.md`；批量 / 状态变更 / 管理员命令下沉到 `reference/<场景>-advanced.md`；不确定命令是否存在直接看 `reference/cheatsheet.md`。
 
 ## 版本要求
 

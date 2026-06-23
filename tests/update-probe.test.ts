@@ -30,10 +30,13 @@ describe('runDailyUpdateProbe', () => {
   it('notifies when cache has a newer version', async () => {
     process.env.NODE_ENV = 'development';
 
+    const { CLI_VERSION } = await import('../src/version.js');
+    const newerVersion = '9.9.9';
+
     vi.doMock('node:os', () => ({ homedir: () => '/tmp/home' }));
     vi.doMock('node:fs/promises', () => ({
       mkdir: vi.fn(async () => undefined),
-      readFile: vi.fn(async () => JSON.stringify({ lastCheckedDate: '2026-01-01', latestVersion: '0.1.34', currentVersion: '0.1.33' })),
+      readFile: vi.fn(async () => JSON.stringify({ lastCheckedDate: '2026-01-01', latestVersion: newerVersion, currentVersion: CLI_VERSION })),
       writeFile: vi.fn(async () => undefined),
     }));
 
@@ -42,7 +45,7 @@ describe('runDailyUpdateProbe', () => {
 
     await runDailyUpdateProbe('getMyTasks');
 
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('检测到 zentao CLI 新版本 0.1.34（当前 0.1.33）。'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining(`检测到 zentao CLI 新版本 ${newerVersion}（当前 ${CLI_VERSION}）。`));
     expect(write).toHaveBeenCalledWith(expect.stringContaining('zentao update --skip-config-check'));
   });
 

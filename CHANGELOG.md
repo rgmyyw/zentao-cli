@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.34 - 2026-06-24
+
+### 新增
+
+- 新增 `reference/cheatsheet.md`，覆盖 CLI 注册的全部 306 个命令，用于兜底文档索引。
+- 新增 `reference/index.md` 分类总览与跳转表，把高频主链路和低频高级文档统一汇入二级目录。
+- 新增 `reference/scenarios.md`，沉淀 16 类典型用户意图到命令组合示例，例如“查一个迭代的完整上下文”、“按需求拆任务”、“周报自然语言日期”、“URL 解析”等。
+- 新增 `reference/url-intent.md`、`reference/comment.md`、`reference/context.md`、`reference/relation.md`、`reference/search.md`、`reference/resource-analysis.md`、`reference/program.md` 七个独立辅助能力文档。
+- 新增按场景下沉到二级目录的 `reference/<场景>-advanced.md` 系列：覆盖 188 个之前散落在 `commands.md` 的低频 / 批量 / 状态变更 / 管理员命令：
+  - `bug-advanced.md`（16 个）：批量修改分支 / 模块 / 计划 / 指派 / 确认 / 解决 / 关闭 / 激活 / 删除 / 关联。
+  - `task-advanced.md`（22 个）：状态变更、批量完成 / 取消 / 关闭 / 指派、批量切换分支 / 模块 / 计划、批量创建 / 编辑、导入 / 导出、团队编辑。
+  - `story-advanced.md`（17 个）：批量评审 / 关闭 / 阶段 / 关联 / 指派 / 分支 / 模块 / 计划、撤回 / 提交评审、需求间关联与解除。
+  - `execution-advanced.md`（36 个）：状态变更、批量编辑、批量变更状态、成员管理、看板、关联需求 / Bug、白名单、CF 计算、链接需求单条 / 批量。
+  - `product-advanced.md`（16 个）：批量编辑、状态变更、白名单、动态 / 路线图 / 仪表盘、产品线管理。
+  - `project-advanced.md`（21 个）：批量编辑、状态变更、成员 / 分组 / 白名单、动态、关联产品、组复制。
+  - `testcase-advanced.md`（27 个）：批量 / 用例库 / 导入 / 导出 / 关联 Bug / 关联用例 / 确认需求变更 / 确认用例库变更。
+  - `testtask-advanced.md`（10 个）：激活 / 阻塞 / 删除、用例运行 / 批量运行、用例关联 / 解除、批量指派、单位结果导入。
+  - `build-advanced.md`（3 个）：构建通知 Bug、指派、删除。
+- 新增 `scripts/extract-commands.mjs`：扫描 `src/tools/*.ts` 提取全部 CLI 命令注册信息（名称、文件、参数数量、首个 `describe`）。
+- 新增 `scripts/check-coverage.mjs`：扫描 `reference/**/*.md` 提到的所有命令，对比 CLI 注册命令清单，输出 `未覆盖` / `误识别` 数量与明细；本次发布验证输出 `未覆盖: 0  误识别: 0`。
+- 新增 `scripts/gen-cheatsheet.mjs` 与 `scripts/gen-advanced.mjs`：分别生成全量速查文档与按场景的 `-advanced` 文档，可在 CI 中重跑保证 reference 与 CLI 同步。
+
+### 变更
+
+- `SKILL.md` 从 272 行精简到 90 行，去除内联命令清单、命令选择规则与场景化使用说明，改为通过分类总览 + Reference 跳转表指到二级目录。
+- 删除 `reference/overview.md`、`reference/dev-coverage.md`、`reference/commands.md` 三个旧索引：能力并入 `SKILL.md` + `reference/index.md`，全量命令清单下沉到 `reference/cheatsheet.md`。
+- 主链路 reference 文档（`bug.md` / `task.md` / `story.md` / `execution.md` / `product.md` / `project.md` / `build.md` / `testcase.md` / `testtask.md` 等）保持并加强高频日常场景内容；批量 / 状态变更 / 管理员命令下沉到 `-advanced.md`。
+- 写保护说明中 `ZENTAO_DISABLE_WRITE` 变量名在 `SKILL.md` 中已与 `AGENTS.md` 一致；旧版 `ZENTAO_ENABLE_WRITE` 错误写法已不再出现。
+
+### 验证
+
+- `pnpm typecheck`、`pnpm lint`、`pnpm build`、`pnpm test` 全部通过：300 个单测全 pass，`tsc --noEmit` 无报错，`oxlint` 0 warning / 0 error。
+- `npm pack --dry-run` 产物包含完整 35 个 `skills/zentao-cli/reference/*.md` + `SKILL.md`，目录结构正确。
+- `node scripts/check-coverage.mjs` 输出 `CLI 注册命令: 306 / reference 提到命令: 306 / 未覆盖: 0 / 误识别: 0`。
+
 ## 0.1.33 - 2026-06-23
 
 ### 新增
