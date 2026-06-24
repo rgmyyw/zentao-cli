@@ -23,6 +23,7 @@ export function printHelp(role: Role, commands: string[]): void {
     '  zentao help <command>        查看命令参数',
     '  zentao whoami                校验当前账号',
     '  zentao --version             查看版本',
+    '  zentao --output compact whoami',
     '',
     '常用命令：',
     ...recommended.map((item) => `  - ${item.name.padEnd(24)} ${item.description}`),
@@ -36,6 +37,7 @@ export function printHelp(role: Role, commands: string[]): void {
     '  zentao list                  按场景查看命令说明',
     '  zentao list --raw            仅输出命令名，适合脚本处理',
     '  zentao help <command>        查看某个命令的参数',
+    '  compact / normal / verbose   只改变 JSON 形态，不裁剪数据',
     '',
   ].join('\n'));
 }

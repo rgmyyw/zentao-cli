@@ -3,7 +3,7 @@ import { runCli } from '../src/cli.js';
 import { setApi } from '../src/core/api-provider.js';
 import { CLI_VERSION } from '../src/version.js';
 import * as installModule from '../src/install.js';
-import { setGlobalOutputMode } from '../src/tools/shared.js';
+import { jsonResult, setGlobalOutputMode } from '../src/tools/shared.js';
 
 describe('runCli', () => {
   afterEach(() => {
@@ -121,6 +121,26 @@ describe('runCli', () => {
     write.mockClear();
     await runCli(['--output=verbose', 'getBugDetail', '--bugId', '1']);
     expect(JSON.parse(String(write.mock.calls.at(-1)?.[0]))).toMatchObject({ id: 1, steps: expect.any(String) });
+  });
+
+  it('compact 输出保留字符串化 JSON 字段完整内容', () => {
+    setGlobalOutputMode('compact');
+    const longJson = JSON.stringify({
+      permissions: Array.from({ length: 120 }, (_, index) => ({
+        id: index + 1,
+        code: `perm-${index + 1}`,
+      })),
+    });
+
+    const result = jsonResult({
+      body: longJson,
+      message: 'x'.repeat(700),
+    });
+    const parsed = JSON.parse(result.content[0].text) as { body: string; message: string };
+
+    expect(parsed.body).toBe(longJson);
+    expect(() => JSON.parse(parsed.body)).not.toThrow();
+    expect(parsed.message).toHaveLength(700);
   });
 
   it('prints help metadata when available', async () => {

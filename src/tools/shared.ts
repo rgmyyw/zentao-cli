@@ -48,27 +48,7 @@ export function withToolMeta(value: unknown, meta: Record<string, unknown>): unk
 }
 
 function normalizeCompactPayload(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.length <= 20 ? value : { total: value.length, items: value.slice(0, 20) };
-  }
-
-  if (!isPlainObject(value)) return value;
-
-  const record = value as Record<string, unknown>;
-  const keys = Object.keys(record);
-  const compact: Record<string, unknown> = {};
-  for (const key of keys) {
-    if (key === 'items' && Array.isArray(record.items)) {
-      compact.items = record.items.length <= 20 ? record.items : record.items.slice(0, 20);
-      continue;
-    }
-    if (['content', 'data', 'raw', 'html', 'text', 'message'].includes(key) && typeof record[key] === 'string' && String(record[key]).length > 600) {
-      compact[key] = `${String(record[key]).slice(0, 600)}…`;
-      continue;
-    }
-    compact[key] = record[key];
-  }
-  return compact;
+  return value;
 }
 
 function normalizeNormalPayload(value: unknown): unknown {
