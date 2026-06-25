@@ -421,16 +421,26 @@ interface WhoamiLevel {
   rank: number;
 }
 
+interface WhoamiLevelConfig extends WhoamiLevel {
+  minScore: number;
+}
+
+// whoami 等级阈值集中配置，便于后续调整（P2：避免硬编码散落在分支判断里）。
+const WHOAMI_LEVELS: readonly WhoamiLevelConfig[] = [
+  { minScore: 300, label: '王者', rank: 8 },
+  { minScore: 180, label: '钻石', rank: 7 },
+  { minScore: 120, label: '翡翠', rank: 6 },
+  { minScore: 75, label: '铂金', rank: 5 },
+  { minScore: 40, label: '金', rank: 4 },
+  { minScore: 20, label: '白银', rank: 3 },
+  { minScore: 8, label: '青铜', rank: 2 },
+  { minScore: 0, label: '黑铁', rank: 1 },
+];
+
 function resolveWhoamiLevel(projectCount: number, productCount: number, sprintCount: number): WhoamiLevel {
   const scopeScore = projectCount * 2 + productCount + sprintCount;
-  if (scopeScore >= 300) return { label: '王者', rank: 8 };
-  if (scopeScore >= 180) return { label: '钻石', rank: 7 };
-  if (scopeScore >= 120) return { label: '翡翠', rank: 6 };
-  if (scopeScore >= 75) return { label: '铂金', rank: 5 };
-  if (scopeScore >= 40) return { label: '黄金', rank: 4 };
-  if (scopeScore >= 20) return { label: '白银', rank: 3 };
-  if (scopeScore >= 8) return { label: '青铜', rank: 2 };
-  return { label: '黑铁', rank: 1 };
+  const matched = WHOAMI_LEVELS.find(level => scopeScore >= level.minScore) ?? WHOAMI_LEVELS[WHOAMI_LEVELS.length - 1];
+  return { label: matched.label, rank: matched.rank };
 }
 
 function buildFocusInsight(projectCount: number, productCount: number, sprintCount: number, levelRank: number): string {

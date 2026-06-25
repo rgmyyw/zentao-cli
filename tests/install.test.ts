@@ -360,7 +360,7 @@ describe('install command', () => {
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const { runInstallCommand } = await import('../src/install.js');
 
-    await expect(runInstallCommand([])).rejects.toThrow('禅道配置文件损坏，请检查 /tmp/home/.zentao/config.json：配置内容必须是 JSON 对象');
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('检测到禅道配置文件异常：禅道配置文件损坏'));
+    await expect(runInstallCommand([])).rejects.toThrow(/禅道配置文件损坏.*当前不是交互式终端/s);
+    expect(write).not.toHaveBeenCalledWith(expect.stringContaining('检测到禅道配置文件异常'));
   });
 });

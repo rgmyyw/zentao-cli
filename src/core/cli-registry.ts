@@ -80,7 +80,9 @@ function parseArgv(args: string[]): Record<string, unknown> {
 
     const next = args[index + 1];
     const hasInlineValue = equalsIndex >= 0;
-    const hasExplicitValue = !hasInlineValue && typeof next === 'string' && !next.startsWith('--');
+    // 以 -- 开头的 token 视为下一个 flag，但能解析为数字的（如负数 -5、--5）放行为显式值，
+    // 避免 --offset -5 这类负数参数被误判为新 flag 而丢失。
+    const hasExplicitValue = !hasInlineValue && typeof next === 'string' && (!next.startsWith('--') || isNumericValue(next));
     const value = hasInlineValue ? token.slice(equalsIndex + 1) : hasExplicitValue ? next : true;
 
     if (hasExplicitValue) index += 1;
@@ -196,4 +198,12 @@ function toNumber(value: unknown): number {
     if (Number.isFinite(parsed)) return parsed;
   }
   throw new Error(`无法解析数字: ${String(value)}`);
+}
+
+/** 判断字符串是否可解析为有限数字（用于把负数等显式值从 flag 误判中放行）。 */
+function isNumericValue(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed === '') return false;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed);
 }

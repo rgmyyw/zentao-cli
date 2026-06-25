@@ -72,7 +72,10 @@ interface ParsedInputTarget {
   serverUrl?: string;
 }
 
-const WRITE_PAGE_PATTERN = /(?:^|[-_/])(create|edit|delete|finish|close|assign|resolve|activate)(?:[-_/]|$)/i;
+// 写页面命名清单：命中这些动词片段的页面/文件名一律降级为 explain，不自动执行写命令。
+// 覆盖禅道常见写动作（finish/close/activate/start/pause/restart/cancel/confirm/suspend/putoff/assign/resolve
+// 以及 batch* 批量写、create/edit/delete 等）。只读列表页（如 execution-bug、bug-view）不在此列。
+const WRITE_PAGE_PATTERN = /(?:^|[-_/])(create|edit|delete|finish|close|assign|resolve|activate|start|pause|restart|cancel|confirm|suspend|putoff|batch\w*)(?:[-_/]|$)/i;
 
 const ROUTE_SPECS: RouteSpec[] = [
   {

@@ -396,7 +396,7 @@ describe('simple API wrappers', () => {
 });
 
 describe('TaskApi', () => {
-  it('fetches full assigned task list then filters and paginates client-side', async () => {
+  it('fetches full assigned task list via standard pagination then filters and paginates client-side', async () => {
     const http = createHttp([
       { tasks: [{ id: 1, status: 'doing' }], page: 1, limit: 1, total: 3 },
       { tasks: [{ id: 1, status: 'doing' }, { id: 2, status: 'done' }, { id: 3, status: 'doing' }], total: 3 },
@@ -405,19 +405,39 @@ describe('TaskApi', () => {
 
     expect(result).toMatchObject({ source: 'client-paginated', total: 2, scanned: 3, items: [{ id: 1, status: 'doing' }] });
     expect(http.request).toHaveBeenNthCalledWith(1, 'GET', '/tasks', { params: { assignedTo: 'me', page: 1 } });
-    expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/tasks', { params: { assignedTo: 'me', page: 3 } });
+    expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/tasks', { params: { assignedTo: 'me', page: 1, limit: 100 } });
   });
 
-  it('falls back to standard pagination when the task full-list shortcut is incomplete', async () => {
+  it('skips full pagination when the first page already covers total', async () => {
     const http = createHttp([
-      { tasks: [{ id: 1, status: 'doing' }], page: 1, limit: 1, total: 3 },
-      { tasks: [{ id: 1, status: 'doing' }], total: 3 },
       { tasks: [{ id: 1, status: 'doing' }, { id: 2, status: 'done' }, { id: 3, status: 'doing' }], total: 3 },
     ]);
     const result = await new TaskApi(http as never).getMyTasks({ status: 'all', page: 1, limit: 10 });
 
     expect(result).toMatchObject({ total: 3, scanned: 3 });
-    expect(http.request).toHaveBeenNthCalledWith(3, 'GET', '/tasks', { params: { assignedTo: 'me', page: 1, limit: 100 } });
+    expect(http.request).toHaveBeenCalledTimes(1);
+    expect(http.request).toHaveBeenCalledWith('GET', '/tasks', { params: { assignedTo: 'me', page: 1 } });
+  });
+
+  it('serializes batchCreateTasks object array into tasks[i][field] form data without [object Object]', async () => {
+    const http = createHttp([{}]);
+    const api = new TaskApi(http as never);
+
+    await api.batchCreateTasks({
+      execution: 2140,
+      project: 1772,
+      tasks: [
+        { name: '任务一', assignedTo: 'lixm1', type: 'devel' },
+        { name: '任务二', assignedTo: 'dev1', type: 'test' },
+      ],
+    });
+
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/task-batchCreate-2140.json', {
+      data: 'tasks%5B0%5D%5Bname%5D=%E4%BB%BB%E5%8A%A1%E4%B8%80&tasks%5B0%5D%5BassignedTo%5D=lixm1&tasks%5B0%5D%5Btype%5D=devel&tasks%5B1%5D%5Bname%5D=%E4%BB%BB%E5%8A%A1%E4%BA%8C&tasks%5B1%5D%5BassignedTo%5D=dev1&tasks%5B1%5D%5Btype%5D=test&project=1772',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    const data = (http.legacyRequest.mock.calls[0] as unknown[])[2] as { data: string };
+    expect(data.data).not.toContain('[object Object]');
   });
 
   it('scans only the first page when scan is false', async () => {
@@ -661,6 +681,43 @@ describe('TaskApi', () => {
     await expect(api.createTask({ execution: 8, name: '任务', assignedTo: '   ', estStarted: '2026-02-01', deadline: '2026-02-02' }))
       .rejects.toThrow('assignedTo 不能为空');
     expect(http.request).not.toHaveBeenCalled();
+  });
+
+  it('serializes batchCancelTasks/batchCloseTasks id arrays into form data without [object Object]', async () => {
+    const http = createHttp([{}, {}]);
+    const api = new TaskApi(http as never);
+
+    await api.batchCancelTasks({ taskIds: [3] });
+    await api.batchCloseTasks({ taskIds: [4, 5] });
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/task-batchCancel.json', {
+      data: 'taskIDList%5B%5D=3',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/task-batchClose.json', {
+      data: 'taskIDList%5B%5D=4&taskIDList%5B%5D=5',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    for (const call of http.legacyRequest.mock.calls as unknown[][]) {
+      const data = (call[2] as { data: string }).data;
+      expect(data).not.toContain('[object Object]');
+      // taskIDList 必须展开为 [] 数组形式，不得出现裸对象字符串
+      expect(data).toContain('taskIDList%5B%5D=');
+    }
+  });
+
+  it('serializes editEstimate scalar fields into form data without [object Object]', async () => {
+    const http = createHttp([{}]);
+    const api = new TaskApi(http as never);
+
+    await api.editEstimate(42, { date: '2026-06-26', consumed: 3, left: 15, work: '联调修复' });
+
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/task-editEstimate-42.json', {
+      data: 'date=2026-06-26&consumed=3&left=15&work=%E8%81%94%E8%B0%83%E4%BF%AE%E5%A4%8D',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    const data = (http.legacyRequest.mock.calls[0] as unknown[])[2] as { data: string };
+    expect(data.data).not.toContain('[object Object]');
   });
 });
 
@@ -992,6 +1049,22 @@ describe('BugApi', () => {
     await expect(api.batchEditBugs({ productId: 1, bugIds: [] })).rejects.toThrow('bugIds 至少需要 1 项');
     await expect(api.linkBugs({ bugId: 1, linkedBugIds: [] })).rejects.toThrow('linkedBugIds 至少需要 1 项');
     expect(http.legacyRequest).not.toHaveBeenCalled();
+  });
+
+  it('serializes batchCreateBugs titles array into form data without [object Object]', async () => {
+    const http = createHttp([{}]);
+    const api = new BugApi(http as never);
+
+    await api.batchCreateBugs({ productId: 153, branch: 0, executionId: 2140, moduleId: 66, titles: ['问题一', '问题二'], assignedTo: 'lixm1' });
+
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/bug-batchCreate-153-0-2140-66.json', {
+      data: 'titles%5B%5D=%E9%97%AE%E9%A2%98%E4%B8%80&titles%5B%5D=%E9%97%AE%E9%A2%98%E4%BA%8C&assignedTo=lixm1',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    const data = (http.legacyRequest.mock.calls[0] as unknown[])[2] as { data: string };
+    expect(data.data).not.toContain('[object Object]');
+    // titles 必须展开为 [] 数组形式，而非把数组整体 toString
+    expect(data.data).toContain('titles%5B%5D=');
   });
 });
 
@@ -2132,6 +2205,27 @@ describe('StatisticsApi', () => {
 
     await expect(api.getMyTaskStatistics()).resolves.toMatchObject({ total: 2, byStatus: { doing: 1, done: 1 }, byPriority: { 1: 1, 2: 1 } });
     await expect(api.getMyBugStatistics(3)).resolves.toMatchObject({ productId: 3, total: 2, byStatus: { active: 1, resolved: 1 }, bySeverity: { 1: 1, 2: 1 } });
+  });
+
+  it('samples only the first page in compact mode when scan is false', async () => {
+    const taskApi = {
+      getMyTasks: vi.fn(async () => ({
+        items: [{ id: 1, name: 't1', status: 'doing', pri: 1 }, { id: 2, name: 't2', status: 'done', pri: 2 }],
+        total: 101,
+        scanned: 2,
+        partial: true,
+      })),
+    };
+    const bugApi = { getMyBugs: vi.fn() };
+    const http = createHttp();
+    const api = new StatisticsApi(taskApi as never, bugApi as never, http as never);
+
+    const result = await api.getMyTaskStatistics({ scan: false }) as Record<string, unknown>;
+
+    // compact 模式：标明 partial/sampled，只采首页，不扫描全量分页
+    expect(result).toMatchObject({ total: 2, partial: true, sampled: true, scanned: 2 });
+    expect(taskApi.getMyTasks).toHaveBeenCalledTimes(1);
+    expect(taskApi.getMyTasks).toHaveBeenCalledWith({ status: 'all', scan: false, limit: 100 });
   });
 
   it('builds weekly activity from legacy dynamic response', async () => {

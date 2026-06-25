@@ -12,6 +12,12 @@ export interface HttpError extends Error {
 }
 
 export class ZentaoHttpClient {
+  /** GET 请求触发的写副作用路径片段（禅道用 GET 调用 finish/activate 等动词）。 */
+  private static readonly WRITE_VERB_PATTERN = /(?:^|\/)(finish|activate|start|close|confirm|pause|restart|cancel|suspend|putoff|assign|resolve)(?:\/|$)/i;
+  /** 旧版资源下载大小上限（50MB），防止恶意 URL 拖垮内存。 */
+  private static readonly MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024;
+  /** GET 响应缓存条目上限，避免长期运行时内存无限增长。 */
+  private static readonly MAX_CACHE_ENTRIES = 64;
   private readonly client: AxiosInstance;
   private readonly auth: ZentaoAuth;
   private readonly responseCache = new Map<string, { expiresAt: number; value: unknown }>();
@@ -48,6 +54,42 @@ export class ZentaoHttpClient {
     return `${baseURL}${path}`;
   }
 
+  /**
+   * 校验绝对 URL 的 host 必须匹配配置的禅道 serverUrl，防止 SSRF（如引向 169.254.169.254）。
+   * 相对路径直接放行（会拼接到配置的 legacy base URL）。
+   */
+  private assertAllowedLegacyHost(targetUrl: string): void {
+    if (!/^https?:\/\//i.test(targetUrl)) return;
+    let parsed: URL;
+    try {
+      parsed = new URL(targetUrl);
+    } catch {
+      return;
+    }
+    const configuredHost = this.getConfiguredHost();
+    if (!configuredHost) return;
+    if (normalizeHost(parsed.host) !== normalizeHost(configuredHost)) {
+      throw createHttpError(
+        `旧版资源下载地址 host 与禅道配置不一致: ${parsed.host}（期望 ${configuredHost}），已拒绝以防止 SSRF`,
+        undefined,
+        { url: targetUrl },
+      );
+    }
+  }
+
+  private getConfiguredHost(): string | undefined {
+    const candidates = [this.config.legacyBaseUrl, this.config.apiBaseUrl, this.config.url];
+    for (const candidate of candidates) {
+      if (typeof candidate !== 'string' || candidate.trim() === '') continue;
+      try {
+        return new URL(candidate.startsWith('http') ? candidate : `http://${candidate}`).host;
+      } catch {
+        continue;
+      }
+    }
+    return undefined;
+  }
+
   async downloadLegacy(pathOrUrl: string): Promise<{ data: Buffer; contentType?: string; fileName?: string }> {
     return this.downloadLegacyWithRetry(pathOrUrl, false);
   }
@@ -61,6 +103,7 @@ export class ZentaoHttpClient {
   private async downloadLegacyWithRetry(pathOrUrl: string, retried: boolean): Promise<{ data: Buffer; contentType?: string; fileName?: string }> {
     const token = await this.auth.getToken();
     const url = this.resolveLegacyUrl(pathOrUrl);
+    this.assertAllowedLegacyHost(url);
     recordRequestStarted();
     const startedAt = Date.now();
 
@@ -70,6 +113,10 @@ export class ZentaoHttpClient {
         url,
         timeout: 30_000,
         responseType: 'arraybuffer',
+        maxContentLength: ZentaoHttpClient.MAX_DOWNLOAD_BYTES,
+        maxBodyLength: ZentaoHttpClient.MAX_DOWNLOAD_BYTES,
+        httpAgent: this.client.defaults.httpAgent,
+        httpsAgent: this.client.defaults.httpsAgent,
         headers: { Token: token },
       });
       recordRequestFinished(Date.now() - startedAt);
@@ -175,6 +222,8 @@ export class ZentaoHttpClient {
 
   private getCacheKey(method: string, url: string, options: AxiosRequestConfig): string | undefined {
     if (method.toUpperCase() !== 'GET') return undefined;
+    // 禅道用 GET 触发写副作用（如 /todos/{id}/finish、/todos/{id}/activate），不能缓存。
+    if (ZentaoHttpClient.WRITE_VERB_PATTERN.test(url)) return undefined;
     return JSON.stringify({ method: method.toUpperCase(), url, params: options.params ?? null, data: options.data ?? null });
   }
 
@@ -186,11 +235,19 @@ export class ZentaoHttpClient {
       this.responseCache.delete(key);
       return undefined;
     }
+    // 重新插入以维持 LRU 访问顺序（Map 按插入序）。
+    this.responseCache.delete(key);
+    this.responseCache.set(key, cached);
     return attachCacheMeta(cached.value) as T;
   }
 
   private writeCache(key: string | undefined, method: string, value: unknown): void {
     if (!key || method.toUpperCase() !== 'GET') return;
+    if (this.responseCache.size >= ZentaoHttpClient.MAX_CACHE_ENTRIES && !this.responseCache.has(key)) {
+      // 删除最早插入且大概率最早过期的条目，限制缓存规模。
+      const oldestKey = this.responseCache.keys().next().value;
+      if (oldestKey !== undefined) this.responseCache.delete(oldestKey);
+    }
     this.responseCache.set(key, { expiresAt: Date.now() + 15_000, value });
   }
 }
@@ -222,6 +279,11 @@ function isRetryableNetworkError(error: { code?: string; message?: string }): bo
 
 function getHeaderString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
+}
+
+function normalizeHost(host: string): string {
+  // 去除端口与大小写差异，便于 host 比对。
+  return host.toLowerCase().replace(/:\d+$/, '');
 }
 
 function getFileNameFromDisposition(disposition: unknown): string | undefined {

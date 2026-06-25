@@ -75,34 +75,40 @@ async function writeUpdateCheckState(state: UpdateCheckState): Promise<void> {
 }
 
 function triggerBackgroundVersionCheck(): void {
+  // 用 node:https 直接探测 npm registry，避免 spawn npm 在 Windows 上的路径/转义问题，
+  // 也避免把 packageName/cliVersion 拼进 shell 命令带来的转义风险。
   const script = `
-    const { spawn } = require('child_process');
+    const https = require('https');
     const { mkdirSync, writeFileSync } = require('fs');
     const { homedir } = require('os');
     const path = require('path');
 
     const packageName = ${JSON.stringify(PACKAGE_NAME)};
     const cliVersion = ${JSON.stringify(CLI_VERSION)};
-    const shell = ${process.platform === 'win32'};
 
-    const npm = spawn('npm', ['view', packageName, 'version', '--silent'], {
-      shell,
-      detached: true,
-      stdio: ['ignore', 'pipe', 'ignore'],
+    const req = https.request({
+      hostname: 'registry.npmjs.org',
+      path: '/' + encodeURIComponent(packageName) + '/latest',
+      method: 'GET',
+      timeout: 8000,
+    }, function (res) {
+      let body = '';
+      res.on('data', function (chunk) { body += chunk; });
+      res.on('end', function () {
+        if (res.statusCode !== 200) return;
+        let info;
+        try { info = JSON.parse(body); } catch (e) { return; }
+        const latestVersion = typeof info.version === 'string' ? info.version : '';
+        if (!latestVersion) return;
+        const today = new Date().toISOString().slice(0, 10);
+        const checkFile = path.join(homedir(), '.zentao', 'update-check.json');
+        mkdirSync(path.dirname(checkFile), { recursive: true, mode: 0o700 });
+        writeFileSync(checkFile, JSON.stringify({ lastCheckedDate: today, latestVersion: latestVersion, currentVersion: cliVersion }, null, 2) + '\\n', { mode: 0o600 });
+      });
     });
-
-    let stdout = '';
-    npm.stdout.on('data', (chunk) => { stdout += chunk.toString('utf8'); });
-
-    npm.on('close', (code) => {
-      if (code !== 0) return;
-      const latestVersion = stdout.trim();
-      if (!latestVersion) return;
-      const today = new Date().toISOString().slice(0, 10);
-      const checkFile = path.join(homedir(), '.zentao', 'update-check.json');
-      mkdirSync(path.dirname(checkFile), { recursive: true, mode: 0o700 });
-      writeFileSync(checkFile, JSON.stringify({ lastCheckedDate: today, latestVersion, currentVersion: cliVersion }, null, 2) + '\\n', { mode: 0o600 });
-    });
+    req.on('error', function () {});
+    req.on('timeout', function () { req.destroy(); });
+    req.end();
   `;
 
   const child = spawn(process.execPath, ['-e', script], {

@@ -4,7 +4,7 @@ import { extractItems, toClientPaginatedListResult, toServerListResult } from '.
 import { fetchAllPages, normalizePagination, type PaginationInput } from '../core/pagination.js';
 import { requireNonBlank } from '../core/validation.js';
 import type { ZentaoTask } from '../types/zentao.js';
-import { toFormUrlEncoded } from '../utils/form.js';
+import { toFormUrlEncoded, type FormEncodable } from '../utils/form.js';
 
 export interface MyTaskListInput extends PaginationInput {
   status?: string;
@@ -98,17 +98,9 @@ export class TaskApi {
 
     const firstPage = toServerListResult<ZentaoTask>(firstResponse, ['tasks'], { page: 1, limit: 1 });
     const total = Math.max(firstPage.total, firstPage.items.length);
-    const fullResponse = total > firstPage.items.length
-      ? await this.http.request<{ tasks?: ZentaoTask[] } | ZentaoTask[]>('GET', '/tasks', {
-        params: {
-          assignedTo: this.http.username,
-          page: total,
-        },
-      })
-      : firstResponse;
-
-    const fullTasks = extractItems<ZentaoTask>(fullResponse, ['tasks']);
-    const allTasks = total > fullTasks.length ? await this.getAllMyTasksByPages(total) : fullTasks;
+    // 直接走标准分页拉取全量，删除原先"page=total 试探一次性返回"的脆弱分支：
+    // 该试探在部分部署上会返回截断结果，导致 scanned 与 total 不一致。
+    const allTasks = total > firstPage.items.length ? await this.getAllMyTasksByPages(total) : firstPage.items;
     const filteredTasks = input.status && input.status !== 'all'
       ? allTasks.filter(task => task.status === input.status)
       : allTasks;
@@ -156,7 +148,7 @@ export class TaskApi {
   async editEstimate(estimateId: number, input: EditTaskEstimateInput): Promise<unknown> {
     const normalized = this.normalizeRecordEstimateInput(input);
     return this.http.legacyRequest('POST', `/task-editEstimate-${estimateId}.json`, {
-      data: toFormUrlEncoded(normalized as unknown as Record<string, unknown>),
+      data: toFormUrlEncoded(normalized as unknown as FormEncodable),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   }
@@ -260,7 +252,7 @@ export class TaskApi {
   async batchCancelTasks(input: { taskIds: number[] }): Promise<unknown> {
     const taskIds = normalizeTaskIdList(input.taskIds, 'taskIds');
     return this.http.legacyRequest('POST', '/task-batchCancel.json', {
-      data: toFormUrlEncoded({ taskIDList: taskIds } as unknown as Record<string, unknown>),
+      data: toFormUrlEncoded({ taskIDList: taskIds } as FormEncodable),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   }
@@ -268,7 +260,7 @@ export class TaskApi {
   async batchCloseTasks(input: { taskIds: number[] }): Promise<unknown> {
     const taskIds = normalizeTaskIdList(input.taskIds, 'taskIds');
     const response = await this.http.legacyRequest('POST', '/task-batchClose.json', {
-      data: toFormUrlEncoded({ taskIDList: taskIds } as unknown as Record<string, unknown>),
+      data: toFormUrlEncoded({ taskIDList: taskIds } as FormEncodable),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
     const skipTaskIdList = this.extractBatchCloseSkipTaskIdList(response);
@@ -285,7 +277,7 @@ export class TaskApi {
   async batchChangeTaskModule(input: { taskIds: number[]; moduleId: number }): Promise<unknown> {
     const taskIds = normalizeTaskIdList(input.taskIds, 'taskIds');
     return this.http.legacyRequest('POST', `/task-batchChangeModule-${input.moduleId}.json`, {
-      data: toFormUrlEncoded({ taskIDList: taskIds } as unknown as Record<string, unknown>),
+      data: toFormUrlEncoded({ taskIDList: taskIds } as FormEncodable),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   }
@@ -322,10 +314,12 @@ export class TaskApi {
 
   async batchCreateTasks(input: { execution: number; project?: number; tasks: Array<Record<string, unknown>> }): Promise<unknown> {
     if (!Array.isArray(input.tasks) || input.tasks.length === 0) throw new Error('tasks 至少需要 1 项');
+    // 对象数组由 toFormUrlEncoded 展开为 tasks[0][name]=...&tasks[0][assignedTo]=...，
+    // 避免之前 tasks[]=[object Object] 的双重包装问题。
     const formData: Record<string, unknown> = { tasks: input.tasks };
     if (input.project !== undefined) formData.project = input.project;
     return this.http.legacyRequest('POST', `/task-batchCreate-${input.execution}.json`, {
-      data: toFormUrlEncoded(formData as unknown as Record<string, unknown>),
+      data: toFormUrlEncoded(formData),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   }
@@ -377,7 +371,7 @@ export class TaskApi {
     if (input.hours !== undefined) formData.hours = input.hours.join(',');
     if (input.roles !== undefined) formData.roles = input.roles.join(',');
     return this.http.legacyRequest('POST', `/task-editTeam-${input.taskId}.json`, {
-      data: toFormUrlEncoded(formData as unknown as Record<string, unknown>),
+      data: toFormUrlEncoded(formData as FormEncodable),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   }
@@ -390,7 +384,7 @@ export class TaskApi {
   }
 
   async convertBugToTask(input: ConvertBugToTaskInput): Promise<unknown> {
-    const normalizedTask = this.normalizeTaskInput(input as unknown as Record<string, unknown>, ['name', 'assignedTo', 'estStarted', 'deadline']);
+    const normalizedTask = this.normalizeTaskInput(input as unknown as FormEncodable, ['name', 'assignedTo', 'estStarted', 'deadline']);
     const estimate = typeof normalizedTask.estimate === 'number' ? normalizedTask.estimate : undefined;
     const formPayload: Record<string, unknown> = {
       execution: input.execution,

@@ -3,7 +3,7 @@ import { toClientPaginatedListResult, toServerListResult, type ListResult } from
 import { fetchAllPages, normalizePagination, type PaginationInput } from '../core/pagination.js';
 import type { ZentaoBug, ZentaoExecution, ZentaoListResponse, ZentaoTask } from '../types/zentao.js';
 import { addDays, formatDate, isOnOrBefore, makeCalendarDate, normalizeOptionalText, parseCalendarDate, toDateOnly } from '../utils/date.js';
-import { toFormUrlEncoded } from '../utils/form.js';
+import { toFormUrlEncoded, type FormEncodable } from '../utils/form.js';
 import { bugMatchesKeyword, bugMatchesModuleAlias, normalizeBugFilterText } from './bug-filter.js';
 
 export interface UpdateExecutionInput {
@@ -303,8 +303,8 @@ export class ExecutionApi {
   async getExecutionDailyBugStats(executionId: number, input: ExecutionDailyBugStatsInput = {}): Promise<unknown> {
     const normalizedInput = {
       ...input,
-      iterationName: this.normalizeOptionalText(input.iterationName),
-      date: this.normalizeOptionalText(input.date),
+      iterationName: normalizeOptionalText(input.iterationName),
+      date: normalizeOptionalText(input.date),
     };
     const date = this.resolveStatsDate(normalizedInput.date);
     const bugs = await this.getAllExecutionBugs(executionId);
@@ -364,7 +364,7 @@ export class ExecutionApi {
      * 旧版 execution::edit() 控制器直接调用模型 update()，绕过该 bug。
      * 通过 $this->send() 返回 JSON，走 .json 扩展。
      */
-    const formData = toFormUrlEncoded(this.normalizeExecutionUpdate(update) as Record<string, unknown>);
+    const formData = toFormUrlEncoded(this.normalizeExecutionUpdate(update) as FormEncodable);
     return this.http.legacyRequest('POST', `/execution-edit-${executionId}.json`, {
       data: formData.toString(),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -377,50 +377,41 @@ export class ExecutionApi {
      * 旧版 execution::start($executionID, $from='execution') 走 `.json` 控制器。
      */
     return this.http.legacyRequest('POST', `/execution-start-${executionId}-execution.json`, {
-      data: toFormUrlEncoded(this.normalizeExecutionAction(payload) as Record<string, unknown>),
+      data: toFormUrlEncoded(this.normalizeExecutionAction(payload) as FormEncodable),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   }
 
   async closeExecution(executionId: number, payload: ExecutionActionInput = {}): Promise<unknown> {
     return this.http.legacyRequest('POST', `/execution-close-${executionId}-execution.json`, {
-      data: toFormUrlEncoded(this.normalizeExecutionAction(payload) as Record<string, unknown>),
+      data: toFormUrlEncoded(this.normalizeExecutionAction(payload) as FormEncodable),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   }
 
   async suspendExecution(executionId: number, payload: ExecutionActionInput = {}): Promise<unknown> {
     return this.http.legacyRequest('POST', `/execution-suspend-${executionId}-execution.json`, {
-      data: toFormUrlEncoded(this.normalizeExecutionAction(payload) as Record<string, unknown>),
+      data: toFormUrlEncoded(this.normalizeExecutionAction(payload) as FormEncodable),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   }
 
   async activateExecution(executionId: number, payload: ExecutionActionInput = {}): Promise<unknown> {
     return this.http.legacyRequest('POST', `/execution-activate-${executionId}-execution.json`, {
-      data: toFormUrlEncoded(this.normalizeExecutionAction(payload) as Record<string, unknown>),
+      data: toFormUrlEncoded(this.normalizeExecutionAction(payload) as FormEncodable),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   }
 
   async putoffExecution(executionId: number, payload: PutoffExecutionInput): Promise<unknown> {
     return this.http.legacyRequest('POST', `/execution-putoff-${executionId}-execution.json`, {
-      data: toFormUrlEncoded(this.normalizePutoffExecution(payload) as unknown as Record<string, unknown>),
+      data: toFormUrlEncoded(this.normalizePutoffExecution(payload) as unknown as FormEncodable),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   }
 
   private normalizeExecutionUpdate(update: UpdateExecutionInput): UpdateExecutionInput {
     return this.normalizeStringFields(update as Record<string, unknown>, ['name', 'code', 'desc', 'begin', 'end', 'lifetime', 'PO', 'PM', 'QD', 'RD', 'acl'], ['teamMembers', 'whitelist']) as UpdateExecutionInput;
-  }
-
-  private normalizeOptionalText(value?: string): string | undefined {
-    if (typeof value !== 'string') {
-      return value;
-    }
-
-    const trimmed = value.trim();
-    return trimmed === '' ? undefined : trimmed;
   }
 
   private normalizeExecutionBugQueryParams(params: ExecutionBugListParams): ExecutionBugListParams {
@@ -804,7 +795,7 @@ export class ExecutionApi {
     if (!Array.isArray(input.executionIds) || input.executionIds.length === 0) {
       throw new Error('executionIds 至少需要 1 项');
     }
-    const status = this.normalizeOptionalText(input.status);
+    const status = normalizeOptionalText(input.status);
     if (!status) throw new Error('status 不能为空');
     const formData: Record<string, unknown> = { executionIdList: input.executionIds };
     /**
@@ -898,8 +889,8 @@ export class ExecutionApi {
 
   async executionAll(input: { status?: string; orderBy?: string; limit?: number; productId?: number }): Promise<unknown> {
     const params = new URLSearchParams();
-    const status = this.normalizeOptionalText(input.status) ?? 'undone';
-    const orderBy = this.normalizeOptionalText(input.orderBy) ?? 'order_asc';
+    const status = normalizeOptionalText(input.status) ?? 'undone';
+    const orderBy = normalizeOptionalText(input.orderBy) ?? 'order_asc';
     params.set('status', status);
     params.set('orderBy', orderBy);
     if (input.productId !== undefined) params.set('productID', String(input.productId));
@@ -1028,7 +1019,7 @@ export class ExecutionApi {
     if (!Array.isArray(input.executionIds) || input.executionIds.length === 0) {
       throw new Error('executionIds 至少需要 1 项');
     }
-    const orderBy = this.normalizeOptionalText(input.orderBy) ?? 'order_asc';
+    const orderBy = normalizeOptionalText(input.orderBy) ?? 'order_asc';
     /**
      * 禅道 18.5 execution::updateOrder 控制器读 `executions` 逗号字符串与 `orderBy`。
      * 不是 `id/order` 数组下标。
@@ -1047,7 +1038,7 @@ export class ExecutionApi {
     if (!Array.isArray(input.storyIds) || input.storyIds.length === 0) {
       throw new Error('storyIds 至少需要 1 项');
     }
-    const orderBy = this.normalizeOptionalText(input.orderBy) ?? 'order_asc';
+    const orderBy = normalizeOptionalText(input.orderBy) ?? 'order_asc';
     /**
      * 禅道 18.5 execution::storySort 控制器读 `storys` 逗号字符串与 `orderBy`。
      * 不是 `id/order` 数组下标。

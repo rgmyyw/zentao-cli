@@ -23,11 +23,26 @@ export class StatisticsApi {
     private readonly http: ZentaoHttpClient,
   ) {}
 
-  async getMyTaskStatistics(): Promise<unknown> {
-    const tasks = await this.getAllMyTasks();
+  async getMyTaskStatistics(input: { scan?: boolean } = {}): Promise<unknown> {
+    let tasks: ZentaoTask[];
+    let partial = false;
+    let scanned = 0;
+
+    if (input.scan === false) {
+      // compact 模式：只采样首页，不扫描全量分页，用于 whoami 等快速预览场景。
+      const result = await this.taskApi.getMyTasks({ status: 'all', scan: false, limit: 100 }) as ListResult<ZentaoTask>;
+      tasks = result.items;
+      partial = true;
+      scanned = result.scanned ?? tasks.length;
+    } else {
+      tasks = await this.getAllMyTasks();
+    }
+
     return {
       total: tasks.length,
-      partial: false,
+      partial,
+      scanned,
+      sampled: input.scan === false,
       byStatus: countBy(tasks, task => task.status),
       byPriority: countBy(tasks, task => task.pri as number | undefined),
       tasks: this.pickTasks(tasks),
