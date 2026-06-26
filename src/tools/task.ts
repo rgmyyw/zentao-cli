@@ -26,7 +26,15 @@ export function registerTaskTools(server: CliRegistry): void {
       limit: z.number().int().positive().max(100).optional(),
     },
     async (input) => jsonResult(await getApi().task.getMyTasks(input)),
-    { costHint: 'low', nextBestTools: ['getTaskDetail', 'getMyTaskStatistics', 'getMyWeeklyActivity'] },
+    {
+      costHint: 'low',
+      nextBestTools: ['getTaskDetail', 'getMyTaskStatistics', 'getMyWeeklyActivity'],
+      recommendations: [
+        { tool: 'getMyTaskStatistics', reason: '汇总当前任务的工时和状态分布', priority: 0 },
+        { tool: 'getMyWeeklyActivity', reason: '生成阶段性工作清单', priority: 0 },
+        { tool: 'getMyTasks', reason: '可重新按状态过滤', args: { status: 'doing' }, priority: -1 },
+      ],
+    },
   );
 
   server.tool(
@@ -35,7 +43,17 @@ export function registerTaskTools(server: CliRegistry): void {
       taskId: z.number().int().positive(),
     },
     async ({ taskId }) => jsonResult(await getApi().task.getTaskDetail(taskId)),
-    { costHint: 'low', nextBestTools: ['getComments', 'getMyTasks', 'getExecutionSnapshot'] },
+    {
+      costHint: 'low',
+      nextBestTools: ['getComments', 'getMyTasks', 'getExecutionSnapshot'],
+      recommendations: [
+        { tool: 'startTask', reason: '开始任务并登记消耗工时', args: { taskId: { source: 'input', path: 'taskId' } } },
+        { tool: 'finishTask', reason: '完成任务并记录完成时间', args: { taskId: { source: 'input', path: 'taskId' } } },
+        { tool: 'updateTask', reason: '调整任务字段、负责人或排期', args: { taskId: { source: 'input', path: 'taskId' } } },
+        { tool: 'addComment', reason: '为任务添加备注', args: { objectType: 'task', objectID: { source: 'input', path: 'taskId' } } },
+        { tool: 'getComments', reason: '查看任务历史评论', args: { objectType: 'task', objectID: { source: 'input', path: 'taskId' } } },
+      ],
+    },
   );
 
   server.tool(

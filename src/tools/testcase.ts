@@ -18,6 +18,11 @@ export function registerTestCaseTools(server: CliRegistry): void {
     {
       costHint: 'low',
       nextBestTools: ['getTestCaseDetail', 'getTestTasks', 'getProductStories'],
+      recommendations: [
+        { tool: 'getTestCaseDetail', reason: '查看用例详情' },
+        { tool: 'getTestTasks', reason: '查看产品下的测试单', args: { productId: { source: 'input', path: 'productId' } } },
+        { tool: 'getProductBugs', reason: '查看产品下的 Bug', args: { productId: { source: 'input', path: 'productId' } } },
+      ],
     },
   );
 

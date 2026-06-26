@@ -585,4 +585,44 @@ describe('runCli', () => {
     await expect(runCli(['changelog', '--unknown'])).rejects.toThrow('changelog 不支持参数: --unknown');
     await expect(runCli(['changelog', '--limit', '0'])).rejects.toThrow('changelog --limit 必须是正整数或 all');
   });
+
+  it('--recommend 注入 meta.next 并附带 example 命令行', async () => {
+    const getBugDetail = vi.fn(async () => ({ id: 84362, status: 'active' }));
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    setApi({ bug: { getBugDetail } } as never);
+
+    await runCli(['--recommend', 'getBugDetail', '--bugId', '84362']);
+
+    const payload = JSON.parse(String(write.mock.calls.at(-1)?.[0])) as { meta?: { next?: Array<{ tool: string; example?: string }> } };
+    expect(payload.meta?.next).toBeDefined();
+    const tools = payload.meta?.next?.map((item) => item.tool);
+    expect(tools).toContain('resolveBug');
+    expect(tools).toContain('closeBug');
+    const resolve = payload.meta?.next?.find((item) => item.tool === 'resolveBug');
+    expect(resolve?.example).toBeUndefined();
+    const relatedStory = payload.meta?.next?.find((item) => item.tool === 'getBugRelatedStory');
+    expect(relatedStory?.example).toBe('zentao getBugRelatedStory --bugId 84362');
+  });
+
+  it('不带 --recommend 时不注入 meta.next', async () => {
+    const getBugDetail = vi.fn(async () => ({ id: 84362, status: 'active' }));
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    setApi({ bug: { getBugDetail } } as never);
+
+    await runCli(['getBugDetail', '--bugId', '84362']);
+
+    const payload = JSON.parse(String(write.mock.calls.at(-1)?.[0])) as { meta?: { next?: unknown } };
+    expect(payload.meta?.next).toBeUndefined();
+  });
+
+  it('--recommend=false 等价于不开启', async () => {
+    const getBugDetail = vi.fn(async () => ({ id: 84362 }));
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    setApi({ bug: { getBugDetail } } as never);
+
+    await runCli(['--recommend=false', 'getBugDetail', '--bugId', '84362']);
+
+    const payload = JSON.parse(String(write.mock.calls.at(-1)?.[0])) as { meta?: { next?: unknown } };
+    expect(payload.meta?.next).toBeUndefined();
+  });
 });

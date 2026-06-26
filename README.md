@@ -499,6 +499,17 @@ zentao --role pm batchReviewStories --storyIds 1 --storyIds 2 --confirm true
 export ZENTAO_DISABLE_WRITE=true
 ```
 
+## 下一步自动推荐
+
+加 `--recommend` 可以在命令返回的 `meta.next` 拿到结构化推荐（含 `tool / reason / args / example`），Agent 无需再翻 docs。
+
+```bash
+zentao --recommend getBugDetail --bugId 84362
+zentao --recommend getExecutionDetail --executionId 2130
+```
+
+约束：默认 opt-in，不传则不输出；推荐按当前 role 过滤；`args` 由声明从 `input` / `payload` 路径解析。
+
 ## 更多命令
 
 ```bash

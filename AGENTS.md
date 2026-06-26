@@ -48,6 +48,24 @@
 - `execution-build-2130.html`：解析为 execution ID `2130` 的版本 / 构建列表，命令 `getExecutionBuilds --executionId 2130`。
 - `execution-dynamic-2130.html`：解析为 execution ID `2130` 的执行动态，命令 `getExecutionDynamic --executionId 2130`。
 
+### 下一步自动推荐
+
+任何命令加 `--recommend` 后，CLI 在返回 JSON 的 `meta.next` 注入结构化推荐条目，含 `tool / reason / args / example`，Agent 拿到结果后可直接挑一条 `example` 接着跑。
+
+实现要点：
+
+- 数据源头：命令 `server.tool()` 的 `metadata.recommendations: Recommendation[]`，回退到既有 `nextBestTools`。
+- `Recommendation.args` 既支持 `{ source: 'input' | 'payload', path: 'dot.path' }` 路径映射，也支持字面量（`string / number / boolean / null`）。
+- 运行时：`src/core/recommendations.ts` 跑纯函数 `resolveRecommendations`；CLI 在 `injectRecommendations` 里调用，按当前 role 过滤，按 `priority` 倒序；写命令 example 自动追加 `--confirm true`。
+- 默认 opt-in flag：`--recommend`（`--recommend=true` / `--recommend=false` 也支持）；不传则不注入。
+- 已覆盖首批 ~20 个查询入口（任务 / Bug / 需求 / 执行 / 项目 / 产品 / 构建 / 测试 / 搜索 / 计划）；未声明的命令自然回退到 `nextBestTools`。
+
+限制：
+
+- 不支持 `when(payload)` 条件分支，参数路径解析失败时该字段不出现在 `args` 里、对应 `example` 省略，推荐条目本身保留。
+- 列表型 payload 的 item 字段（如 `getMyTasks` 数组里的 `id`）不在 `meta.next` 预填范围内，因为 `args` 解析不到根级 `id`；Agent 需自选 ID。
+- 推荐只走一步，不串多跳。
+
 ### 我的任务
 
 `getMyTasks` 支持 `status`、`limit`、`page`。如果服务端忽略部分过滤参数，CLI 会尽量拉取后在客户端分页 / 过滤，并在返回中标明 `source`、`total`、`scanned`。

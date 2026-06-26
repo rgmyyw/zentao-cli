@@ -4,9 +4,24 @@ import type { JsonContentResult } from '../types/common.js';
 export type CliHandler<TInput extends Record<string, unknown> = Record<string, unknown>> =
   (input: TInput) => Promise<JsonContentResult> | JsonContentResult;
 
+export interface ArgumentMapping {
+  source: 'input' | 'payload';
+  path: string;
+}
+
+export type ArgumentValue = ArgumentMapping | string | number | boolean | null;
+
+export interface Recommendation {
+  tool: string;
+  reason: string;
+  args?: Record<string, ArgumentValue>;
+  priority?: number;
+}
+
 export interface CliCommandMetadata {
   costHint?: 'low' | 'medium' | 'high';
   nextBestTools?: string[];
+  recommendations?: Recommendation[];
 }
 
 export interface CliCommandDefinition {

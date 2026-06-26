@@ -986,6 +986,26 @@ CI 可验证：
 - 查询旧版页面 URL 时，先解析路径里的对象类型和 ID，再调 CLI 查结构化数据。
 - 角色过滤只改变 CLI 暴露命令范围，不改变服务端账号权限。
 
+### 16.16 下一步推荐函数规则
+
+面向 Agent / 脚本调用的 CLI 可提供 opt-in 下一步推荐机制：命令执行后在 JSON 返回的 `meta.next` 注入结构化推荐条目，含 `tool / reason / priority / args / example`。
+
+设计约束：
+
+- 推荐声明放在 `server.tool(..., metadata)`，字段为 `recommendations`，并保留 `nextBestTools` 作为低保真回退。
+- 推荐只在全局 flag `--recommend` 开启时注入；不传时不改变原 payload 结构。
+- `args` 支持字面量和 `{ source: 'input' | 'payload', path: 'dot.path' }` 直接路径映射，不支持表达式和业务条件分支。
+- 运行时必须按当前 `role` 过滤推荐目标，不能把当前角色不可见命令通过 `meta.next` 暴露出去。
+- 只有目标命令 schema 的必填参数全部可解析时才生成 `example`；缺必填参数时保留 `tool / reason / args`，但不输出不可执行命令行。
+- 写命令的 `example` 在必填参数齐全时自动追加 `--confirm true`，继续遵守写保护。
+- 列表型 payload 不默认从 `items[0]` 取 ID，避免 Agent 被第一条数据误导；应让 Agent 或用户自选列表项。
+
+测试要求：
+
+- 覆盖 `--recommend` 注入、不传不注入、`--recommend=false` 不注入。
+- 覆盖 `input` / `payload` 路径解析、字面量参数、路径解析失败、角色过滤、`priority` 排序。
+- 覆盖“缺目标必填参数不生成 `example`”，避免测试保护不可执行推荐。
+
 ## 17. 新项目对齐清单
 
 创建新项目时按以下清单落地：

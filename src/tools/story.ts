@@ -13,7 +13,15 @@ export function registerStoryTools(server: CliRegistry): void {
       limit: z.number().int().positive().max(100).optional(),
     },
     async (input) => jsonResult(await getApi().story.getProductStories(input)),
-    { costHint: 'low', nextBestTools: ['getStoryDetail', 'getDevelopmentContextSnapshot', 'getProductPlans'] },
+    {
+      costHint: 'low',
+      nextBestTools: ['getStoryDetail', 'getDevelopmentContextSnapshot', 'getProductPlans'],
+      recommendations: [
+        { tool: 'searchStories', reason: '在产品内按关键字搜索需求', args: { productId: { source: 'input', path: 'productId' } } },
+        { tool: 'getProductPlans', reason: '查看产品的计划列表', args: { productId: { source: 'input', path: 'productId' } } },
+        { tool: 'getProductBugs', reason: '同时查看该产品下的 Bug', args: { productId: { source: 'input', path: 'productId' } } },
+      ],
+    },
   );
 
   server.tool(
@@ -22,7 +30,18 @@ export function registerStoryTools(server: CliRegistry): void {
       storyId: z.number().int().positive(),
     },
     async ({ storyId }) => jsonResult(await getApi().story.getStoryDetail(storyId)),
-    { costHint: 'low', nextBestTools: ['getStoryRelatedBugs', 'getDevelopmentContextSnapshot', 'getProductStories'] },
+    {
+      costHint: 'low',
+      nextBestTools: ['getStoryRelatedBugs', 'getDevelopmentContextSnapshot', 'getProductStories'],
+      recommendations: [
+        { tool: 'updateStory', reason: '调整需求字段或状态', args: { storyId: { source: 'input', path: 'storyId' } } },
+        { tool: 'getStoryRelatedBugs', reason: '查看需求关联的 Bug', args: { storyId: { source: 'input', path: 'storyId' } } },
+        { tool: 'getDevelopmentContext', reason: '聚合需求的开发上下文', args: { entityType: 'story', entityId: { source: 'input', path: 'storyId' } } },
+        { tool: 'createTaskFromStory', reason: '把需求拆成任务', args: { storyId: { source: 'input', path: 'storyId' } } },
+        { tool: 'addComment', reason: '为需求添加备注', args: { objectType: 'story', objectID: { source: 'input', path: 'storyId' } } },
+        { tool: 'getComments', reason: '查看需求历史评论', args: { objectType: 'story', objectID: { source: 'input', path: 'storyId' } } },
+      ],
+    },
   );
 
   server.tool(

@@ -12,6 +12,10 @@ export function registerSearchTools(server: CliRegistry): void {
   }, async (input) => jsonResult(await getApi().search.searchStories(input)), {
     costHint: 'medium',
     nextBestTools: ['getStoryDetail', 'getDevelopmentContextSnapshot', 'searchStoriesByProductName'],
+    recommendations: [
+      { tool: 'searchStories', reason: '可在更多产品内深搜', args: { keyword: { source: 'input', path: 'keyword' } } },
+      { tool: 'searchStoriesByProductName', reason: '按产品名 + 关键字搜索', args: { keyword: { source: 'input', path: 'keyword' } } },
+    ],
   });
 
   server.tool('searchStoriesByProductName', {
@@ -22,5 +26,9 @@ export function registerSearchTools(server: CliRegistry): void {
   }, async ({ productName, keyword, limit, deepSearch }) => jsonResult(await getApi().search.searchStoriesByProductName(productName, keyword, { limit, deepSearch })), {
     costHint: 'medium',
     nextBestTools: ['searchStories', 'getProductStories', 'getStoryDetail'],
+    recommendations: [
+      { tool: 'searchStories', reason: '直接按 productId 精确搜索', args: { keyword: { source: 'input', path: 'keyword' } } },
+      { tool: 'getProductStories', reason: '列出产品下全部需求' },
+    ],
   });
 }

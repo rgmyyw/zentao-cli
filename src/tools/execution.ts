@@ -16,7 +16,16 @@ export function registerExecutionTools(server: CliRegistry): void {
       executionId: z.number().int().positive(),
     },
     async ({ executionId }) => jsonResult(await getApi().execution.getExecutionDetail(executionId)),
-    { costHint: 'low', nextBestTools: ['getExecutionSnapshot', 'getExecutionBugs', 'getExecutionDynamic'] },
+    {
+      costHint: 'low',
+      nextBestTools: ['getExecutionSnapshot', 'getExecutionBugs', 'getExecutionDynamic'],
+      recommendations: [
+        { tool: 'getExecutionBugs', reason: '查看执行下的 Bug 列表', args: { executionId: { source: 'input', path: 'executionId' } } },
+        { tool: 'getExecutionBuilds', reason: '查看执行下的构建/版本', args: { executionId: { source: 'input', path: 'executionId' } } },
+        { tool: 'getExecutionDynamic', reason: '查看执行动态', args: { executionId: { source: 'input', path: 'executionId' } } },
+        { tool: 'getExecutionDailyBugStats', reason: '生成执行每日 Bug / 任务统计', args: { executionId: { source: 'input', path: 'executionId' } } },
+      ],
+    },
   );
 
   server.tool(
@@ -43,7 +52,14 @@ export function registerExecutionTools(server: CliRegistry): void {
       projectId: z.number().int().positive(),
     },
     async ({ projectId }) => jsonResult(await getApi().execution.getProjectExecutions(projectId)),
-    { costHint: 'low', nextBestTools: ['getExecutionDetail', 'getExecutionSnapshot', 'getProjectDetail'] },
+    {
+      costHint: 'low',
+      nextBestTools: ['getExecutionDetail', 'getExecutionSnapshot', 'getProjectDetail'],
+      recommendations: [
+        { tool: 'getProjectDetail', reason: '回到项目详情', args: { projectId: { source: 'input', path: 'projectId' } } },
+        { tool: 'getProjectBuilds', reason: '查看项目下的构建', args: { projectId: { source: 'input', path: 'projectId' } } },
+      ],
+    },
   );
 
   server.tool(
@@ -52,7 +68,14 @@ export function registerExecutionTools(server: CliRegistry): void {
       executionId: z.number().int().positive(),
     },
     async ({ executionId }) => jsonResult(await getApi().execution.getExecutionBuilds(executionId)),
-    { costHint: 'low', nextBestTools: ['getExecutionSnapshot', 'getBuildDetail', 'getExecutionDetail'] },
+    {
+      costHint: 'low',
+      nextBestTools: ['getExecutionSnapshot', 'getBuildDetail', 'getExecutionDetail'],
+      recommendations: [
+        { tool: 'getExecutionDetail', reason: '回到执行详情', args: { executionId: { source: 'input', path: 'executionId' } } },
+        { tool: 'getBuildDetail', reason: '查看单个构建的详情' },
+      ],
+    },
   );
 
   server.tool(
@@ -67,7 +90,14 @@ export function registerExecutionTools(server: CliRegistry): void {
       moduleId: z.number().int().positive().optional().describe('可选。按执行 Bug 的模块 ID 过滤。'),
     },
     async ({ executionId, page, limit, status, search, module, moduleId }) => jsonResult(await getApi().execution.getExecutionBugs(executionId, { page, limit, status, search, module, moduleId })),
-    { costHint: 'medium', nextBestTools: ['getBugSnapshot', 'getExecutionSnapshot', 'getExecutionDetail'] },
+    {
+      costHint: 'medium',
+      nextBestTools: ['getBugSnapshot', 'getExecutionSnapshot', 'getExecutionDetail'],
+      recommendations: [
+        { tool: 'getExecutionDailyBugStats', reason: '生成执行每日 Bug / 任务统计', args: { executionId: { source: 'input', path: 'executionId' } } },
+        { tool: 'getExecutionDetail', reason: '查看执行详情', args: { executionId: { source: 'input', path: 'executionId' } } },
+      ],
+    },
   );
 
   server.tool(

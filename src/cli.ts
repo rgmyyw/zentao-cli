@@ -9,9 +9,10 @@ import {
   type ChangelogOptions,
 } from './core/cli-output.js';
 import { loadConfig } from './core/config.js';
-import { buildRegistryForCommand, getAvailableCommandNames } from './core/manifest.js';
+import { buildRegistryForCommand, buildRegistryForRole, getAvailableCommandNames } from './core/manifest.js';
 import { getRequestCount, getLastRequestDurationMs } from './core/http-metrics.js';
 import { looksLikeUrlIntentInput, parseUrlIntent, resolveExecutableUrlIntent, type ParsedUrlIntent } from './core/url-intent.js';
+import { resolveRecommendations } from './core/recommendations.js';
 import { runInstallCommand, runUninstallCommand, runUpdateCommand } from './install.js';
 import { setGlobalOutputMode, type OutputMode } from './tools/shared.js';
 import type { Role } from './types/common.js';
@@ -23,7 +24,7 @@ const VALID_ROLES = new Set<Role>(['full', 'dev', 'pm', 'qa']);
 const BUILTIN_COMMAND_NAMES = ['help', 'list', 'version', 'changelog', 'install', 'uninstall', 'remove', 'update', 'upgrade'];
 
 export async function runCli(rawArgs: string[]): Promise<void> {
-  const { role, commandName, commandArgs, outputMode, directIntent } = parseCliArgs(rawArgs);
+  const { role, commandName, commandArgs, outputMode, directIntent, recommend } = parseCliArgs(rawArgs);
   setGlobalOutputMode(outputMode);
   const registeredCommandNames = await getAvailableCommandNames(role);
   const commandNames = [...BUILTIN_COMMAND_NAMES, ...registeredCommandNames]
@@ -157,8 +158,48 @@ export async function runCli(rawArgs: string[]): Promise<void> {
   const requestCountBefore = getRequestCount();
   const input = parseCommandInput(command.schema, commandArgs);
   const result = await command.handler(input);
-  const text = result.content[0]?.text ?? '';
+  let text = result.content[0]?.text ?? '';
+  if (recommend) {
+    text = await injectRecommendations(text, command, input, registeredCommandNames, role);
+  }
   process.stdout.write(`${await formatCommandOutput(command.name, appendCommandMeta(text, requestCountBefore))}\n`);
+}
+
+async function injectRecommendations(
+  text: string,
+  command: { name: string; metadata?: import('./core/cli-registry.js').CliCommandMetadata },
+  input: Record<string, unknown>,
+  registeredCommandNames: string[],
+  role: Role,
+): Promise<string> {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    return text;
+  }
+
+  const fullRegistry = await buildRegistryForRole(role);
+  const next = resolveRecommendations({
+    command: { metadata: command.metadata },
+    input,
+    payload,
+    availableCommandNames: registeredCommandNames,
+    registry: fullRegistry,
+  });
+
+  if (next.length === 0) return text;
+
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return text;
+  }
+
+  const record = payload as Record<string, unknown>;
+  const existingMeta = typeof record.meta === 'object' && record.meta !== null && !Array.isArray(record.meta)
+    ? record.meta as Record<string, unknown>
+    : {};
+  record.meta = { ...existingMeta, next };
+  return JSON.stringify(record);
 }
 
 function appendCommandMeta(text: string, requestCountBefore: number): string {
@@ -236,10 +277,11 @@ function parseChangelogOptions(args: string[]): ChangelogOptions {
   return options;
 }
 
-function parseCliArgs(rawArgs: string[]): { role: Role; commandName?: string; commandArgs: string[]; outputMode: OutputMode; directIntent?: ParsedUrlIntent } {
+function parseCliArgs(rawArgs: string[]): { role: Role; commandName?: string; commandArgs: string[]; outputMode: OutputMode; directIntent?: ParsedUrlIntent; recommend: boolean } {
   const args = [...rawArgs];
   let role: Role = 'full';
   let outputMode: OutputMode = 'compact';
+  let recommend = false;
 
   const inlineRoleArg = args[0];
   if (inlineRoleArg?.startsWith('--role=') || inlineRoleArg?.startsWith('-r=')) {
@@ -281,6 +323,21 @@ function parseCliArgs(rawArgs: string[]): { role: Role; commandName?: string; co
     args.splice(outputArgIndex, 2);
   }
 
+  const recommendInlineIndex = args.findIndex((arg) => arg === '--recommend' || arg.startsWith('--recommend='));
+  if (recommendInlineIndex >= 0) {
+    const token = args[recommendInlineIndex];
+    if (token.startsWith('--recommend=')) {
+      const value = token.slice('--recommend='.length).trim().toLowerCase();
+      recommend = value === 'true' || value === '1' || value === 'yes' || value === 'on';
+    } else {
+      recommend = true;
+    }
+    args.splice(recommendInlineIndex, 1);
+  } else if (args[0] === '--recommend') {
+    recommend = true;
+    args.shift();
+  }
+
   const normalized = normalizeCommandInput(args.shift(), args, role);
   let commandName = normalized.commandName;
   if (normalized.consumedArgs > 0) {
@@ -290,7 +347,7 @@ function parseCliArgs(rawArgs: string[]): { role: Role; commandName?: string; co
     args.unshift(...normalized.prependedArgs);
   }
 
-  return { role, commandName, commandArgs: args, outputMode, directIntent: normalized.directIntent };
+  return { role, commandName, commandArgs: args, outputMode, directIntent: normalized.directIntent, recommend };
 }
 
 function assertOutputMode(value: string): asserts value is OutputMode {

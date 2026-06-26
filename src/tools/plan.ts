@@ -12,9 +12,23 @@ export function registerPlanTools(server: CliRegistry): void {
     status: optionalTrimmedText,
     query: optionalTrimmedText.describe('禅道 18.5 REST v1 支持的计划搜索关键字'),
     order: optionalTrimmedText.describe('排序字段，例如 id_desc'),
-  }, async (input) => jsonResult(await getApi().plan.getProductPlans(input)), { costHint: 'low', nextBestTools: ['getPlanDetail', 'getProductStories', 'getProductBugs'] });
+  }, async (input) => jsonResult(await getApi().plan.getProductPlans(input)), {
+    costHint: 'low',
+    nextBestTools: ['getPlanDetail', 'getProductStories', 'getProductBugs'],
+    recommendations: [
+      { tool: 'getProductStories', reason: '查看产品下的需求', args: { productId: { source: 'input', path: 'productId' } } },
+      { tool: 'getProductBugs', reason: '查看产品下的 Bug', args: { productId: { source: 'input', path: 'productId' } } },
+    ],
+  });
 
-  server.tool('getPlanDetail', { planId: z.number().int().positive() }, async ({ planId }) => jsonResult(await getApi().plan.getPlanDetail(planId)), { costHint: 'low', nextBestTools: ['getProductPlans', 'getProductStories', 'getProductBugs'] });
+  server.tool('getPlanDetail', { planId: z.number().int().positive() }, async ({ planId }) => jsonResult(await getApi().plan.getPlanDetail(planId)), {
+    costHint: 'low',
+    nextBestTools: ['getProductPlans', 'getProductStories', 'getProductBugs'],
+    recommendations: [
+      { tool: 'getProductStories', reason: '查看产品下的需求' },
+      { tool: 'getProductBugs', reason: '查看产品下的 Bug' },
+    ],
+  });
 
   server.tool('startPlan', {
     planId: z.number().int().positive(),

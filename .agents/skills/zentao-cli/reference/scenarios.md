@@ -147,3 +147,33 @@ zentao --version                                        # CLI 版本
 zentao whoami                                           # 当前登录账号
 zentao parseUrlIntent --url <禅道页面 URL>              # URL 解析
 ```
+
+## 17. 自动下一步推荐（`--recommend`）
+
+任何命令加上 `--recommend`，执行完会在返回 JSON 的 `meta.next` 里看到结构化推荐，含 `tool / reason / args / example`。Agent 拿到结果后可以直接挑一条 `example` 接着跑。
+
+```bash
+zentao --recommend getBugDetail --bugId 84362
+# → meta.next 包含：resolveBug、closeBug、getBugRelatedStory、getDevelopmentContext、addComment…
+#   每条 example 已自动填好 --bugId 84362
+```
+
+```bash
+zentao --recommend getExecutionDetail --executionId 2130
+# → meta.next 包含：getExecutionBugs、getExecutionBuilds、getExecutionDynamic、getExecutionDailyBugStats
+#   每条 example 已自动填好 --executionId 2130
+```
+
+```bash
+zentao --recommend getMyTasks --status doing
+# → meta.next 包含：getMyTaskStatistics、getMyWeeklyActivity；getMyTasks --status doing
+#   列表型 payload 的 item.id 解析不到，example 会省略 args，Agent 自己选 ID
+```
+
+约束：
+
+- 推荐按 `priority` 倒序。
+- `args` 来源：声明 `args.<param>: { source: 'input'|'payload', path: 'dot.path' }`，支持嵌套路径；可与字面量混合。
+- 当前 role 看不到的命令会被剔除。
+- 写命令 example 自动追加 `--confirm true`。
+- 默认不开启，需显式 `--recommend`；不传则完全不注入 `meta.next`。

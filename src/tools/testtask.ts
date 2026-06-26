@@ -15,6 +15,11 @@ export function registerTestTaskTools(server: CliRegistry): void {
     {
       costHint: 'low',
       nextBestTools: ['getTestTaskDetail', 'getProductTestCases', 'getProductBugs'],
+      recommendations: [
+        { tool: 'getTestTaskDetail', reason: '查看测试单详情' },
+        { tool: 'getProductTestCases', reason: '查看产品下的测试用例', args: { productId: { source: 'input', path: 'productId' } } },
+        { tool: 'getProductBugs', reason: '查看产品下的 Bug', args: { productId: { source: 'input', path: 'productId' } } },
+      ],
     },
   );
 
@@ -27,6 +32,11 @@ export function registerTestTaskTools(server: CliRegistry): void {
     {
       costHint: 'low',
       nextBestTools: ['getTestTasks', 'getComments', 'getProductTestCases'],
+      recommendations: [
+        { tool: 'getTestTasks', reason: '回到测试单列表', args: { productId: { source: 'payload', path: 'product' } } },
+        { tool: 'getProductTestCases', reason: '查看产品下的测试用例', args: { productId: { source: 'payload', path: 'product' } } },
+        { tool: 'getProductBugs', reason: '查看产品下的 Bug', args: { productId: { source: 'payload', path: 'product' } } },
+      ],
     },
   );
 }

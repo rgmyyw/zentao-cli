@@ -8,10 +8,18 @@ export function registerBuildTools(server: CliRegistry): void {
   server.tool('getProjectBuilds', { projectId: z.number().int().positive() }, async ({ projectId }) => jsonResult(await getApi().build.getProjectBuilds(projectId)), {
     costHint: 'low',
     nextBestTools: ['getBuildDetail', 'getProjectReleases', 'getProjectExecutions'],
+    recommendations: [
+      { tool: 'getProjectDetail', reason: '回到项目详情', args: { projectId: { source: 'input', path: 'projectId' } } },
+      { tool: 'getProjectReleases', reason: '查看项目下的发布', args: { projectId: { source: 'input', path: 'projectId' } } },
+    ],
   });
   server.tool('getBuildDetail', { buildId: z.number().int().positive() }, async ({ buildId }) => jsonResult(await getApi().build.getBuildDetail(buildId)), {
     costHint: 'low',
     nextBestTools: ['getProjectBuilds', 'getComments', 'getProjectReleases'],
+    recommendations: [
+      { tool: 'getProjectBuilds', reason: '查看项目下的所有构建', args: { projectId: { source: 'payload', path: 'project' } } },
+      { tool: 'getProjectReleases', reason: '查看项目下的发布列表', args: { projectId: { source: 'payload', path: 'project' } } },
+    ],
   });
 
   server.tool(

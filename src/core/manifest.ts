@@ -51,3 +51,9 @@ export async function buildRegistryForCommand(role: Role, commandName: string): 
   await registerTools(registry, role, { commandName });
   return registry;
 }
+
+export async function buildRegistryForRole(role: Role): Promise<InMemoryCliRegistry> {
+  const registry = new InMemoryCliRegistry();
+  await registerTools(registry, role);
+  return registry;
+}

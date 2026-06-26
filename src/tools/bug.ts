@@ -15,6 +15,14 @@ export function registerBugTools(server: CliRegistry): void {
       order: optionalTrimmedText,
     },
     async (input) => jsonResult(await getApi().bug.getMyBugs(input)),
+    {
+      costHint: 'low',
+      recommendations: [
+        { tool: 'getMyBugStatistics', reason: '汇总当前 Bug 的状态和严重度分布', priority: 0 },
+        { tool: 'getMyWeeklyActivity', reason: '把当前 Bug 关联到阶段性工作清单', priority: 0 },
+        { tool: 'getProductBugs', reason: '按产品或模块深入查看 Bug', args: { productId: { source: 'input', path: 'productId' }, status: 'all' }, priority: -1 },
+      ],
+    },
   );
 
   server.tool(
@@ -31,6 +39,14 @@ export function registerBugTools(server: CliRegistry): void {
       moduleId: z.number().int().positive().optional().describe('可选。按模块 ID 过滤 Bug。用于查询特定模块下的问题。'),
     },
     async (input) => jsonResult(await getApi().bug.getProductBugs(input)),
+    {
+      costHint: 'low',
+      recommendations: [
+        { tool: 'getProductDetail', reason: '查看当前产品的详情和元信息', args: { productId: { source: 'input', path: 'productId' } } },
+        { tool: 'getProductStories', reason: '查看产品下的需求', args: { productId: { source: 'input', path: 'productId' } } },
+        { tool: 'getProductTestCases', reason: '查看产品下的测试用例', args: { productId: { source: 'input', path: 'productId' } } },
+      ],
+    },
   );
 
   server.tool(
@@ -39,6 +55,18 @@ export function registerBugTools(server: CliRegistry): void {
       bugId: z.number().int().positive(),
     },
     async ({ bugId }) => jsonResult(await getApi().bug.getBugDetail(bugId)),
+    {
+      costHint: 'low',
+      recommendations: [
+        { tool: 'resolveBug', reason: 'Bug 已修复，可以提交解决方案', args: { bugId: { source: 'input', path: 'bugId' } } },
+        { tool: 'closeBug', reason: 'Bug 可直接关闭（重复 / 不修复）', args: { bugId: { source: 'input', path: 'bugId' } } },
+        { tool: 'assignBug', reason: '重新指派给其他人', args: { bugId: { source: 'input', path: 'bugId' } } },
+        { tool: 'getBugRelatedStory', reason: '查看 Bug 关联的需求', args: { bugId: { source: 'input', path: 'bugId' } } },
+        { tool: 'getDevelopmentContext', reason: '聚合 Bug 的开发上下文', args: { entityType: 'bug', entityId: { source: 'input', path: 'bugId' } } },
+        { tool: 'addComment', reason: '为 Bug 添加备注', args: { objectType: 'bug', objectID: { source: 'input', path: 'bugId' } } },
+        { tool: 'getComments', reason: '查看 Bug 历史评论', args: { objectType: 'bug', objectID: { source: 'input', path: 'bugId' } } },
+      ],
+    },
   );
 
   server.tool(

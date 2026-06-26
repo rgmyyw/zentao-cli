@@ -27,6 +27,20 @@ argument-hint: "[command]"
 - 默认支持写操作；真实写入仍必须传 `confirm=true`。
 - 如需禁用写操作 → 设置 `ZENTAO_DISABLE_WRITE=true`。
 
+## 下一步自动推荐（`--recommend`）
+
+- 命令执行后可在 JSON 返回的 `meta.next` 看到结构化推荐，含 `tool / reason / args / example`。
+- 全局 opt-in flag：传 `--recommend`（或 `--recommend=true`）；不传则不输出。
+- 推荐按 `priority` 倒序；参数按声明从 `input` 或 `payload` 路径解析，解析不到则不预填。
+- 例：
+
+  ```bash
+  zentao --recommend getBugDetail --bugId 84362
+  # meta.next[0] = { tool: "resolveBug", reason: "Bug 已修复...", args: { bugId: 84362 }, example: "zentao resolveBug --bugId 84362 --confirm true" }
+  ```
+
+- 已覆盖首批 ~20 个查询入口（任务 / Bug / 需求 / 执行 / 项目 / 产品 / 构建 / 测试 / 搜索），其他命令会自然回退到原有 `nextBestTools`。
+
 ## 命令选择强制规则
 
 - 不确定命令名 / 参数 → 先查 `reference/<场景>.md`，不要猜参数名。
