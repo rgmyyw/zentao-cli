@@ -2,6 +2,51 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.36 - 2026-06-26
+
+### 新增
+
+- **新增附件上传与下载能力**。在禅道 18.5 文件上传 session（`$_SESSION['album']`）基础上新增 CLI 工具 `uploadFile` / `uploadFiles` / `removeFileFromSession` / `deleteFile` / `downloadFile`，并把 `uid` 字段对齐到 18.5 `tasksEntry::post` / `bugsEntry::post` / `storiesEntry::post` / `testcasesEntry::post` / `testtasksEntry::post` / `buildsEntry::post` / `projectReleasesEntry::post` / `productplanEntry::put` / `productEntry::put` / `executionEntry::put` / `release.php::put` 的标准 fields 列表：
+  - `uploadFile --uid <uid> --file <path>` 单图上传（jpg/jpeg/png/gif），返回 `{id, url, path, title, size}`。
+  - `uploadFiles --uid <uid> --files <json array>` 多图串行上传到同一 session。
+  - `removeFileFromSession --uid <uid> --fileId <id>` 走 `fileEntry::put action=remove`，仅从 session 解绑，不删盘。
+  - `deleteFile --fileId <id> --confirm true` 走 legacy `file-delete-{id}-yes.json` 真正删除附件（含磁盘与动作记录）。
+  - `downloadFile --fileId <id> --output <path>` 走 `downloadLegacy` 下载附件，目录自动创建。
+  - 推荐流程：`uploadFile --uid xxx --file ./a.png` → `createBug --product 1 --title ... --uid xxx --confirm true`，禅道会把该 uid 下已上传的 fileID 关联到新 Bug；同步适用于任务、需求、用例、测试单、构建、发布、产品、项目和执行。
+- **新增 `createTask` 多人任务模式字段**。`tasksEntry::post` 接受 `team` / `teamEstimate` / `multiple`，CLI 端补齐 schema（与 `mailto` 一起加入 entry fields）。
+- **新增 9 个核心写工具的 `uid` 字段**：`updateStory` / `updateExecution` / `createExecution` / `createProduct` / `editProduct` / `createTestTask` / `updateTestTask` / `createRelease` / `updateRelease` 现在可显式接收 `uid` 用于附件绑定。
+- **新增 `file` 工具组**：注册 `tool-group: 'file'`，全角色（full/dev/qa/pm）默认开启。
+- **新增 `form-data` 依赖**（4.0.5，pnpm 10），用于 multipart 文件上传。
+
+### 修复
+
+- **修复 `restartTask` 缺 `assignedTo, realStarted` 字段**。原 schema 只暴露 `consumed / left / comment`，但 `taskrestart.php::post` 实际接受并会 `requireFields('consumed,left')`，缺这两个字段时用户根本无法传"重启任务时改负责人 / 实际开始时间"。CLI 现在补齐两字段，并把 `consumed / left` 标记为 `nonnegative`。
+- **修复 `activateStory` 缺 `assignedTo, status` 字段**。原 schema 只暴露 `comment`，无法在激活需求时改负责人 / 改状态，补齐。
+- **修复 `updateExecution` 缺 `status` 字段**。原 schema 不暴露 status，导致 CLI 改不了执行状态；现在补齐。
+- **修复 `createExecution` 缺 `parent, percent` 字段**。原 schema 无法创建嵌套执行 / 设置初始进度，补齐。
+- **修复 `createProduct` / `editProduct` 缺 `program` 字段**。原 schema 无法把产品挂到项目集下，补齐。
+- **修复 `createTestTask` / `updateTestTask` 缺 `product` 字段**。原 schema 一直用 `productID`，与 18.5 `testtasksEntry::post` 实际字段名 `product` 不对齐；现在 CLI 同时接受 `product` 和 `productID`（`product` 优先），API 层透传正确字段名。
+- **修复 `updateTodo` 缺 `date` 字段**。原 schema 不能改待办日期，补齐。
+- **修复 `createRelease` 缺 `notify, mailto` 字段**。原 schema 不能配置发布通知方式 / 抄送人，补齐（API 层把数组 join 成逗号串传给 legacy controller）。
+- **修复 `closeStory` 缺 `childStories` 字段**。原 schema 不能在关闭需求时同时关闭子需求，补齐。
+- **修复 `updateRelease` 缺 `uid` 字段**。原 schema 不支持附件，补齐。
+
+### 变更
+
+- **CLI 与 zentaopms-18.5 entry 字段对齐审计完成**（详见 `scripts/audit-alignment.txt`）：CLI 工具 312 个 / 18.5 entry method 193 个 / 写操作 95 个 / 已映射 CLI 写工具 47 个 / 未在 CLI 暴露的 entry 写操作 48 个。本次重点修复了 9 个核心写工具的字段缺失；其余 entry 写操作（issue / risk / ticket / feedback / program / user / 各种 delete 等）暂未实现，相关 AGENTS.md / 后续 release 计划继续。
+- **createTask 已对齐 `tasks.php::tasksEntry::post` 的 17 字段标准入口**。原 CLI 已经在调用 `POST /executions/{id}/tasks`（即 entry），只是 schema 是子集；本次把 `mailto` / `team` / `teamEstimate` / `multiple` / `uid` 一并补齐。注意：18.5 entry 接受 `team` / `teamEstimate` 时需配 `multiple: true` 且两个数组长度必须一致，CLI 不做强制校验，由 entry controller 拒绝不合法请求。
+
+### 文档
+
+- 更新 `reference/cheatsheet.md` 与 `reference/index.md`，新增 `file` 工具组与 5 个 file 命令条目（由 `scripts/gen-cheatsheet.mjs` 重新生成）。
+- README 的"这版补了什么"改为聚焦 0.1.36 的字段补齐、附件上传与字段对齐审计。
+
+### 验证
+
+- `pnpm check` 全过：306 个单测 pass，`tsc --noEmit` 无报错，`oxlint` 0 warning / 0 error，`guard-sensitive` pass，build 生成 312 commands in 35 groups。
+- `pnpm release:smoke-query` 验证：159 passed / 3 skipped / 0 failed。
+- 旧版本 smoke 数据（执行 2140、产品 153、需求 10154、Bug 84362、任务 79922、构建 5648、计划 360、用例 58191、测试单 2319）全部仍有效。
+
 ## 0.1.35 - 2026-06-25
 
 ### 修复

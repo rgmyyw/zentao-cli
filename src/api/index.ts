@@ -3,6 +3,7 @@ import { BuildApi } from './build.js';
 import { CommentApi } from './comment.js';
 import { DevelopmentContextApi } from './development-context.js';
 import { ExecutionApi } from './execution.js';
+import { FileApi } from './file.js';
 import { ProductApi } from './product.js';
 import { ProgramApi } from './program.js';
 import { ProjectApi } from './project.js';
@@ -43,6 +44,7 @@ export class ZentaoApi {
   readonly release: ReleaseApi;
   readonly resourceAnalysis: ResourceAnalysisApi;
   readonly search: SearchApi;
+  readonly file: FileApi;
 
   constructor(config: ZentaoConfig) {
     this.http = new ZentaoHttpClient(config);
@@ -66,6 +68,7 @@ export class ZentaoApi {
     this.release = new ReleaseApi(this.http);
     this.resourceAnalysis = new ResourceAnalysisApi(this.http, this.bug, this.task);
     this.search = new SearchApi(this.product, this.story);
+    this.file = new FileApi(this.http);
   }
 
   getToken(): Promise<string> {

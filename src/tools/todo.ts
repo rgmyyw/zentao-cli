@@ -35,6 +35,7 @@ export function registerTodoTools(server: CliRegistry): void {
     todoId: z.number().int().positive(),
     name: z.string().trim().min(1).optional(),
     desc: optionalTrimmedText,
+    date: optionalTrimmedText.describe('日期，格式 YYYY-MM-DD。对应禅道 18.5 todo.php::put 的 date 字段；修改待办日期时传'),
     begin: optionalTrimmedText,
     end: optionalTrimmedText,
     type: optionalTrimmedText,

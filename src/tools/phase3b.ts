@@ -31,6 +31,7 @@ export function registerExecutionWriteTools(server: CliRegistry): void {
     end: optionalTrimmedText.describe('格式 YYYY-MM-DD'),
     days: z.number().int().positive().optional().describe('可用工作日'),
     lifetime: optionalTrimmedText.describe('类型：short | long | ops'),
+    status: optionalTrimmedText.describe('执行状态：wait | doing | suspended | closed。禅道 18.5 execution::edit entry 接受；需配合 startExecution / closeExecution / suspendExecution 等状态动作完成状态机'),
     PO: optionalTrimmedText.describe('产品负责人禅道账号'),
     PM: optionalTrimmedText.describe('负责人禅道账号'),
     QD: optionalTrimmedText.describe('测试负责人禅道账号'),
@@ -38,6 +39,7 @@ export function registerExecutionWriteTools(server: CliRegistry): void {
     teamMembers: z.array(z.string().trim().min(1)).optional().describe('团队成员账号数组'),
     acl: optionalTrimmedText.describe('访问控制：private | open'),
     whitelist: z.array(z.string().trim().min(1)).optional().describe('白名单账号数组'),
+    uid: optionalTrimmedText.describe('附件上传会话 UID；先 uploadFile --uid 拿到 fileID，再把同一个 uid 传给本字段'),
     confirm: z.boolean().optional().default(false),
   }, async ({ executionId, confirm, ...update }) => runWithPreview('updateExecution', confirm, { executionId, update }, previewOrAssertWriteAllowed, () => getApi().execution.updateExecution(executionId, update)));
 
@@ -206,6 +208,7 @@ export function registerExecutionWriteTools(server: CliRegistry): void {
     end: z.string().trim().min(1).describe('格式 YYYY-MM-DD，必填'),
     code: optionalTrimmedText.describe('迭代代号，启用时必填'),
     days: z.number().int().positive().optional(),
+    percent: z.number().optional().describe('进度百分比 0-100，禅道 18.5 execution::create 接受；新建时通常使用 0'),
     lifetime: optionalTrimmedText,
     desc: optionalTrimmedText,
     PO: optionalTrimmedText,
@@ -217,6 +220,8 @@ export function registerExecutionWriteTools(server: CliRegistry): void {
     teamMembers: z.array(z.string().trim().min(1)).optional(),
     products: z.array(z.number().int().positive()).optional(),
     plans: z.array(z.number().int().positive()).optional(),
+    parent: z.number().int().positive().optional().describe('父执行 ID，对齐禅道 18.5 execution::create 的 parent 字段，用于创建嵌套执行（如迭代里再分阶段）'),
+    uid: optionalTrimmedText.describe('附件上传会话 UID；先 uploadFile --uid 拿到 fileID，再把同一个 uid 传给本字段'),
     confirm: z.boolean().optional().default(false),
   }, async ({ confirm, ...payload }) => runWithPreview('createExecution', confirm, payload, previewOrAssertWriteAllowed, () => getApi().execution.createExecution(payload)));
 
@@ -543,7 +548,8 @@ export function registerTestCaseWriteTools(server: CliRegistry): void {
 export function registerTestTaskWriteTools(server: CliRegistry): void {
   server.tool('createTestTask', {
     project: z.number().int().positive().describe('所属项目 ID，实机验证发现当前实例创建测试单时必填'),
-    productID: z.number().int().positive(),
+    product: z.number().int().positive().optional().describe('所属产品 ID，对应 18.5 testtasksEntry::post 的 product 字段；与 productID 二选一，优先使用 product'),
+    productID: z.number().int().positive().optional().describe('产品 ID 别名；与 product 等价；优先使用 product'),
     name: z.string().trim().min(1),
     build: z.union([z.number().int().positive(), z.string().trim().min(1)]),
     begin: z.string().trim().min(1).describe('格式 YYYY-MM-DD'),
@@ -554,13 +560,19 @@ export function registerTestTaskWriteTools(server: CliRegistry): void {
     status: optionalTrimmedText,
     pri: z.number().int().optional(),
     desc: optionalTrimmedText,
+    uid: optionalTrimmedText.describe('附件上传会话 UID；先 uploadFile --uid 拿到 fileID，再把同一个 uid 传给本字段'),
     confirm: z.boolean().optional().default(false),
-  }, async ({ confirm, ...payload }) => runWithPreview('createTestTask', confirm, payload, previewOrAssertWriteAllowed, () => getApi().testtask.createTestTask(payload as CreateTestTaskInput)));
+  }, async ({ confirm, ...payload }) => {
+    const { productID, ...rest } = payload;
+    if (productID !== undefined && rest.product === undefined) (rest as Record<string, unknown>).product = productID;
+    return runWithPreview('createTestTask', confirm, payload, previewOrAssertWriteAllowed, () => getApi().testtask.createTestTask({ ...rest, product: rest.product ?? productID } as unknown as CreateTestTaskInput));
+  });
 
   server.tool('updateTestTask', {
     testTaskId: z.number().int().positive(),
     project: z.number().int().positive().optional(),
-    productID: z.number().int().positive().optional(),
+    product: z.number().int().positive().optional().describe('产品 ID；与 productID 二选一'),
+    productID: z.number().int().positive().optional().describe('产品 ID 别名'),
     name: z.string().trim().min(1).optional(),
     build: z.union([z.number().int().positive(), z.string().trim().min(1)]).optional(),
     execution: z.number().int().positive().optional(),
@@ -571,8 +583,14 @@ export function registerTestTaskWriteTools(server: CliRegistry): void {
     begin: optionalTrimmedText.describe('格式 YYYY-MM-DD'),
     end: optionalTrimmedText.describe('格式 YYYY-MM-DD'),
     desc: optionalTrimmedText,
+    uid: optionalTrimmedText.describe('附件上传会话 UID；先 uploadFile --uid 拿到 fileID，再把同一个 uid 传给本字段'),
     confirm: z.boolean().optional().default(false),
-  }, async ({ testTaskId, confirm, ...update }) => runWithPreview('updateTestTask', confirm, { testTaskId, update }, previewOrAssertWriteAllowed, () => getApi().testtask.updateTestTask(testTaskId, update as UpdateTestTaskInput)));
+  }, async ({ testTaskId, confirm, ...update }) => {
+    const { productID, ...rest } = update;
+    if (productID !== undefined && rest.product === undefined) (rest as Record<string, unknown>).product = productID;
+    const payload = { ...rest, product: rest.product ?? productID };
+    return runWithPreview('updateTestTask', confirm, { testTaskId, update: payload }, previewOrAssertWriteAllowed, () => getApi().testtask.updateTestTask(testTaskId, payload as unknown as UpdateTestTaskInput));
+  });
 
   server.tool('startTestTask', {
     testTaskId: z.number().int().positive(),

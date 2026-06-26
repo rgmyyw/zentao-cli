@@ -101,6 +101,7 @@ export function registerTaskTools(server: CliRegistry): void {
       status: optionalTrimmedText,
       closedReason: optionalTrimmedText,
       mailto: optionalTrimmedText,
+      parent: z.number().int().min(-1).optional().describe('父任务 ID；正数 = 设为该任务的子任务；0 = 提升为顶级任务。禅道 18.5 PUT /tasks/{id} 支持 parent'),
       confirm: z.boolean().optional().default(false),
     },
     async ({ taskId, confirm, ...update }) => {
@@ -153,8 +154,10 @@ export function registerTaskTools(server: CliRegistry): void {
     'restartTask',
     {
       taskId: z.number().int().positive(),
-      consumed: z.number().optional(),
-      left: z.number().optional(),
+      consumed: z.number().nonnegative().describe('本次消耗工时。禅道 18.5 /tasks/{id}/restart 必填'),
+      left: z.number().nonnegative().describe('编辑后剩余工时，可为 0。禅道 18.5 /tasks/{id}/restart 必填'),
+      assignedTo: optionalTrimmedText.describe('重新指派给某人；留空则保留原负责人'),
+      realStarted: optionalTrimmedText.describe('实际开始时间或日期；禅道 18.5 /tasks/{id}/restart entry 接受，留空则保留原值'),
       comment: optionalTrimmedText,
       confirm: z.boolean().optional().default(false),
     },

@@ -307,7 +307,12 @@ export const commandToGroup: Record<string, string> = {
   "startProgram": "program-write",
   "suspendProgram": "program-write",
   "unbindProgramWhitelist": "program-write",
-  "unlinkProgramStakeholder": "program-write"
+  "unlinkProgramStakeholder": "program-write",
+  "deleteFile": "file",
+  "downloadFile": "file",
+  "removeFileFromSession": "file",
+  "uploadFile": "file",
+  "uploadFiles": "file"
 };
 
 export const groupCommands: Record<string, string[]> = {
@@ -684,5 +689,12 @@ export const groupCommands: Record<string, string[]> = {
     "suspendProgram",
     "unbindProgramWhitelist",
     "unlinkProgramStakeholder"
+  ],
+  "file": [
+    "deleteFile",
+    "downloadFile",
+    "removeFileFromSession",
+    "uploadFile",
+    "uploadFiles"
   ]
 };

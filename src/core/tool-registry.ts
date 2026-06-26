@@ -44,6 +44,7 @@ export const groupLoaders: Record<ToolGroup, GroupLoader> = {
   'product-write': async () => (await import('../tools/phase3c.js')).registerProductWriteTools,
   'project-write': async () => (await import('../tools/phase3c.js')).registerProjectWriteTools,
   'program-write': async () => (await import('../tools/phase3c.js')).registerProgramWriteTools,
+  file: async () => (await import('../tools/file.js')).registerFileTools,
 };
 
 export async function registerTools(

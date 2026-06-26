@@ -60,6 +60,7 @@ export function registerStoryWriteTools(server: CliRegistry): void {
     keywords: optionalTrimmedText,
     stage: optionalTrimmedText,
     notifyEmail: z.array(z.string().trim().min(1)).optional(),
+    uid: optionalTrimmedText.describe('附件上传会话 UID。先用 uploadFile --uid 拿到 fileID，再把同一个 uid 传给本字段即可在更新时绑定/解绑附件；空字符串表示清空已绑定的附件'),
     confirm: z.boolean().optional().default(false),
   }, async ({ storyId, confirm, ...update }) => runWithPreview('updateStory', confirm, { storyId, update }, previewOrAssertWriteAllowed, () => getApi().story.updateStory(storyId, update)));
 
@@ -100,6 +101,7 @@ export function registerStoryWriteTools(server: CliRegistry): void {
     storyId: z.number().int().positive(),
     closedReason: optionalTrimmedText,
     duplicateStory: z.number().int().positive().optional(),
+    childStories: z.array(z.number().int().positive()).optional().describe('关闭时同时关闭的子需求 ID 列表，对应 18.5 story/close entry childStories 字段'),
     comment: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
   }, async ({ storyId, confirm, ...input }) => runWithPreview('closeStory', confirm, { storyId, ...input }, previewOrAssertWriteAllowed, () => getApi().story.closeStory(storyId, input)));
@@ -113,6 +115,8 @@ export function registerStoryWriteTools(server: CliRegistry): void {
 
   server.tool('activateStory', {
     storyId: z.number().int().positive(),
+    assignedTo: optionalTrimmedText.describe('重新激活时指派给某人；留空则保留原负责人'),
+    status: optionalTrimmedText.describe('激活后状态，默认 active；禅道 18.5 story/active entry 接受'),
     comment: optionalTrimmedText,
     confirm: z.boolean().optional().default(false),
   }, async ({ storyId, confirm, ...input }) => runWithPreview('activateStory', confirm, { storyId, ...input }, previewOrAssertWriteAllowed, () => getApi().story.activateStory(storyId, input)));
@@ -312,6 +316,11 @@ export function registerTaskDerivedTools(server: CliRegistry): void {
     story: z.number().int().positive().optional(),
     module: z.number().int().min(0).optional(),
     estimate: z.number().optional(),
+    mailto: z.array(z.string().trim().min(1)).optional().describe('抄送人禅道账号列表，对应 18.5 task::create mailto 字段，逗号或数组形式'),
+    team: z.array(z.string().trim().min(1)).optional().describe('多人任务模式成员账号列表；与 teamEstimate 长度必须一致；需要同时把 multiple 设为 true'),
+    teamEstimate: z.array(z.number().nonnegative()).optional().describe('多人任务模式每个成员工时；与 team 长度一致'),
+    multiple: z.boolean().optional().describe('是否多人任务模式；true 时按 team/teamEstimate 拆分任务'),
+    uid: optionalTrimmedText.describe('附件上传会话 UID。先用 uploadFile --uid 拿到 fileID，再把同一个 uid 传给本字段即可在创建时绑定附件'),
     confirm: z.boolean().optional().default(false),
   }, async ({ confirm, ...payload }) => {
     const cleaned: Record<string, unknown> = {};

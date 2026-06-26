@@ -9,6 +9,7 @@ export function registerProductWriteTools(server: CliRegistry): void {
     name: z.string().trim().min(1),
     code: z.string().trim().min(1),
     type: z.string().trim().min(1).describe('产品类型，对应 18.5 product/create 页面 type 字段'),
+    program: z.number().int().positive().optional().describe('所属项目集 ID，对齐禅道 18.5 product::create 的 program 字段；不传则不归属任何项目集'),
     status: optionalTrimmedText,
     line: z.number().int().nonnegative().optional(),
     desc: optionalTrimmedText,
@@ -18,6 +19,7 @@ export function registerProductWriteTools(server: CliRegistry): void {
     acl: optionalTrimmedText,
     whitelist: z.array(z.string().trim().min(1)).optional(),
     branches: z.array(z.string().trim().min(1)).optional(),
+    uid: optionalTrimmedText.describe('附件上传会话 UID；先 uploadFile --uid 拿到 fileID，再把同一个 uid 传给本字段'),
     confirm: z.boolean().optional().default(false),
   }, async ({ confirm, ...payload }) => runWithPreview('createProduct', confirm, payload, previewOrAssertWriteAllowed, () => getApi().product.createProduct(payload)));
 
@@ -26,6 +28,7 @@ export function registerProductWriteTools(server: CliRegistry): void {
     name: optionalTrimmedText,
     code: optionalTrimmedText,
     type: optionalTrimmedText,
+    program: z.number().int().positive().optional().describe('所属项目集 ID；不传则保留原值；传 0 可解绑项目集'),
     status: optionalTrimmedText,
     line: z.number().int().nonnegative().optional(),
     desc: optionalTrimmedText,
@@ -34,6 +37,7 @@ export function registerProductWriteTools(server: CliRegistry): void {
     RD: optionalTrimmedText,
     acl: optionalTrimmedText,
     whitelist: z.array(z.string().trim().min(1)).optional(),
+    uid: optionalTrimmedText.describe('附件上传会话 UID；先 uploadFile --uid 拿到 fileID，再把同一个 uid 传给本字段'),
     confirm: z.boolean().optional().default(false),
   }, async ({ productId, confirm, ...update }) => runWithPreview('editProduct', confirm, { productId, update }, previewOrAssertWriteAllowed, () => getApi().product.editProduct(productId, update)));
 

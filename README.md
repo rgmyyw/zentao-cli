@@ -8,6 +8,11 @@
 
 ## 这版补了什么
 
+- `0.1.36` 是一次 CLI ↔ 禅道 18.5 entry 字段对齐收尾 + 附件上传能力补齐：
+  - **新增附件上传与下载**：`uploadFile` / `uploadFiles` / `removeFileFromSession` / `deleteFile` / `downloadFile` 五个新工具，加上 `createTask` / `createBug` / `createStory` / `createTestCase` / `createTestTask` / `createBuild` / `createRelease` / `createProduct` / `editProduct` / `createExecution` / `updateExecution` / `updateStory` / `updateRelease` 的 `uid` 字段，形成"先 `uploadFile --uid xxx --file ./a.png` 拿到 fileID，再 `createBug --uid xxx --confirm true`"的完整附件工作流。
+  - **9 个核心写工具字段补齐**：`restartTask` 补 `assignedTo, realStarted`（`consumed/left` 改为 nonnegative）；`activateStory` 补 `assignedTo, status`；`updateExecution` 补 `status`；`createExecution` 补 `parent, percent`；`createProduct` / `editProduct` 补 `program`；`createTestTask` / `updateTestTask` 接受 `product`（与 `productID` 双别名）；`updateTodo` 补 `date`；`createRelease` 补 `notify, mailto`；`closeStory` 补 `childStories`。
+  - **createTask 字段对齐**：`tasks.php::tasksEntry::post` 的 17 字段标准入口现在 CLI 端全部暴露（新增 `mailto, team, teamEstimate, multiple, uid`），多人任务模式可直接通过 CLI 触发。
+  - **字段对齐审计**（详见 `scripts/audit-alignment.txt`）：312 工具 vs 193 entry method，剩余 48 个未暴露的 entry 写操作（issue / risk / ticket / feedback / program / 各种 delete 等）按需后续实现。
 - `0.1.35` 是 review 触发的安全 / 健壮性修复版（commit `6b506c2`），同时把 `compact` 输出改为只控制 JSON 形态、不再裁剪数据（commit `b7bc2aa`），并新增 `design.md` 工程约定文档。
 - **P0：HTTP GET 缓存不再误命中写副作用路径**。`ZentaoHttpClient` 的 `getCacheKey` 显式排除 `finish` / `activate` / `start` / `close` / `confirm` / `pause` / `restart` / `cancel` / `suspend` / `putoff` / `assign` / `resolve` 这些写动词 URL，避免在 15 秒 TTL 窗口内把写响应错误地返回给后续只读请求。
 - **P0：`downloadLegacy` 增加 host 校验与下载体积上限**。绝对 URL 必须与 `legacyBaseUrl` / `apiBaseUrl` / `url` 推导出的 host 一致，相对路径直接放行，防止把附件下载请求引向内网元数据地址触发 SSRF；并设置 `maxContentLength` / `maxBodyLength` 为 50MB，避免恶意 URL 拖垮内存。
@@ -31,6 +36,27 @@
 
 ### 典型变化
 
+- **附件上传流程**（0.1.36 新增）：
+  ```bash
+  # 1) 上传图片到 session album
+  zentao uploadFile --uid task-attach-1 --file /path/to/screenshot.png
+  # → { "id": 12345, "url": "...", "path": "...", "title": "...", "size": ... }
+
+  # 2) 创建任务时把同一个 uid 传过去，禅道自动把该 uid 下的 fileID 绑定到新任务
+  zentao createTask --execution 2140 --name "修复登录 bug" --type devel \
+    --assignedTo dev --estStarted 2026-06-26 --deadline 2026-06-30 \
+    --uid task-attach-1 --confirm true
+  ```
+  同样适用于 `createBug` / `createStory` / `createTestCase` / `createTestTask` / `createBuild` / `createRelease` / `createProduct` / `createExecution`；更新时把 `uid` 传给 `updateXxx` 即可重新绑定附件；不再需要附件时传空 `uid` 即可解绑。限制：18.5 `fileEntry::post` 仅支持 jpg/jpeg/png/gif，非图片走对象级 `file-{type}-{id}` 控制器（CLI 暂未实现）。
+- **多人任务模式**（0.1.36 新增）：
+  ```bash
+  zentao createTask --execution 2140 --name "联调任务" --type devel \
+    --assignedTo dev --estStarted 2026-06-26 --deadline 2026-06-30 \
+    --multiple true \
+    --team '["dev1","dev2","dev3"]' \
+    --teamEstimate '[4,3,2]' \
+    --confirm true
+  ```
 - **`--output compact` 行为变化**：之前会静默裁剪数据（`items` 截到 20 条、长字符串截到 600 字符 + `…`），现在只控制 JSON 形态、不裁剪字段。AI / 脚本消费时如果想控制体积，请改用 `--limit` / `--page` 或在客户端裁剪。
 - **P0 修复之一**：HTTP GET 缓存不再命中 `finish` / `activate` / `start` / `close` 等写动词 URL；`downloadLegacy` 不再把请求引向非禅道 host；`askPassword` 在不支持密码隐藏的终端直接拒绝。
 - **新增 `design.md`**：项目级工程设计对齐文档（1040 行），方便其他 CLI / Agent Skill 项目复用约定。

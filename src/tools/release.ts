@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { CliRegistry } from '../core/cli-registry.js';
 import { getApi } from '../core/api-provider.js';
 import { previewOrAssertWriteAllowed } from '../core/write-guard.js';
-import { jsonResult, runWithPreview } from './shared.js';
+import { jsonResult, optionalTrimmedText, runWithPreview } from './shared.js';
 
 export function registerReleaseTools(server: CliRegistry): void {
   server.tool('getProjectReleases', { projectId: z.number().int().positive() }, async ({ projectId }) => jsonResult(await getApi().release.getProjectReleases(projectId)), {
@@ -119,15 +119,21 @@ export function registerReleaseWriteTools(server: CliRegistry): void {
     date: z.string().trim().optional().describe('发布日期'),
     desc: z.string().trim().optional().describe('发布说明'),
     status: z.enum(['normal', 'terminate']).optional().describe('状态'),
+    notify: z.array(z.string().trim().min(1)).optional().describe('通知方式：email | message | weixin | dingding 等，多选；对应 18.5 projectReleasesEntry::post 的 notify 字段'),
+    mailto: z.array(z.string().trim().min(1)).optional().describe('抄送人禅道账号列表，对应 18.5 release notify mailto 字段；可与 notify 配合使用'),
+    uid: optionalTrimmedText.describe('附件上传会话 UID；先 uploadFile --uid 拿到 fileID，再把同一个 uid 传给本字段'),
     confirm: z.boolean().optional().default(false),
-  }, async ({ product, name, branch, build, date, desc, status, confirm }) => {
+  }, async ({ product, name, branch, build, date, desc, status, notify, mailto, uid, confirm }) => {
     const payload: Record<string, unknown> = { product, name };
     if (branch !== undefined) payload.branch = branch;
     if (build !== undefined) payload.build = build;
     if (date) payload.date = date;
     if (desc) payload.desc = desc;
     if (status) payload.status = status;
-    return runWithPreview('createRelease', confirm, payload, previewOrAssertWriteAllowed, () => getApi().release.createRelease({ product, branch, name, build, date, desc, status }));
+    if (notify && notify.length) payload.notify = notify.join(',');
+    if (mailto && mailto.length) payload.mailto = mailto.join(',');
+    if (uid) payload.uid = uid;
+    return runWithPreview('createRelease', confirm, payload, previewOrAssertWriteAllowed, () => getApi().release.createRelease({ product, branch, name, build, date, desc, status, notify, mailto, uid }));
   });
 
   server.tool('updateRelease', {
@@ -137,8 +143,9 @@ export function registerReleaseWriteTools(server: CliRegistry): void {
     date: z.string().trim().optional().describe('发布日期'),
     desc: z.string().trim().optional().describe('发布说明'),
     status: z.enum(['normal', 'terminate']).optional().describe('状态'),
+    uid: optionalTrimmedText.describe('附件上传会话 UID；先 uploadFile --uid 拿到 fileID，再把同一个 uid 传给本字段'),
     confirm: z.boolean().optional().default(false),
-  }, async ({ releaseId, name, build, date, desc, status, confirm }) => runWithPreview('updateRelease', confirm, { releaseId, name, build, date, desc, status }, previewOrAssertWriteAllowed, () => getApi().release.updateRelease(releaseId, { name, build, date, desc, status })));
+  }, async ({ releaseId, name, build, date, desc, status, uid, confirm }) => runWithPreview('updateRelease', confirm, { releaseId, name, build, date, desc, status, uid }, previewOrAssertWriteAllowed, () => getApi().release.updateRelease(releaseId, { name, build, date, desc, status, uid })));
 
   server.tool('exportRelease', {
     releaseId: z.number().int().positive().describe('发布 ID'),
