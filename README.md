@@ -8,18 +8,32 @@
 
 ## 这版补了什么
 
+- `0.1.35` 是 review 触发的安全 / 健壮性修复版（commit `6b506c2`），同时把 `compact` 输出改为只控制 JSON 形态、不再裁剪数据（commit `b7bc2aa`），并新增 `design.md` 工程约定文档。
+- **P0：HTTP GET 缓存不再误命中写副作用路径**。`ZentaoHttpClient` 的 `getCacheKey` 显式排除 `finish` / `activate` / `start` / `close` / `confirm` / `pause` / `restart` / `cancel` / `suspend` / `putoff` / `assign` / `resolve` 这些写动词 URL，避免在 15 秒 TTL 窗口内把写响应错误地返回给后续只读请求。
+- **P0：`downloadLegacy` 增加 host 校验与下载体积上限**。绝对 URL 必须与 `legacyBaseUrl` / `apiBaseUrl` / `url` 推导出的 host 一致，相对路径直接放行，防止把附件下载请求引向内网元数据地址触发 SSRF；并设置 `maxContentLength` / `maxBodyLength` 为 50MB，避免恶意 URL 拖垮内存。
+- **P0：`askPassword` 健壮性**。终端不支持密码隐藏时直接拒绝输入并提示改用环境变量，避免密码明文回显；增加 `readline close` 事件兜底还原输出行为，避免 Ctrl+D / EOF / SIGTERM 场景下 `_writeToOutput` 钩子未清理导致后续输出被替换为 `*`。
+- **P0：批量任务 payload 修复双重包装**。`batchCreateTasks` 改为把 `tasks` 数组直接交给 `toFormUrlEncoded` 展开为 `tasks[0][name]=...`，不再拼成 `tasks[]=[object Object]`。
+- **P0：构建期敏感词守卫**。新增 `scripts/guard-sensitive.mjs` 并接入 `pnpm build` 与 `pnpm guard:sensitive`，在发包前静态扫 `dist/` 防止把真实 token / 密码打进产物；同步修复敏感配置日志中的 placeholder 还原逻辑。
+- **P1：HTTP 指标并发覆盖修复**。`src/core/http-metrics.ts` 用最近 16 次请求耗时环形缓冲替换单变量，并发请求几乎同时完成时不再互相覆盖最后耗时。
+- **P1：`getMyTasks` 去掉 `page=total` 一次性返回的脆弱试探**，统一走标准分页拉取全量。
+- **P1：`url-intent` 写动词清单补齐**。`WRITE_PAGE_PATTERN` 增补 `start` / `pause` / `restart` / `cancel` / `confirm` / `suspend` / `putoff` 以及 `batch*` 批量写动作，确保 `task-finish-1.html` / `execution-batchEdit-1.html` 这类写页面统一降级为 `explain`。
+- **P1：非交互终端早期拦截**。`install` / `update` 在缺失配置或登录校验失败且 stdin/stdout 都不是 TTY 时直接抛错，提示用 `ZENTAO_URL` / `ZENTAO_USERNAME` / `ZENTAO_PASSWORD` 环境变量。
+- **P1：`getMyTaskStatistics` 支持 `scan: false` 快速采样**，`whoami` 等场景只采样首页 100 条任务并标注 `sampled: true` / `partial: true`。
+- **P1：`axios` 锁定为 `1.13.2`**，避免 `^1.13.2` 在不同环境拉到 1.13.x 后续版本时 `https.Agent` 行为差异。
+- **P2**：清理 `execution.ts` / `task.ts` / `form.ts` 中冗余的 `Record<string, unknown>` 类型断言，统一收敛到 `FormEncodable`；`normalizeOptionalText` 从 `ExecutionApi` 私有方法下沉到 `src/utils/date.ts` 复用；CLI 参数解析支持负数等可解析为数字的显式值，`--offset -5` 不会再被当成新 flag；whoami 等级阈值集中到 `WHOAMI_LEVELS` 表；GET 响应缓存接入 LRU 上限 64 条；`update-probe` 改用 `node:https` 直接请求 npm registry，规避 Windows 上 `spawn npm` 的路径/转义问题。
+- **`--output compact` 不再裁剪数据**。原先 `compact` 会把长数组截断到 20 项、长字符串截短到 600 字符 + `…`；现在 `compact` 只控制 JSON 形态（保留关键元信息、压缩空白），不再对业务字段做截断。三个模式都保持数据完整，需要控制长度的场景请改用 `--limit` / `--page` 等业务参数或在客户端按需裁剪。
+- **新增 `design.md`（1040 行）**：从文档定位、目录结构、Skill 设计、安装维护、测试方式、发布流程、代码风格、技术栈与依赖等维度，沉淀本项目可复用的工程约定，供其他 CLI / Agent Skill / 自动化工具项目直接对齐参考。
 - `0.1.34` 重构 Skill 文档为 2 级索引：`SKILL.md` 主入口从 272 行精简到 90 行，通过分类总览 + Reference 跳转表指到二级目录；二级 `reference/` 覆盖 CLI 注册的全部 306 个命令，按场景聚合并拆分高频主链路与低频高级文档。
 - 新增 `reference/cheatsheet.md` 兜底速查、`reference/index.md` 分类总览、`reference/scenarios.md` 场景化组合（共 16 类典型用户意图 → 命令组合示例）。
 - 新增 `reference/<场景>-advanced.md` 系列（共 9 个文档 / 168 个低频命令）：`bug-advanced.md`、`task-advanced.md`、`story-advanced.md`、`execution-advanced.md`、`product-advanced.md`、`project-advanced.md`、`testcase-advanced.md`、`testtask-advanced.md`、`build-advanced.md`，覆盖批量 / 状态变更 / 管理员命令。
-- 新增 7 个独立辅助能力文档：`url-intent.md`、`comment.md`、`context.md`、`relation.md`、`search.md`、`resource-analysis.md`、`program.md`。
-- 新增 4 个持久化脚本：`scripts/extract-commands.mjs`、`scripts/check-coverage.mjs`、`scripts/gen-cheatsheet.mjs`、`scripts/gen-advanced.mjs`，可在 CI 中重跑验证 reference 覆盖 vs CLI 注册命令 diff = 0。
-- 删除旧的 `reference/commands.md`、`reference/overview.md`、`reference/dev-coverage.md`，能力并入新的二级目录结构。
 - `0.1.33` 新增 `parseUrlIntent`，可以把禅道浏览器页面 URL、legacy 页面文件名或本地路径直接解析成结构化 CLI 意图。
 - 直接把 URL 当首参传给 `zentao` 时，同站且安全的只读页面会自动跳到真实查询命令；跨实例 URL、无直连命令页面和写页面则返回说明 JSON，不会误执行写操作。
-- 本次还补齐了一批高价值页面规则：`program-view`、`todo-view`、`projectrelease-view` 可直达详情命令；`doc-view`、`job-view`、`user-profile` 会返回候选命令与说明。
 
 ### 典型变化
 
+- **`--output compact` 行为变化**：之前会静默裁剪数据（`items` 截到 20 条、长字符串截到 600 字符 + `…`），现在只控制 JSON 形态、不裁剪字段。AI / 脚本消费时如果想控制体积，请改用 `--limit` / `--page` 或在客户端裁剪。
+- **P0 修复之一**：HTTP GET 缓存不再命中 `finish` / `activate` / `start` / `close` 等写动词 URL；`downloadLegacy` 不再把请求引向非禅道 host；`askPassword` 在不支持密码隐藏的终端直接拒绝。
+- **新增 `design.md`**：项目级工程设计对齐文档（1040 行），方便其他 CLI / Agent Skill 项目复用约定。
 - **先解析再执行**：`zentao parseUrlIntent --url "https://your-zentao.example.com/zentao/bug-view-84362.html"` 会告诉你该 URL 对应哪个命令、哪些参数、是否可自动执行。
 - **直接贴 URL**：`zentao program-view-620.html`、`zentao todo-view-2319.html` 现在可以直接跳到详情命令；`zentao doc-view-12.html` 会返回 explain JSON 和候选命令。
 - **Skill 文档 2 级索引**：进 skill 后先看 `SKILL.md` 的 Reference 路由表，按场景跳到 `reference/<场景>.md`；批量 / 状态变更 / 管理员命令下沉到 `reference/<场景>-advanced.md`；不确定命令是否存在直接看 `reference/cheatsheet.md`。

@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.35 - 2026-06-25
+
+### 修复
+
+- **P0：HTTP GET 缓存不再误命中写副作用路径**。禅道会把 `finish` / `activate` / `start` / `close` / `confirm` / `pause` / `restart` / `cancel` / `suspend` / `putoff` / `assign` / `resolve` 这类写动作挂在 `GET` 上，`ZentaoHttpClient` 的 `getCacheKey` 现在显式排除这些写动词路径，避免在 15 秒 TTL 窗口内把写响应错误地返回给后续只读请求。
+- **P0：`downloadLegacy` 增加 host 校验与下载体积上限**。绝对 URL 必须与 `legacyBaseUrl` / `apiBaseUrl` / `url` 推导出的 host 一致，相对路径直接放行，防止把附件下载请求引向 `169.254.169.254` 等内网元数据地址触发 SSRF；并设置 `maxContentLength` / `maxBodyLength` 为 50MB，避免恶意 URL 拖垮内存。
+- **P0：`askPassword` 在终端不支持密码隐藏时直接拒绝**，避免密码明文回显；增加 `readline close` 事件兜底还原输出行为，避免 Ctrl+D / EOF / SIGTERM 场景下 `_writeToOutput` 钩子未清理导致后续输出被替换为 `*`。
+- **P0：批量任务 payload 修复双重包装**。`batchCreateTasks` 改为把 `tasks: Array<Record<string, unknown>>` 直接交给 `toFormUrlEncoded`，由其按 `tasks[0][name]=...` 形式展开，不再拼成 `tasks[]=[object Object]`。
+- **P0：敏感词占位符与 `guard-sensitive` 构建守卫**。修复敏感配置日志中 placeholder 还原逻辑，新增 `scripts/guard-sensitive.mjs` 并接入 `pnpm build` 与 `pnpm guard:sensitive`，在发包前静态扫 `dist/` 防止把真实 token / 密码打进产物。
+- **P1：HTTP 指标并发覆盖修复**。`src/core/http-metrics.ts` 用最近 16 次请求耗时环形缓冲替换单变量，并发请求几乎同时完成时不再互相覆盖最后耗时。
+- **P1：`getMyTasks` 去掉 `page=total` 一次性返回的脆弱试探**，统一走标准分页拉取全量，避免部分部署上 `scanned` 与 `total` 不一致。
+- **P1：`url-intent` 写动词清单补齐**。`WRITE_PAGE_PATTERN` 增补 `start` / `pause` / `restart` / `cancel` / `confirm` / `suspend` / `putoff` 以及 `batch*` 批量写动作，确保 `task-finish-1.html` / `execution-batchEdit-1.html` 这类写页面统一降级为 `explain`，不自动执行写命令。
+- **P1：非交互终端下的 `install` / `update` 早期拦截**。`ensureValidZentaoConfig` 在缺失配置或登录校验失败且 `stdin/stdout` 都不是 TTY 时直接抛错，提示用 `ZENTAO_URL` / `ZENTAO_USERNAME` / `ZENTAO_PASSWORD` 环境变量，不再依赖后续 `promptForConfig` 在无 TTY 时 hang 住。
+- **P1：`getMyTaskStatistics` 支持 `scan: false` 快速采样**，`whoami` 等场景只采样首页 100 条任务并标注 `sampled: true` / `partial: true` / `scanned`，不再每次都全量分页。
+- **P1：`axios` 锁定为 `1.13.2`**，避免 `^1.13.2` 在不同环境拉到 1.13.x 后续版本时 `https.Agent` 行为差异。
+- **P2：清理 `execution.ts` / `task.ts` / `form.ts` 中冗余的 `Record<string, unknown>` 类型断言**，统一收敛到 `FormEncodable` 类型；`normalizeOptionalText` 从 `ExecutionApi` 私有方法下沉到 `src/utils/date.ts` 复用。
+- **P2：CLI 参数解析支持负数等可解析为数字的显式值**，`--offset -5` 不会再被当成新的 flag 而丢失。
+- **P2：whoami 等级阈值集中到 `WHOAMI_LEVELS` 表**，便于后续调档；并修正 `'黄金'` 拼写为 `'金'`。
+- **P2：GET 响应缓存接入 LRU**，上限 64 条；超出时丢弃最早插入且大概率最早过期的条目，避免长期运行内存无限增长。
+- **P2：包内不再要求 `npm view` 子进程探测版本**，`update-probe` 改用 `node:https` 直接请求 `registry.npmjs.org`，规避 Windows 上 `spawn npm` 的路径/转义问题，也消除把 `packageName` / `cliVersion` 拼进 shell 的注入风险。
+
+### 变更
+
+- **`--output compact` 模式不再裁剪数据**。原先 `compact` 会把长数组截断到 20 项、把 `content` / `data` / `raw` / `html` / `text` / `message` 长度超过 600 字符的字符串截短到 `…`，现在 `compact` 只控制 JSON 形态（保留关键元信息、压缩空白），不再对业务字段做截断。需要控制长度的场景请改用 `--limit` / `--page` 等业务参数，或在客户端按需裁剪，避免 `getMyBugs` / `getProductBugs` 列表被静默截到 20 条后用户看不到全量。
+- `help` 输出新增 `zentao --output compact whoami` 提示，并在 `zentao --help` 中补充 `compact / normal / verbose   只改变 JSON 形态，不裁剪数据` 说明。
+- `src/core/cli-registry.ts` 中 `parseArgv` 抽出 `isNumericValue` 工具函数，便于后续扩展更多显式值判定。
+
+### 文档
+
+- 新增 `design.md`（1040 行）工程设计对齐文档：从文档定位、目录结构、Skill 设计、安装维护、测试方式、发布流程、代码风格、技术栈与依赖等维度，沉淀本项目可复用的工程约定，供其他 CLI / Agent Skill / 自动化工具项目直接对齐参考。
+- README 中 `--output` 描述同步：明确 `compact` 不再裁剪数据，三个模式只影响 JSON 形态。
+- 新增 `pnpm guard:sensitive` 命令说明，作为发布前的敏感配置静态扫入口。
+
+### 测试
+
+- 新增 `tests/cli.test.ts` 用例：覆盖 `compact` 模式对长 JSON 字符串、700 字符 `message` 等场景不再裁剪。
+- 修复性测试覆盖：批量任务 payload 序列化、GET 缓存排除写动词、`url-intent` 写动词降级、`getMyTaskStatistics({ scan: false })` 快速采样、参数解析负数等。
+- 现有 300+ 单测全部通过，`tsc --noEmit` 无报错，`oxlint` 0 warning / 0 error。
+
 ## 0.1.34 - 2026-06-24
 
 ### 新增
