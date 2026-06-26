@@ -2,6 +2,7 @@ import type { ZentaoHttpClient } from '../core/http.js';
 import { toServerListResult } from '../core/list-result.js';
 import { normalizePagination, type PaginationInput } from '../core/pagination.js';
 import { requireNonBlank } from '../core/validation.js';
+import { containsHtmlMarkup } from '../utils/html.js';
 import { toFormUrlEncoded } from '../utils/form.js';
 import type { ZentaoStory } from '../types/zentao.js';
 
@@ -47,20 +48,65 @@ export class StoryApi {
   }
 
   async createStory(data: Record<string, unknown> & { product: number }): Promise<unknown> {
+    const normalized = this.normalizeStoryInput(data, { requiredFields: ['title'] });
+    if (containsHtmlMarkup(normalized.spec) || containsHtmlMarkup(normalized.verify)) {
+      const formData = this.buildStoryCreateLegacyPayload({ ...normalized, product: data.product });
+      return this.http.legacyRequest('POST', `/story-create-${data.product}-0-0-0-0-0-0-0--story.json`, {
+        data: toFormUrlEncoded(formData),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      });
+    }
     return this.http.request('POST', `/products/${data.product}/stories`, {
-      data: this.normalizeStoryInput(data, { requiredFields: ['title'] }),
+      data: normalized,
     });
   }
 
   async updateStory(storyId: number, update: Record<string, unknown>): Promise<unknown> {
+    const normalized = this.normalizeStoryInput(update, { requiredFields: [] });
+    const needsLegacy = containsHtmlMarkup(normalized.spec) || containsHtmlMarkup(normalized.verify) || typeof normalized.comment === 'string';
+    if (needsLegacy) {
+      const current = await this.getStoryDetail(storyId);
+      const preserved = this.pickStoryEditDefaults(current);
+      const payload = this.normalizeStoryLegacyInput({ ...preserved, ...normalized });
+      return this.http.legacyRequest('POST', `/story-edit-${storyId}.json`, {
+        data: toFormUrlEncoded(payload),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      });
+    }
     return this.http.request('PUT', `/stories/${storyId}`, {
-      data: this.normalizeStoryInput(update, { requiredFields: [] }),
+      data: normalized,
     });
   }
 
   async changeStory(storyId: number, update: Record<string, unknown>): Promise<unknown> {
+    const normalized = this.normalizeStoryInput(update, { requiredFields: ['title'] });
+    if (containsHtmlMarkup(normalized.spec) || containsHtmlMarkup(normalized.verify)) {
+      const current = await this.getStoryDetail(storyId);
+      const oldReviewerList = this.normalizeReviewerList(current.reviewedBy ?? current.reviewer ?? current.reviewers);
+      const reviewerList = this.normalizeReviewerList(normalized.reviewer);
+      const payload: Record<string, unknown> = {
+        title: requireNonBlank(normalized.title as string | undefined, 'title 不能为空'),
+        spec: normalized.spec ?? current.spec ?? '',
+        verify: normalized.verify ?? current.verify ?? '',
+        comment: normalized.comment ?? '',
+        uid: normalized.uid,
+      };
+      if (reviewerList.length > 0) payload.reviewer = reviewerList;
+      else if (oldReviewerList.length > 0) payload.reviewer = oldReviewerList;
+      else payload.needNotReview = 1;
+      if (normalized.reviewedBy !== undefined) payload.reviewedBy = normalized.reviewedBy;
+      if (Array.isArray(normalized.executions)) payload.executions = normalized.executions;
+      if (Array.isArray(normalized.bugs)) payload.bugs = normalized.bugs;
+      if (Array.isArray(normalized.cases)) payload.cases = normalized.cases;
+      if (Array.isArray(normalized.tasks)) payload.tasks = normalized.tasks;
+
+      return this.http.legacyRequest('POST', `/story-change-${storyId}.json`, {
+        data: toFormUrlEncoded(payload),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      });
+    }
     return this.http.request('POST', `/stories/${storyId}/change`, {
-      data: this.normalizeStoryInput(update, { requiredFields: ['title'] }),
+      data: normalized,
     });
   }
 
@@ -314,6 +360,91 @@ export class StoryApi {
     }
 
     return normalized;
+  }
+
+  private normalizeStoryLegacyInput(input: Record<string, unknown>): Record<string, unknown> {
+    const normalized = { ...input };
+    for (const key of ['title', 'assignedTo', 'comment', 'reviewedBy', 'spec', 'verify', 'type', 'source', 'sourceNote', 'category', 'keywords', 'stage', 'closedReason', 'reviewedDate', 'uid'] as const) {
+      if (!Object.prototype.hasOwnProperty.call(normalized, key)) continue;
+      const value = normalized[key];
+      if (typeof value !== 'string') continue;
+      const trimmed = value.trim();
+      if (trimmed === '') delete normalized[key];
+      else normalized[key] = trimmed;
+    }
+    if (typeof normalized.reviewer === 'string') {
+      const reviewer = normalized.reviewer.trim();
+      if (reviewer === '') delete normalized.reviewer;
+      else normalized.reviewer = [reviewer];
+    }
+    if (Array.isArray(normalized.reviewer)) {
+      normalized.reviewer = normalized.reviewer
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter((item) => item !== '');
+    }
+    if (Array.isArray(normalized.mailto)) normalized.mailto = normalized.mailto.join(',');
+    if (Array.isArray(normalized.notifyEmail)) normalized.notifyEmail = normalized.notifyEmail.join(',');
+    return normalized;
+  }
+
+  private pickStoryEditDefaults(story: ZentaoStory): Record<string, unknown> {
+    return {
+      title: story.title,
+      product: story.product,
+      parent: story.parent,
+      reviewer: this.normalizeReviewerList(story.reviewer ?? story.reviewedBy ?? story.reviewers),
+      type: story.type,
+      plan: story.plan,
+      module: story.module,
+      source: story.source,
+      sourceNote: story.sourceNote,
+      category: story.category,
+      pri: story.pri,
+      estimate: story.estimate,
+      mailto: this.normalizeUserList(story.mailto),
+      keywords: story.keywords,
+      stage: story.stage,
+      notifyEmail: this.normalizeNotifyEmail(story.notifyEmail),
+      spec: story.spec,
+      verify: story.verify,
+    };
+  }
+
+  private buildStoryCreateLegacyPayload(input: Record<string, unknown> & { product: number }): Record<string, unknown> {
+    const payload = this.normalizeStoryLegacyInput({ ...input });
+    if (Array.isArray(payload.reviewer) && payload.reviewer.length === 0) payload.needNotReview = 1;
+    if (!Array.isArray(payload.reviewer) && !payload.reviewer) payload.needNotReview = 1;
+    return payload;
+  }
+
+  private normalizeUserList(value: unknown): string[] {
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => {
+          if (typeof item === 'string') return item.trim();
+          if (item && typeof item === 'object' && 'account' in item) {
+            const account = (item as { account?: unknown }).account;
+            return typeof account === 'string' ? account.trim() : '';
+          }
+          return '';
+        })
+        .filter((item) => item !== '');
+    }
+    if (typeof value === 'string') {
+      return value.split(',').map((item) => item.trim()).filter((item) => item !== '');
+    }
+    return [];
+  }
+
+  private normalizeReviewerList(value: unknown): string[] {
+    return this.normalizeUserList(value);
+  }
+
+  private normalizeNotifyEmail(value: unknown): string[] {
+    if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter((item) => item !== '');
+    if (typeof value === 'string') return value.split(',').map((item) => item.trim()).filter((item) => item !== '');
+    return [];
   }
 
   private normalizeIdArray(values: number[], fieldName: string): number[] {

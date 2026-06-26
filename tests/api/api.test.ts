@@ -320,6 +320,38 @@ describe('simple API wrappers', () => {
     });
   });
 
+  it('uses legacy build forms when desc contains HTML', async () => {
+    const http = createHttp([
+      {},
+      { execution: 4, product: 5, name: '旧构建', builder: { account: 'me' }, date: '2026-01-01', desc: 'old' },
+      {},
+    ]);
+    const api = new BuildApi(http as never);
+
+    await api.createBuild({ project: 3, execution: 4, product: 5, name: '构建一', builder: 'me', desc: '<p>富文本</p>' });
+    await api.updateBuild(2, { desc: '<p>更新描述</p>' });
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/build-create-4-5-3.json', expect.objectContaining({
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    }));
+    expect(http.request).toHaveBeenCalledWith('GET', '/builds/2');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/build-edit-2.json', expect.objectContaining({
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    }));
+
+    const createCall = http.legacyRequest.mock.calls[0] as [string, string, { data: string }];
+    const createDecoded = decodeURIComponent(createCall[2].data.replace(/\+/g, ' '));
+    expect(createDecoded).toContain('name=构建一');
+    expect(createDecoded).toContain('desc=<p>富文本</p>');
+
+    const updateCall = http.legacyRequest.mock.calls[1] as [string, string, { data: string }];
+    const updateDecoded = decodeURIComponent(updateCall[2].data.replace(/\+/g, ' '));
+    expect(updateDecoded).toContain('name=旧构建');
+    expect(updateDecoded).toContain('builder=me');
+    expect(updateDecoded).toContain('date=2026-01-01');
+    expect(updateDecoded).toContain('desc=<p>更新描述</p>');
+  });
+
   it('rejects blank required build write strings before sending requests', async () => {
     const http = createHttp();
     const api = new BuildApi(http as never);
@@ -450,7 +482,7 @@ describe('TaskApi', () => {
   });
 
   it('calls detail and write endpoints', async () => {
-    const http = createHttp([{ id: 1 }, {}, {}, {}, {}, {}, {}, {}, {}, {}]);
+    const http = createHttp([{ id: 1 }, {}, { id: 1 }, {}, {}, {}, {}, {}, {}, {}, {}]);
     const api = new TaskApi(http as never);
     await api.getTaskDetail(1);
     await api.recordEstimate(1, { date: '2026-06-12', consumed: 2, left: 18, work: '处理联调' });
@@ -476,29 +508,51 @@ describe('TaskApi', () => {
         work: ['处理联调'],
       },
     });
-    expect(http.request).toHaveBeenNthCalledWith(3, 'PUT', '/tasks/1', { data: { name: 'n' } });
+    expect(http.request).toHaveBeenNthCalledWith(3, 'GET', '/tasks/1');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/task-edit-1.json', {
+      data: 'name=n&pri=0&module=0&story=0&estimate=0&left=0&consumed=0&parent=0',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
     expect(http.request).toHaveBeenNthCalledWith(4, 'POST', '/tasks/1/finish', { data: { consumed: 1, realStarted: '2026-01-01', finishedDate: '2026-01-02' } });
     expect(http.request).toHaveBeenNthCalledWith(5, 'POST', '/executions/7/tasks', {
       data: { execution: 7, name: 't', assignedTo: 'me', estStarted: '2026-01-01', deadline: '2026-01-02' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/task-create-2140-0-0-0-0-projectID=1772-84733.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/task-create-2140-0-0-0-0-projectID=1772-84733.json', {
       data: 'execution=2140&project=1772&module=0&story=0&name=%E4%BF%AE%E5%A4%8D%E7%99%BB%E5%BD%95%E5%A4%B1%E8%B4%A5&type=devel&assignedTo%5B%5D=me&estStarted=2026-01-01&deadline=2026-01-02&desc=&status=wait&after=toTaskList',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/task-editEstimate-12.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/task-editEstimate-12.json', {
       data: 'date=2026-06-12&consumed=2&left=18&work=%E5%A4%84%E7%90%86%E8%81%94%E8%B0%83',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'GET', '/task-deleteEstimate-12-yes.json');
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'GET', '/task-confirmStoryChange-1.json');
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'POST', '/task-cancel-1.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'GET', '/task-deleteEstimate-12-yes.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'GET', '/task-confirmStoryChange-1.json');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(6, 'POST', '/task-cancel-1.json', {
       data: 'status=cancel&comment=%E6%9A%82%E4%B8%8D%E5%A4%84%E7%90%86',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   });
 
   it('trims and validates task write string fields before sending requests', async () => {
-    const http = createHttp([{}, {}, {}, {}, { assignedTo: 'owner', openedBy: 'creator' }, {}, {}, {}, {}, {}, {}, {}, {}]);
+    const http = createHttp([
+      {},
+      { id: 9 },
+      {},
+      {},
+      {},
+      { assignedTo: 'owner', openedBy: 'creator' },
+      {},
+      { id: 3 },
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+    ]);
     const api = new TaskApi(http as never);
 
     await api.recordEstimate(8, { date: ' 2026-06-12 ', consumed: 2, left: 18, work: ' 今天处理联调 ' });
@@ -527,8 +581,10 @@ describe('TaskApi', () => {
         work: ['今天处理联调'],
       },
     });
-    expect(http.request).toHaveBeenNthCalledWith(2, 'PUT', '/tasks/9', {
-      data: { name: '新任务', comment: 'note', assignedTo: 'dev' },
+    expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/tasks/9');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/task-edit-9.json', {
+      data: 'name=%E6%96%B0%E4%BB%BB%E5%8A%A1&pri=0&module=0&story=0&assignedTo=dev&estimate=0&left=0&consumed=0&parent=0&comment=note',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
     expect(http.request).toHaveBeenNthCalledWith(3, 'POST', '/tasks/1/finish', {
       data: { realStarted: '2026-01-01', finishedDate: '2026-01-02', assignedTo: 'me', comment: 'ok' },
@@ -538,7 +594,11 @@ describe('TaskApi', () => {
     });
     expect(http.request).toHaveBeenNthCalledWith(5, 'GET', '/tasks/3');
     expect(http.request).toHaveBeenNthCalledWith(6, 'POST', '/tasks/3/start', { data: {} });
-    expect(http.request).toHaveBeenNthCalledWith(7, 'PUT', '/tasks/3', { data: { status: 'doing', assignedTo: 'owner' } });
+    expect(http.request).toHaveBeenNthCalledWith(7, 'GET', '/tasks/3');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/task-edit-3.json', {
+      data: 'pri=0&status=doing&module=0&story=0&assignedTo=owner&estimate=0&left=0&consumed=0&parent=0',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
     expect(http.request).toHaveBeenNthCalledWith(8, 'POST', '/tasks/4/pause', { data: { comment: '暂停原因' } });
     expect(http.request).toHaveBeenNthCalledWith(9, 'POST', '/tasks/5/restart', { data: { comment: '继续做', assignedTo: 'qa' } });
     expect(http.request).toHaveBeenNthCalledWith(10, 'POST', '/tasks/6/close', { data: { comment: '已关闭' } });
@@ -546,18 +606,98 @@ describe('TaskApi', () => {
     expect(http.request).toHaveBeenNthCalledWith(12, 'POST', '/executions/8/tasks', {
       data: { execution: 8, name: '新建任务', assignedTo: 'owner', estStarted: '2026-02-01', deadline: '2026-02-02', desc: '描述' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/task-create-2140-0-0-0-0-projectID=1772-84731.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/task-create-2140-0-0-0-0-projectID=1772-84731.json', {
       data: 'execution=2140&project=1772&module=0&story=0&name=%E4%BF%AE%E5%A4%8D%E6%94%AF%E4%BB%98%E5%BC%82%E5%B8%B8&type=devel&assignedTo%5B%5D=dev&estStarted=2026-02-03&deadline=2026-02-04&desc=%E5%A4%84%E7%90%86+bug&pri=1&status=wait&after=toTaskList&estimate=2&left=2',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/task-editEstimate-12.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(4, 'POST', '/task-editEstimate-12.json', {
       data: 'date=2026-06-12&consumed=2&left=18&work=%E5%A4%84%E7%90%86%E8%81%94%E8%B0%83',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/task-cancel-13.json', {
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(5, 'POST', '/task-cancel-13.json', {
       data: 'status=cancel&comment=%E6%9A%82%E4%B8%8D%E5%A4%84%E7%90%86',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
+  });
+
+  it('updateTask preserves desc HTML by going through legacy task-edit endpoint', async () => {
+    const http = createHttp([
+      {
+        id: 80704,
+        name: '原始任务',
+        type: 'devel',
+        pri: 2,
+        status: 'doing',
+        assignedTo: { account: 'lixm1' },
+        story: 0,
+        module: 0,
+      },
+      {},
+    ]);
+    const api = new TaskApi(http as never);
+
+    await api.updateTask(80704, { desc: '<h3>标题</h3><table><tr><td>单元格</td></tr></table>' });
+
+    expect(http.request).toHaveBeenCalledWith('GET', '/tasks/80704');
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/task-edit-80704.json', {
+      data: 'name=%E5%8E%9F%E5%A7%8B%E4%BB%BB%E5%8A%A1&type=devel&pri=2&status=doing&module=0&story=0&assignedTo=lixm1&estimate=0&left=0&consumed=0&desc=%3Ch3%3E%E6%A0%87%E9%A2%98%3C%2Fh3%3E%3Ctable%3E%3Ctr%3E%3Ctd%3E%E5%8D%95%E5%85%83%E6%A0%BC%3C%2Ftd%3E%3C%2Ftr%3E%3C%2Ftable%3E&parent=0',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+  });
+
+  it('updateTask extracts account from assignedTo object when preserving defaults', async () => {
+    const http = createHttp([
+      {
+        id: 1,
+        name: '任务',
+        type: 'devel',
+        pri: 1,
+        assignedTo: { account: 'lixm1', realname: '李' },
+        mailto: [{ account: 'qa1' }, { account: 'qa2' }],
+      },
+      {},
+    ]);
+    const api = new TaskApi(http as never);
+
+    await api.updateTask(1, { name: '新名' });
+
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/task-edit-1.json', expect.objectContaining({
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    }));
+    const call = http.legacyRequest.mock.calls[0] as [string, string, { data: string }];
+    const decoded = decodeURIComponent(call[2].data.replace(/\+/g, ' '));
+    expect(decoded).toContain('assignedTo=lixm1');
+    expect(decoded).toContain('mailto=qa1,qa2');
+    expect(decoded).toContain('name=新名');
+  });
+
+  it('createTask uses legacy create form when desc contains HTML', async () => {
+    const http = createHttp([{}]);
+    const api = new TaskApi(http as never);
+
+    await api.createTask({
+      execution: 8,
+      story: 3,
+      module: 4,
+      name: '任务',
+      assignedTo: 'owner',
+      estStarted: '2026-02-01',
+      deadline: '2026-02-02',
+      estimate: 2,
+      desc: '<h3>标题</h3><p>内容</p>',
+    });
+
+    expect(http.request).not.toHaveBeenCalled();
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/task-create-8-3-4.json', expect.objectContaining({
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    }));
+    const call = http.legacyRequest.mock.calls[0] as [string, string, { data: string }];
+    const decoded = decodeURIComponent(call[2].data.replace(/\+/g, ' '));
+    expect(decoded).toContain('execution=8');
+    expect(decoded).toContain('story=3');
+    expect(decoded).toContain('module=4');
+    expect(decoded).toContain('assignedTo[]=owner');
+    expect(decoded).toContain('desc=<h3>标题</h3><p>内容</p>');
   });
 
   it('calls batch task operations', async () => {
@@ -909,6 +1049,23 @@ describe('BugApi', () => {
     });
   });
 
+  it('createBug uses legacy create form when steps contains HTML', async () => {
+    const http = createHttp([{}]);
+    const api = new BugApi(http as never);
+
+    await api.createBug({ product: 2, title: '标题', openedBuild: 'trunk', steps: '<p>富文本步骤</p>' });
+
+    expect(http.request).not.toHaveBeenCalled();
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/bug-create-2.json', expect.objectContaining({
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    }));
+    const call = http.legacyRequest.mock.calls[0] as [string, string, { data: string }];
+    const decoded = decodeURIComponent(call[2].data.replace(/\+/g, ' '));
+    expect(decoded).toContain('title=标题');
+    expect(decoded).toContain('openedBuild[]=trunk');
+    expect(decoded).toContain('steps=<p>富文本步骤</p>');
+  });
+
   it('passes project and execution through updateBug', async () => {
     const http = createHttp([existingBug, {}]);
     const api = new BugApi(http as never);
@@ -1213,6 +1370,51 @@ describe('StoryApi, TestCaseApi and TestTaskApi', () => {
     });
   });
 
+  it('uses legacy story forms for rich HTML spec and update comments', async () => {
+    const http = createHttp([
+      {},
+      { id: 1, title: '原始标题', product: 2 },
+      {},
+      { id: 1, title: '原始标题', spec: '旧规格', verify: '' },
+      {},
+    ]);
+    const api = new StoryApi(http as never);
+
+    await api.createStory({ product: 2, title: '新需求', reviewer: 'me', spec: '<p>规格</p>' });
+    await api.updateStory(1, { comment: '<p>备注</p>' });
+    await api.changeStory(1, { title: '变更标题', spec: '<p>新规格</p>', comment: '说明' });
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/story-create-2-0-0-0-0-0-0-0--story.json', expect.objectContaining({
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    }));
+    expect(http.request).toHaveBeenNthCalledWith(1, 'GET', '/stories/1');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/story-edit-1.json', expect.objectContaining({
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    }));
+    expect(http.request).toHaveBeenNthCalledWith(2, 'GET', '/stories/1');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(3, 'POST', '/story-change-1.json', expect.objectContaining({
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    }));
+
+    const createCall = http.legacyRequest.mock.calls[0] as [string, string, { data: string }];
+    const createDecoded = decodeURIComponent(createCall[2].data.replace(/\+/g, ' '));
+    expect(createDecoded).toContain('title=新需求');
+    expect(createDecoded).toContain('reviewer[]=me');
+    expect(createDecoded).toContain('spec=<p>规格</p>');
+
+    const updateCall = http.legacyRequest.mock.calls[1] as [string, string, { data: string }];
+    const updateDecoded = decodeURIComponent(updateCall[2].data.replace(/\+/g, ' '));
+    expect(updateDecoded).toContain('title=原始标题');
+    expect(updateDecoded).toContain('product=2');
+    expect(updateDecoded).toContain('comment=<p>备注</p>');
+
+    const changeCall = http.legacyRequest.mock.calls[2] as [string, string, { data: string }];
+    const changeDecoded = decodeURIComponent(changeCall[2].data.replace(/\+/g, ' '));
+    expect(changeDecoded).toContain('title=变更标题');
+    expect(changeDecoded).toContain('spec=<p>新规格</p>');
+    expect(changeDecoded).toContain('comment=说明');
+  });
+
   it('rejects blank required story write strings before sending requests', async () => {
     const http = createHttp();
     const api = new StoryApi(http as never);
@@ -1487,6 +1689,33 @@ describe('StoryApi, TestCaseApi and TestTaskApi', () => {
     });
   });
 
+  it('createTestTask uses legacy create form when desc contains HTML', async () => {
+    const http = createHttp([{}]);
+    const api = new TestTaskApi(http as never);
+
+    await api.createTestTask({
+      project: 1,
+      productID: 4,
+      execution: 6,
+      name: '测试单',
+      build: 2,
+      begin: '2026-01-01',
+      end: '2026-01-02',
+      desc: '<p>测试描述</p>',
+    });
+
+    expect(http.request).not.toHaveBeenCalled();
+    expect(http.legacyRequest).toHaveBeenCalledWith('POST', '/testtask-create-4-6-2-1.json', expect.objectContaining({
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    }));
+    const call = http.legacyRequest.mock.calls[0] as [string, string, { data: string }];
+    const decoded = decodeURIComponent(call[2].data.replace(/\+/g, ' '));
+    expect(decoded).toContain('product=4');
+    expect(decoded).toContain('execution=6');
+    expect(decoded).toContain('name=测试单');
+    expect(decoded).toContain('desc=<p>测试描述</p>');
+  });
+
   it('rejects blank required test task write strings before sending requests', async () => {
     const http = createHttp();
     const api = new TestTaskApi(http as never);
@@ -1627,6 +1856,39 @@ describe('TodoApi', () => {
     expect(http.request).toHaveBeenNthCalledWith(2, 'PUT', '/todos/1', {
       data: { name: 'next', begin: '2026-01-01' },
     });
+  });
+
+  it('uses legacy todo forms when desc contains HTML', async () => {
+    const http = createHttp([
+      {},
+      { name: '旧待办', type: 'custom', pri: 3, status: 'wait', begin: '2400', end: '2400', private: 0, date: '2026-01-01', desc: 'old' },
+      {},
+    ]);
+    const api = new TodoApi(http as never);
+
+    await api.createTodo({ name: 'todo', desc: '<p>说明</p>' });
+    await api.updateTodo(1, { desc: '<p>更新</p>' });
+
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(1, 'POST', '/todo-create.json', expect.objectContaining({
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    }));
+    expect(http.request).toHaveBeenCalledWith('GET', '/todos/1');
+    expect(http.legacyRequest).toHaveBeenNthCalledWith(2, 'POST', '/todo-edit-1.json', expect.objectContaining({
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    }));
+
+    const createCall = http.legacyRequest.mock.calls[0] as [string, string, { data: string }];
+    const createDecoded = decodeURIComponent(createCall[2].data.replace(/\+/g, ' '));
+    expect(createDecoded).toContain('name=todo');
+    expect(createDecoded).toContain('desc=<p>说明</p>');
+    expect(createDecoded).toContain('type=custom');
+    expect(createDecoded).toContain('status=wait');
+
+    const updateCall = http.legacyRequest.mock.calls[1] as [string, string, { data: string }];
+    const updateDecoded = decodeURIComponent(updateCall[2].data.replace(/\+/g, ' '));
+    expect(updateDecoded).toContain('name=旧待办');
+    expect(updateDecoded).toContain('date=2026-01-01');
+    expect(updateDecoded).toContain('desc=<p>更新</p>');
   });
 
   it('rejects blank todo names before sending requests', async () => {

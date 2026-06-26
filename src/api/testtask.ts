@@ -2,6 +2,7 @@ import type { ZentaoHttpClient } from '../core/http.js';
 import { toServerListResult } from '../core/list-result.js';
 import { normalizePagination, type PaginationInput } from '../core/pagination.js';
 import { requireNonBlank } from '../core/validation.js';
+import { containsHtmlMarkup } from '../utils/html.js';
 import { toFormUrlEncoded } from '../utils/form.js';
 
 export interface TestTaskListInput extends PaginationInput {
@@ -66,6 +67,13 @@ export class TestTaskApi {
 
   async createTestTask(payload: CreateTestTaskInput): Promise<unknown> {
     const { project, productID, ...testTask } = this.normalizeTestTaskInput(payload, ['name', 'begin', 'end']);
+    if (containsHtmlMarkup(testTask.desc)) {
+      const execution = typeof testTask.execution === 'number' ? testTask.execution : 0;
+      return this.http.legacyRequest('POST', `/testtask-create-${productID}-${execution}-${testTask.build}-${project}.json`, {
+        data: toFormUrlEncoded({ product: productID, ...testTask } as Record<string, unknown>).toString(),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      });
+    }
     return this.http.request('POST', `/projects/${project}/testtasks`, {
       data: {
         product: productID,

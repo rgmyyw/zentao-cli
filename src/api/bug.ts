@@ -3,6 +3,7 @@ import { toClientPaginatedListResult, toServerListResult, type ListResult } from
 import { fetchAllPages, normalizePagination, type PaginationInput } from '../core/pagination.js';
 import { requireNonBlank } from '../core/validation.js';
 import type { ZentaoBug, ZentaoListResponse } from '../types/zentao.js';
+import { containsHtmlMarkup } from '../utils/html.js';
 import { toFormUrlEncoded } from '../utils/form.js';
 import { bugMatchesKeyword, bugMatchesModuleAlias, normalizeBugFilterText } from './bug-filter.js';
 
@@ -62,8 +63,17 @@ export class BugApi {
   constructor(private readonly http: ZentaoHttpClient) {}
 
   async createBug(data: Record<string, unknown> & { product: number }): Promise<unknown> {
+    const normalized = this.normalizeBugWriteInput(data, { requiredFields: ['title'] });
+    if (containsHtmlMarkup(normalized.steps)) {
+      const legacyPayload = { ...normalized };
+      if (typeof legacyPayload.openedBuild === 'string') legacyPayload.openedBuild = [legacyPayload.openedBuild];
+      return this.http.legacyRequest('POST', `/bug-create-${data.product}.json`, {
+        data: toFormUrlEncoded(legacyPayload),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      });
+    }
     return this.http.request('POST', `/products/${data.product}/bugs`, {
-      data: this.normalizeBugWriteInput(data, { requiredFields: ['title'] }),
+      data: normalized,
     });
   }
 

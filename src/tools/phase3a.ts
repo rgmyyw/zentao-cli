@@ -53,6 +53,7 @@ export function registerStoryWriteTools(server: CliRegistry): void {
     module: z.number().int().nonnegative().optional(),
     source: optionalTrimmedText,
     sourceNote: optionalTrimmedText,
+    comment: optionalTrimmedText.describe('编辑备注。CLI 在需要时走旧版 story-edit-{id}.json，可附带备注'),
     pri: z.number().optional(),
     estimate: z.number().optional(),
     category: optionalTrimmedText,

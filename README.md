@@ -8,6 +8,10 @@
 
 ## 这版补了什么
 
+- `0.1.37` 是针对富文本与备注的兼容修复版：
+  - **修复任务描述 / 需求规格 / Bug 步骤 / 构建描述 / 待办描述 / 测试单描述被转义**：禅道 18.5 REST v1 的 `batchSetPost()` 会对 `desc` / `spec` / `verify` / `steps` 执行 `htmlspecialchars`，CLI 现在在检测到 HTML 标签时自动走旧版控制器，保留原始富文本。
+  - **补齐备注写入能力**：`updateTask` / `updateStory` 现在支持 `comment`；`updateTask` 还会在旧版链路中先读取任务详情再 merge 回写，避免编辑时丢失未传字段。
+  - **补齐创建链路保护**：`createTask`、`createStory`、`changeStory`、`createBug`、`createBuild`、`updateBuild`、`createTodo`、`updateTodo`、`createTestTask` 在富文本场景下统一走安全旧版路径。
 - `0.1.36` 是一次 CLI ↔ 禅道 18.5 entry 字段对齐收尾 + 附件上传能力补齐：
   - **新增附件上传与下载**：`uploadFile` / `uploadFiles` / `removeFileFromSession` / `deleteFile` / `downloadFile` 五个新工具，加上 `createTask` / `createBug` / `createStory` / `createTestCase` / `createTestTask` / `createBuild` / `createRelease` / `createProduct` / `editProduct` / `createExecution` / `updateExecution` / `updateStory` / `updateRelease` 的 `uid` 字段，形成"先 `uploadFile --uid xxx --file ./a.png` 拿到 fileID，再 `createBug --uid xxx --confirm true`"的完整附件工作流。
   - **9 个核心写工具字段补齐**：`restartTask` 补 `assignedTo, realStarted`（`consumed/left` 改为 nonnegative）；`activateStory` 补 `assignedTo, status`；`updateExecution` 补 `status`；`createExecution` 补 `parent, percent`；`createProduct` / `editProduct` 补 `program`；`createTestTask` / `updateTestTask` 接受 `product`（与 `productID` 双别名）；`updateTodo` 补 `date`；`createRelease` 补 `notify, mailto`；`closeStory` 补 `childStories`。
@@ -36,6 +40,19 @@
 
 ### 典型变化
 
+- **富文本兼容修复**（0.1.37 新增）：
+  ```bash
+  # 任务描述保持原样 HTML，不再变成 &lt;h3&gt; 这类实体
+  zentao updateTask --taskId 80704 --desc '<h3>标题</h3><p>正文</p>' --confirm true
+
+  # 任务备注现在可以直接通过 updateTask 附带
+  zentao updateTask --taskId 80704 --comment '<p>补充说明</p>' --confirm true
+
+  # 需求规格 / Bug 步骤 / 构建描述 / 待办描述 / 测试单描述同样保留 HTML
+  zentao createStory --product 2 --title '新需求' --spec '<p>富文本规格</p>' --confirm true
+  zentao changeStory --storyId 10154 --title '变更需求' --spec '<p>新规格</p>' --confirm true
+  ```
+  背景：禅道 18.5 REST v1 的 `batchSetPost()` 会对 `desc`、`spec`、`verify`、`steps` 做 `htmlspecialchars`；CLI 现在在检测到 HTML 标签时会改走旧版控制器，从而保留原始富文本。`updateTask` 还支持 `comment`，并在旧版链路中先读取任务详情再 merge 回写，避免把未传字段清空。
 - **附件上传流程**（0.1.36 新增）：
   ```bash
   # 1) 上传图片到 session album

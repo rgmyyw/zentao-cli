@@ -1,6 +1,7 @@
 import type { ZentaoHttpClient } from '../core/http.js';
 import { requireNonBlank } from '../core/validation.js';
 import { extractItems } from '../core/list-result.js';
+import { containsHtmlMarkup } from '../utils/html.js';
 import { toFormUrlEncoded } from '../utils/form.js';
 
 export class TodoApi {
@@ -16,11 +17,27 @@ export class TodoApi {
   }
 
   async createTodo(data: Record<string, unknown>): Promise<unknown> {
-    return this.http.request('POST', '/todos', { data: this.normalizeTodoInput(data, true) });
+    const normalized = this.normalizeTodoInput(data, true);
+    if (containsHtmlMarkup(normalized.desc)) {
+      return this.http.legacyRequest('POST', '/todo-create.json', {
+        data: toFormUrlEncoded(this.normalizeTodoLegacyPayload(normalized, true)),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      });
+    }
+    return this.http.request('POST', '/todos', { data: normalized });
   }
 
   async updateTodo(todoId: number, update: Record<string, unknown>): Promise<unknown> {
-    return this.http.request('PUT', `/todos/${todoId}`, { data: this.normalizeTodoInput(update, false) });
+    const normalized = this.normalizeTodoInput(update, false);
+    if (containsHtmlMarkup(normalized.desc)) {
+      const current = await this.getTodoDetail(todoId) as Record<string, unknown>;
+      const preserved = this.pickTodoEditDefaults(current);
+      return this.http.legacyRequest('POST', `/todo-edit-${todoId}.json`, {
+        data: toFormUrlEncoded(this.normalizeTodoLegacyPayload({ ...preserved, ...normalized }, false)),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      });
+    }
+    return this.http.request('PUT', `/todos/${todoId}`, { data: normalized });
   }
 
   async startTodo(todoId: number): Promise<unknown> {
@@ -141,6 +158,36 @@ export class TodoApi {
     });
   }
 
+  private pickTodoEditDefaults(todo: Record<string, unknown>): Record<string, unknown> {
+    return {
+      date: todo.date,
+      type: todo.type,
+      name: todo.name,
+      pri: todo.pri,
+      desc: todo.desc,
+      status: todo.status,
+      begin: todo.begin,
+      end: todo.end,
+      private: todo.private,
+    };
+  }
+
+  private normalizeTodoLegacyPayload(input: Record<string, unknown>, isCreate: boolean): Record<string, unknown> {
+    const payload: Record<string, unknown> = { ...input };
+    if (isCreate && payload.date === undefined) payload.date = today();
+    if (isCreate && payload.type === undefined) payload.type = 'custom';
+    if (isCreate && payload.status === undefined) payload.status = 'wait';
+    if (isCreate && payload.pri === undefined) payload.pri = 3;
+
+    for (const key of ['begin', 'end'] as const) {
+      const value = payload[key];
+      if (typeof value === 'string') payload[key] = value.replace(/:/g, '');
+    }
+
+    if (typeof payload.private === 'boolean') payload.private = payload.private ? 1 : 0;
+    return payload;
+  }
+
   private normalizeTodoInput(input: Record<string, unknown>, requireName: boolean): Record<string, unknown> {
     const normalized: Record<string, unknown> = { ...input };
 
@@ -182,4 +229,12 @@ function normalizeTodoIdList(values: unknown, fieldName: string): number[] {
     }
     return numeric;
   });
+}
+
+function today(): string {
+  const now = new Date();
+  const year = String(now.getFullYear());
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }

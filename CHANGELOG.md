@@ -1,6 +1,29 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+所有值得注意的版本变更都会记录在本文件中。
+
+## 0.1.37 - 2026-06-26
+
+### 修复
+
+- **修复富文本写入被转义**：`updateTask`、`createTask`、`createStory`、`changeStory`、`updateStory`、`createBug`、`createBuild`、`updateBuild`、`createTodo`、`updateTodo`、`createTestTask` 在涉及 `desc` / `spec` / `verify` / `steps` 时，改为走旧版控制器，避免禅道 18.5 REST v1 `batchSetPost()` 对富文本做 `htmlspecialchars`。
+- **修复任务备注无法写入**：`updateTask` / `updateStory` 现在支持 `comment`；`updateTask` 并在旧版链路中先读取任务详情再 merge 回写，避免丢失未传字段。
+- **修复 `startTask` 传参中 `assignedTo` 对象未被正确提取**：当负责人字段返回对象时，CLI 现在会提取 `account` 并回写为字符串。
+
+### 变更
+
+- **富文本自动走 legacy**：检测到 HTML 标签时自动切换到旧版 `task-edit`、`story-edit`、`story-change`、`bug-create`、`build-create`、`build-edit`、`todo-create`、`todo-edit`、`testtask-create` 路径；普通文本仍走原 REST / legacy 路径，避免行为大幅漂移。
+- **工具 schema 补齐**：`updateTask` / `updateStory` 增加 `comment` 参数。
+
+### 文档
+
+- 更新 `AGENTS.md`：补充 18.5 已知限制中 `task`、`story`、`bug`、`build`、`todo`、`testtask` 相关入口说明。
+- 更新 README，说明 0.1.37 修复了富文本转义与备注写入问题。
+
+### 验证
+
+- `pnpm check` 全过：`tsc --noEmit` 无报错，`oxlint` 0 warning / 0 error，314 个单测全 pass。
+- 已覆盖新增回归：任务描述 HTML、需求规格 HTML、Bug 步骤 HTML、构建/待办/测试单描述 HTML、`updateStory --comment`、对象型 `assignedTo` 提取。
 
 ## 0.1.36 - 2026-06-26
 

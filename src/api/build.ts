@@ -1,6 +1,7 @@
 import type { ZentaoHttpClient } from '../core/http.js';
 import { toServerListResult } from '../core/list-result.js';
 import { requireNonBlank } from '../core/validation.js';
+import { containsHtmlMarkup } from '../utils/html.js';
 import { toFormUrlEncoded } from '../utils/form.js';
 
 export interface CreateBuildInput {
@@ -57,11 +58,28 @@ export class BuildApi {
 
   async createBuild(payload: CreateBuildInput): Promise<unknown> {
     const { project, ...build } = this.normalizeBuildInput(payload, ['name', 'builder']);
+    if (containsHtmlMarkup(build.desc)) {
+      const legacyPayload = this.normalizeBuildLegacyPayload(build as Record<string, unknown>);
+      return this.http.legacyRequest('POST', `/build-create-${build.execution}-${build.product}-${project}.json`, {
+        data: toFormUrlEncoded(legacyPayload),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      });
+    }
     return this.http.request('POST', `/projects/${project}/builds`, { data: build });
   }
 
   async updateBuild(buildId: number, update: UpdateBuildInput): Promise<unknown> {
-    return this.http.request('PUT', `/builds/${buildId}`, { data: this.normalizeBuildInput(update, []) });
+    const normalizedUpdate = this.normalizeBuildInput(update, []);
+    if (containsHtmlMarkup(normalizedUpdate.desc)) {
+      const current = await this.getBuildDetail(buildId) as Record<string, unknown>;
+      const preserved = this.pickBuildEditDefaults(current);
+      const legacyPayload = this.normalizeBuildLegacyPayload(this.normalizeBuildInput({ ...preserved, ...update }, []));
+      return this.http.legacyRequest('POST', `/build-edit-${buildId}.json`, {
+        data: toFormUrlEncoded(legacyPayload),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      });
+    }
+    return this.http.request('PUT', `/builds/${buildId}`, { data: normalizedUpdate });
   }
 
   async linkStoriesToBuild(buildId: number, input: LinkStoriesToBuildInput): Promise<unknown> {
@@ -146,6 +164,56 @@ export class BuildApi {
     }
 
     return normalized as T;
+  }
+
+  private normalizeBuildLegacyPayload(input: Record<string, unknown>): Record<string, unknown> {
+    const payload = { ...input };
+    const branchList = this.toCsvList(payload.branch);
+    if (branchList.length > 0) payload.branch = branchList;
+    const buildsList = this.toCsvList(payload.builds);
+    if (buildsList.length > 0) payload.builds = buildsList;
+    return payload;
+  }
+
+  private pickBuildEditDefaults(build: Record<string, unknown>): Record<string, unknown> {
+    const defaults: Record<string, unknown> = {
+      execution: build.execution,
+      product: build.product,
+      name: build.name,
+      builder: this.extractAccountString(build.builder),
+      date: build.date,
+      scmPath: build.scmPath,
+      filePath: build.filePath,
+      desc: build.desc,
+    };
+    const branchList = this.toCsvList(build.branch);
+    if (branchList.length > 0) defaults.branch = branchList;
+    const buildsList = this.toCsvList(build.builds);
+    if (buildsList.length > 0) defaults.builds = buildsList;
+    return defaults;
+  }
+
+  private extractAccountString(value: unknown): string | undefined {
+    if (typeof value === 'string') return value;
+    if (value && typeof value === 'object' && 'account' in value) {
+      const account = (value as { account?: unknown }).account;
+      return typeof account === 'string' ? account : undefined;
+    }
+    return undefined;
+  }
+
+  private toCsvList(value: unknown): string[] {
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => String(item).trim())
+        .filter((item) => item !== '' && item !== '0');
+    }
+    if (typeof value === 'number') return value > 0 ? [String(value)] : [];
+    if (typeof value !== 'string') return [];
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter((item) => item !== '' && item !== '0');
   }
 
   private normalizeOptionalString(value: string): string | undefined {

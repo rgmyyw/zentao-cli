@@ -4,6 +4,7 @@ import { extractItems, toClientPaginatedListResult, toServerListResult } from '.
 import { fetchAllPages, normalizePagination, type PaginationInput } from '../core/pagination.js';
 import { requireNonBlank } from '../core/validation.js';
 import type { ZentaoTask } from '../types/zentao.js';
+import { containsHtmlMarkup } from '../utils/html.js';
 import { toFormUrlEncoded, type FormEncodable } from '../utils/form.js';
 
 export interface MyTaskListInput extends PaginationInput {
@@ -183,9 +184,18 @@ export class TaskApi {
   }
 
   async updateTask(taskId: number, update: Record<string, unknown>): Promise<unknown> {
-    const normalizedUpdate = this.normalizeTaskInput(update);
-    return this.http.request('PUT', `/tasks/${taskId}`, {
-      data: normalizedUpdate,
+    /**
+     * 禅道 18.5 REST v1 PUT /tasks/{id} 对 desc 走 htmlspecialchars，
+     * 富文本会变成 &lt;h3&gt; 这种实体，禅道网页端 KindEditor 提交走的是
+     * 旧版 task-edit-{id}.json 控制器，后者按原样存 HTML。
+     * 旧版控制器对未提交的字段采用替换语义，所以先 GET 详情再 merge。
+     */
+    const current = await this.getTaskDetail(taskId);
+    const preserved = this.pickTaskEditDefaults(current);
+    const formData = toFormUrlEncoded(this.normalizeTaskLegacyInput({ ...preserved, ...update }));
+    return this.http.legacyRequest('POST', `/task-edit-${taskId}.json`, {
+      data: formData,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
   }
 
@@ -196,8 +206,9 @@ export class TaskApi {
     const normalizedData = this.normalizeTaskInput(data);
     const before = await this.getTaskDetail(taskId);
     const result = await this.http.request('POST', `/tasks/${taskId}/start`, { data: normalizedData });
-    const assignedTo = (normalizedData.assignedTo as string | undefined) ?? before.assignedTo ?? before.openedBy;
-    await this.updateTask(taskId, { status: 'doing', assignedTo });
+    const fallbackAssignee = this.extractAccountString(before.assignedTo) || this.extractAccountString(before.openedBy);
+    const assignedTo = (normalizedData.assignedTo as string | undefined) ?? fallbackAssignee;
+    await this.updateTask(taskId, { status: 'doing', ...(assignedTo ? { assignedTo } : {}) });
     return result;
   }
 
@@ -378,6 +389,42 @@ export class TaskApi {
 
   async createTask(task: Record<string, unknown> & { execution: number }): Promise<unknown> {
     const normalizedTask = this.normalizeTaskInput(task, ['name', 'assignedTo', 'estStarted', 'deadline']);
+    if (containsHtmlMarkup(normalizedTask.desc)) {
+      const legacyTask = this.normalizeTaskLegacyInput({ ...task });
+      legacyTask.name = requireNonBlank(legacyTask.name as string | undefined, 'name 不能为空');
+      legacyTask.assignedTo = requireNonBlank(legacyTask.assignedTo as string | undefined, 'assignedTo 不能为空');
+      legacyTask.estStarted = requireNonBlank(legacyTask.estStarted as string | undefined, 'estStarted 不能为空');
+      legacyTask.deadline = requireNonBlank(legacyTask.deadline as string | undefined, 'deadline 不能为空');
+
+      const storyId = typeof task.story === 'number' ? task.story : 0;
+      const moduleId = typeof legacyTask.module === 'number' ? legacyTask.module : 0;
+      const formData: Record<string, unknown> = {
+        execution: task.execution,
+        story: storyId,
+        module: moduleId,
+        name: legacyTask.name,
+        type: legacyTask.type ?? 'devel',
+        assignedTo: [legacyTask.assignedTo],
+        estStarted: legacyTask.estStarted,
+        deadline: legacyTask.deadline,
+        desc: legacyTask.desc ?? '',
+        status: 'wait',
+        after: 'toTaskList',
+      };
+      if (legacyTask.pri !== undefined) formData.pri = legacyTask.pri;
+      if (legacyTask.estimate !== undefined) formData.estimate = legacyTask.estimate;
+      if (legacyTask.left !== undefined) formData.left = legacyTask.left;
+      if (legacyTask.mailto !== undefined) formData.mailto = legacyTask.mailto;
+      if (legacyTask.team !== undefined) formData.team = legacyTask.team;
+      if (legacyTask.teamEstimate !== undefined) formData.teamEstimate = legacyTask.teamEstimate;
+      if (legacyTask.multiple !== undefined) formData.multiple = legacyTask.multiple;
+      if (legacyTask.uid !== undefined) formData.uid = legacyTask.uid;
+
+      return this.http.legacyRequest('POST', `/task-create-${task.execution}-${storyId}-${moduleId}.json`, {
+        data: toFormUrlEncoded(formData),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      });
+    }
     return this.http.request('POST', `/executions/${task.execution}/tasks`, {
       data: normalizedTask,
     });
@@ -473,6 +520,89 @@ export class TaskApi {
     }
 
     return normalized;
+  }
+
+  private normalizeTaskLegacyInput(data: Record<string, unknown>): Record<string, unknown> {
+    /**
+     * 旧版 task-edit-{id}.json 控制器对未传字段采用替换语义，所以要保留数字字段原值。
+     * 与 normalizeTaskInput 不同：这里不把数字字段当空字符串误删，保留 story=0 等显式数值。
+     */
+    const stringFields = [
+      'name', 'type', 'desc', 'assignedTo', 'estStarted', 'deadline',
+      'status', 'closedReason', 'mailto', 'color', 'comment',
+    ] as const;
+    const normalized: Record<string, unknown> = { ...data };
+    for (const field of stringFields) {
+      if (!Object.prototype.hasOwnProperty.call(normalized, field)) continue;
+      const value = normalized[field];
+      if (value === undefined || value === null) {
+        delete normalized[field];
+        continue;
+      }
+      if (typeof value !== 'string') continue;
+      const trimmed = value.trim();
+      if (trimmed === '') {
+        delete normalized[field];
+        continue;
+      }
+      normalized[field] = trimmed;
+    }
+    return normalized;
+  }
+
+  private pickTaskEditDefaults(task: ZentaoTask): Record<string, unknown> {
+    const assignedTo = this.extractAccountString(task.assignedTo);
+    const story = task.story === undefined || task.story === null ? 0 : task.story;
+    const moduleId = task.module === undefined || task.module === null ? 0 : task.module;
+    const pri = task.pri === undefined || task.pri === null ? 0 : task.pri;
+    const parent = task.parent === undefined || task.parent === null ? 0 : task.parent;
+
+    return {
+      name: task.name,
+      type: task.type,
+      pri,
+      status: task.status,
+      module: moduleId,
+      story,
+      assignedTo,
+      estStarted: task.estStarted,
+      deadline: task.deadline,
+      estimate: task.estimate ?? 0,
+      left: task.left ?? 0,
+      consumed: task.consumed ?? 0,
+      desc: task.desc ?? '',
+      color: task.color ?? '',
+      parent,
+      mailto: this.normalizeMailto(task.mailto),
+      closedReason: task.closedReason ?? '',
+    };
+  }
+
+  private extractAccountString(value: unknown): string {
+    if (value && typeof value === 'object' && 'account' in value) {
+      const account = (value as { account?: unknown }).account;
+      return typeof account === 'string' ? account : '';
+    }
+    if (typeof value === 'string') return value;
+    return '';
+  }
+
+  private normalizeMailto(value: unknown): string {
+    if (!Array.isArray(value)) {
+      if (typeof value === 'string') return value;
+      return '';
+    }
+    const accounts = value
+      .map((item) => {
+        if (item && typeof item === 'object' && 'account' in item) {
+          const account = (item as { account?: unknown }).account;
+          return typeof account === 'string' ? account : '';
+        }
+        if (typeof item === 'string') return item;
+        return '';
+      })
+      .filter((account) => account !== '');
+    return accounts.join(',');
   }
 
   private normalizeOptionalString(value: unknown): string | undefined {

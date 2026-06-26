@@ -91,7 +91,10 @@
 - `getExecutionDynamic` 是近似读取：调用 `GET /executions/{id}?fields=dynamics`，不是旧版 `execution-dynamic` 页面完整等价实现。
 - `getComments` 在禅道 18.5 上会 fallback 到对象详情里的 `actions`，返回结果会标注 `source: "actions-fallback"`。
 - `addComment`：禅道 18.5 v1 没有 `/comment` REST entry，已改为走旧版 `action-comment-{type}-{id}.json` 控制器。非 API 模式返回 HTML（js::reload），客户端通过响应模式判定成功。
-- `updateTask` 和 `updateStory`：禅道 18.5 Task PUT / Story PUT 的 `batchSetPost` 字段列表不包含 `comment`，无法直接通过 PUT 写备注，备注请通过 `finishTask` / `resolveBug` / `changeStory` 等状态变更操作附带。
+- `createTask` / `updateTask`：禅道 18.5 REST v1 对 `desc` 走 `batchSetPost()`，其中会对 `desc` 做 `htmlspecialchars`。CLI 现在会在 `desc` 含 HTML 标签时切到旧版 `task-create-*.json` / `task-edit-{id}.json`；`updateTask` 额外支持 `comment`，并会先 `GET /tasks/{id}` 再 merge，避免旧版 edit 覆盖未传字段。
+- `createStory` / `changeStory` / `updateStory`：禅道 18.5 REST v1 对 `spec` / `verify` 走 `batchSetPost()`，HTML 会被转义；`updateStory` 的 PUT 还不会接收 `comment`。CLI 现在会在 `spec` / `verify` 含 HTML 时切到旧版 `story-create-*.json` / `story-change-{id}.json`，并在 `updateStory` 传 `comment` 时切到 `story-edit-{id}.json`。
+- `createBug`：禅道 18.5 REST v1 对 `steps` 走 `batchSetPost()`，HTML 会被转义。CLI 现在会在 `steps` 含 HTML 时切到旧版 `bug-create-{product}.json`。
+- `createBuild` / `updateBuild` / `createTodo` / `updateTodo` / `createTestTask`：禅道 18.5 REST v1 对 `desc` 走 `batchSetPost()`，HTML 会被转义。CLI 现在会在 `desc` 含 HTML 时切到对应旧版 `build-*` / `todo-*` / `testtask-create-*` 控制器；更新类接口会先拉详情再 merge，避免旧版 edit 覆盖未传字段。
 - `updateExecution`：禅道 18.5 REST PUT 在启用迭代代号时 `code` 字段拼接缺逗号，已改为走旧版 `execution-edit-{id}.json` 控制器。
 - `updateTestTask`：禅道 18.5 v1 没有 testtask PUT 入口，已改为走旧版 `testtask-edit-{id}.json` 控制器。
 - `createTaskFromBug` 应走旧版 `task/create` + `bugID` 兼容模式，并按页面链路显式传 `project` 与 `execution`，保证服务端执行真正的 `toTask` 语义：同步写 `task.fromBug`、`bug.toTask` 并记录 `converttotask` 动作。
