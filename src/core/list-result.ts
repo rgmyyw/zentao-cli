@@ -1,4 +1,5 @@
 import { normalizePagination, type PaginationInput } from './pagination.js';
+import type { ListSummary } from './list-summary.js';
 
 export interface ListResult<T = unknown> {
   source: 'server-paginated' | 'server-full-list' | 'client-paginated';
@@ -9,6 +10,13 @@ export interface ListResult<T = unknown> {
   scanned?: number;
   itemKey: string;
   items: T[];
+  /**
+   * Agent-first summary. When present, downstream tools should surface
+   * it as the "first answer" before the caller reaches for `items`.
+   */
+  summary?: ListSummary;
+  /** Marker telling consumers this output is already processed. */
+  meta?: { processed: true; partial: boolean; total: number };
 }
 
 export function extractItems<T = unknown>(response: unknown, keys: string[]): T[] {

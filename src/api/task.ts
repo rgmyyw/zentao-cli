@@ -6,6 +6,7 @@ import { requireNonBlank } from '../core/validation.js';
 import type { ZentaoTask } from '../types/zentao.js';
 import { containsHtmlMarkup } from '../utils/html.js';
 import { toFormUrlEncoded, type FormEncodable } from '../utils/form.js';
+import { summarizeList } from '../core/list-summary.js';
 
 export interface MyTaskListInput extends PaginationInput {
   status?: string;
@@ -79,11 +80,14 @@ export class TaskApi {
       const filteredTasks = input.status && input.status !== 'all'
         ? tasks.filter(task => task.status === input.status)
         : tasks;
-
+      const listResult = toClientPaginatedListResult({ tasks: filteredTasks }, ['tasks'], { page: 1, limit: pagination.limit });
+      const summary = summarizeList(filteredTasks, { sortKey: 'deadline', groupKey: 'product' });
       return {
-        ...toClientPaginatedListResult({ tasks: filteredTasks }, ['tasks'], { page: 1, limit: pagination.limit }),
+        ...listResult,
         partial: true,
         scanned: tasks.length,
+        summary,
+        meta: { processed: true, partial: true, total: filteredTasks.length },
       };
     }
 
@@ -105,10 +109,14 @@ export class TaskApi {
     const filteredTasks = input.status && input.status !== 'all'
       ? allTasks.filter(task => task.status === input.status)
       : allTasks;
+    const listResult = toClientPaginatedListResult({ tasks: filteredTasks }, ['tasks'], pagination);
+    const summary = summarizeList(filteredTasks, { sortKey: 'deadline', groupKey: 'product' });
 
     return {
-      ...toClientPaginatedListResult({ tasks: filteredTasks }, ['tasks'], pagination),
+      ...listResult,
       scanned: allTasks.length,
+      summary,
+      meta: { processed: true, partial: listResult.partial, total: filteredTasks.length },
     };
   }
 

@@ -48,6 +48,20 @@ export function withToolMeta(value: unknown, meta: Record<string, unknown>): unk
 }
 
 function normalizeCompactPayload(value: unknown): unknown {
+  return promoteAgentFirstFields(value);
+}
+
+function promoteAgentFirstFields(value: unknown): unknown {
+  // When a tool returns a ListResult with summary + meta.processed, hoist
+  // the summary to the top-level so the agent sees it before items.
+  if (!isPlainObject(value)) return value;
+  const record = value as Record<string, unknown>;
+  if (record.meta && isPlainObject(record.meta) && (record.meta as Record<string, unknown>).processed === true) {
+    return {
+      ...(isPlainObject(record.summary) ? { summary: record.summary } : {}),
+      ...record,
+    };
+  }
   return value;
 }
 

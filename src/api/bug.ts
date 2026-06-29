@@ -6,6 +6,7 @@ import type { ZentaoBug, ZentaoListResponse } from '../types/zentao.js';
 import { containsHtmlMarkup } from '../utils/html.js';
 import { toFormUrlEncoded } from '../utils/form.js';
 import { bugMatchesKeyword, bugMatchesModuleAlias, normalizeBugFilterText } from './bug-filter.js';
+import { summarizeList } from '../core/list-summary.js';
 
 export interface BugListParams extends PaginationInput {
   productId: number;
@@ -121,6 +122,8 @@ export class BugApi {
         partial: true,
         scope: 'global-assigntome',
         scannedProducts: productsResult.items.length,
+        summary: summarizeList(sorted, { sortKey: 'deadline', groupKey: 'product' }),
+        meta: { processed: true, partial: true, total: sorted.length },
       };
     }
 
