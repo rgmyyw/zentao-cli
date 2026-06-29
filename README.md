@@ -6,80 +6,34 @@
 
 除了标准 REST API，本工具还补充了部分扩展场景：会在必要时读取页面 JSON、详情页动作记录，或模拟禅道前端请求，把标准接口不好覆盖的查询、统计和流转动作封装成可调用命令。
 
-## 这版补了什么
+## 核心能力
 
-- `0.1.37` 是针对富文本与备注的兼容修复版：
-  - **修复任务描述 / 需求规格 / Bug 步骤 / 构建描述 / 待办描述 / 测试单描述被转义**：禅道 18.5 REST v1 的 `batchSetPost()` 会对 `desc` / `spec` / `verify` / `steps` 执行 `htmlspecialchars`，CLI 现在在检测到 HTML 标签时自动走旧版控制器，保留原始富文本。
-  - **补齐备注写入能力**：`updateTask` / `updateStory` 现在支持 `comment`；`updateTask` 还会在旧版链路中先读取任务详情再 merge 回写，避免编辑时丢失未传字段。
-  - **补齐创建链路保护**：`createTask`、`createStory`、`changeStory`、`createBug`、`createBuild`、`updateBuild`、`createTodo`、`updateTodo`、`createTestTask` 在富文本场景下统一走安全旧版路径。
-- `0.1.36` 是一次 CLI ↔ 禅道 18.5 entry 字段对齐收尾 + 附件上传能力补齐：
-  - **新增附件上传与下载**：`uploadFile` / `uploadFiles` / `removeFileFromSession` / `deleteFile` / `downloadFile` 五个新工具，加上 `createTask` / `createBug` / `createStory` / `createTestCase` / `createTestTask` / `createBuild` / `createRelease` / `createProduct` / `editProduct` / `createExecution` / `updateExecution` / `updateStory` / `updateRelease` 的 `uid` 字段，形成"先 `uploadFile --uid xxx --file ./a.png` 拿到 fileID，再 `createBug --uid xxx --confirm true`"的完整附件工作流。
-  - **9 个核心写工具字段补齐**：`restartTask` 补 `assignedTo, realStarted`（`consumed/left` 改为 nonnegative）；`activateStory` 补 `assignedTo, status`；`updateExecution` 补 `status`；`createExecution` 补 `parent, percent`；`createProduct` / `editProduct` 补 `program`；`createTestTask` / `updateTestTask` 接受 `product`（与 `productID` 双别名）；`updateTodo` 补 `date`；`createRelease` 补 `notify, mailto`；`closeStory` 补 `childStories`。
-  - **createTask 字段对齐**：`tasks.php::tasksEntry::post` 的 17 字段标准入口现在 CLI 端全部暴露（新增 `mailto, team, teamEstimate, multiple, uid`），多人任务模式可直接通过 CLI 触发。
-  - **字段对齐审计**（详见 `scripts/audit-alignment.txt`）：312 工具 vs 193 entry method，剩余 48 个未暴露的 entry 写操作（issue / risk / ticket / feedback / program / 各种 delete 等）按需后续实现。
-- `0.1.35` 是 review 触发的安全 / 健壮性修复版（commit `6b506c2`），同时把 `compact` 输出改为只控制 JSON 形态、不再裁剪数据（commit `b7bc2aa`），并新增 `design.md` 工程约定文档。
-- **P0：HTTP GET 缓存不再误命中写副作用路径**。`ZentaoHttpClient` 的 `getCacheKey` 显式排除 `finish` / `activate` / `start` / `close` / `confirm` / `pause` / `restart` / `cancel` / `suspend` / `putoff` / `assign` / `resolve` 这些写动词 URL，避免在 15 秒 TTL 窗口内把写响应错误地返回给后续只读请求。
-- **P0：`downloadLegacy` 增加 host 校验与下载体积上限**。绝对 URL 必须与 `legacyBaseUrl` / `apiBaseUrl` / `url` 推导出的 host 一致，相对路径直接放行，防止把附件下载请求引向内网元数据地址触发 SSRF；并设置 `maxContentLength` / `maxBodyLength` 为 50MB，避免恶意 URL 拖垮内存。
-- **P0：`askPassword` 健壮性**。终端不支持密码隐藏时直接拒绝输入并提示改用环境变量，避免密码明文回显；增加 `readline close` 事件兜底还原输出行为，避免 Ctrl+D / EOF / SIGTERM 场景下 `_writeToOutput` 钩子未清理导致后续输出被替换为 `*`。
-- **P0：批量任务 payload 修复双重包装**。`batchCreateTasks` 改为把 `tasks` 数组直接交给 `toFormUrlEncoded` 展开为 `tasks[0][name]=...`，不再拼成 `tasks[]=[object Object]`。
-- **P0：构建期敏感词守卫**。新增 `scripts/guard-sensitive.mjs` 并接入 `pnpm build` 与 `pnpm guard:sensitive`，在发包前静态扫 `dist/` 防止把真实 token / 密码打进产物；同步修复敏感配置日志中的 placeholder 还原逻辑。
-- **P1：HTTP 指标并发覆盖修复**。`src/core/http-metrics.ts` 用最近 16 次请求耗时环形缓冲替换单变量，并发请求几乎同时完成时不再互相覆盖最后耗时。
-- **P1：`getMyTasks` 去掉 `page=total` 一次性返回的脆弱试探**，统一走标准分页拉取全量。
-- **P1：`url-intent` 写动词清单补齐**。`WRITE_PAGE_PATTERN` 增补 `start` / `pause` / `restart` / `cancel` / `confirm` / `suspend` / `putoff` 以及 `batch*` 批量写动作，确保 `task-finish-1.html` / `execution-batchEdit-1.html` 这类写页面统一降级为 `explain`。
-- **P1：非交互终端早期拦截**。`install` / `update` 在缺失配置或登录校验失败且 stdin/stdout 都不是 TTY 时直接抛错，提示用 `ZENTAO_URL` / `ZENTAO_USERNAME` / `ZENTAO_PASSWORD` 环境变量。
-- **P1：`getMyTaskStatistics` 支持 `scan: false` 快速采样**，`whoami` 等场景只采样首页 100 条任务并标注 `sampled: true` / `partial: true`。
-- **P1：`axios` 锁定为 `1.13.2`**，避免 `^1.13.2` 在不同环境拉到 1.13.x 后续版本时 `https.Agent` 行为差异。
-- **P2**：清理 `execution.ts` / `task.ts` / `form.ts` 中冗余的 `Record<string, unknown>` 类型断言，统一收敛到 `FormEncodable`；`normalizeOptionalText` 从 `ExecutionApi` 私有方法下沉到 `src/utils/date.ts` 复用；CLI 参数解析支持负数等可解析为数字的显式值，`--offset -5` 不会再被当成新 flag；whoami 等级阈值集中到 `WHOAMI_LEVELS` 表；GET 响应缓存接入 LRU 上限 64 条；`update-probe` 改用 `node:https` 直接请求 npm registry，规避 Windows 上 `spawn npm` 的路径/转义问题。
-- **`--output compact` 不再裁剪数据**。原先 `compact` 会把长数组截断到 20 项、长字符串截短到 600 字符 + `…`；现在 `compact` 只控制 JSON 形态（保留关键元信息、压缩空白），不再对业务字段做截断。三个模式都保持数据完整，需要控制长度的场景请改用 `--limit` / `--page` 等业务参数或在客户端按需裁剪。
-- **新增 `design.md`（1040 行）**：从文档定位、目录结构、Skill 设计、安装维护、测试方式、发布流程、代码风格、技术栈与依赖等维度，沉淀本项目可复用的工程约定，供其他 CLI / Agent Skill / 自动化工具项目直接对齐参考。
-- `0.1.34` 重构 Skill 文档为 2 级索引：`SKILL.md` 主入口从 272 行精简到 90 行，通过分类总览 + Reference 跳转表指到二级目录；二级 `reference/` 覆盖 CLI 注册的全部 306 个命令，按场景聚合并拆分高频主链路与低频高级文档。
-- 新增 `reference/cheatsheet.md` 兜底速查、`reference/index.md` 分类总览、`reference/scenarios.md` 场景化组合（共 16 类典型用户意图 → 命令组合示例）。
-- 新增 `reference/<场景>-advanced.md` 系列（共 9 个文档 / 168 个低频命令）：`bug-advanced.md`、`task-advanced.md`、`story-advanced.md`、`execution-advanced.md`、`product-advanced.md`、`project-advanced.md`、`testcase-advanced.md`、`testtask-advanced.md`、`build-advanced.md`，覆盖批量 / 状态变更 / 管理员命令。
-- `0.1.33` 新增 `parseUrlIntent`，可以把禅道浏览器页面 URL、legacy 页面文件名或本地路径直接解析成结构化 CLI 意图。
-- 直接把 URL 当首参传给 `zentao` 时，同站且安全的只读页面会自动跳到真实查询命令；跨实例 URL、无直连命令页面和写页面则返回说明 JSON，不会误执行写操作。
+- 覆盖禅道任务、Bug、需求、执行、测试、构建、发布、动态与统计等常见终端工作流。
+- 在标准 REST API 之外，补充 legacy 页面 JSON、动作记录、URL 意图解析等扩展场景，用来覆盖标准接口不完整的查询和流转动作。
+- 支持附件上传/下载、富文本写入兼容、`whoami`、`changelog`、`parseUrlIntent`、安装/更新/卸载等内置链路。
+- 写命令统一要求显式传入 `--confirm true`；未确认时返回 preview，不直接发起写请求。
+- 支持 `compact / normal / verbose / pretty` 输出模式，适合终端查看、脚本消费和 Agent 调用。
 
-### 典型变化
+## 典型用法
 
-- **富文本兼容修复**（0.1.37 新增）：
+- 富文本写入：
   ```bash
-  # 任务描述保持原样 HTML，不再变成 &lt;h3&gt; 这类实体
   zentao updateTask --taskId 80704 --desc '<h3>标题</h3><p>正文</p>' --confirm true
-
-  # 任务备注现在可以直接通过 updateTask 附带
   zentao updateTask --taskId 80704 --comment '<p>补充说明</p>' --confirm true
-
-  # 需求规格 / Bug 步骤 / 构建描述 / 待办描述 / 测试单描述同样保留 HTML
-  zentao createStory --product 2 --title '新需求' --spec '<p>富文本规格</p>' --confirm true
-  zentao changeStory --storyId 10154 --title '变更需求' --spec '<p>新规格</p>' --confirm true
   ```
-  背景：禅道 18.5 REST v1 的 `batchSetPost()` 会对 `desc`、`spec`、`verify`、`steps` 做 `htmlspecialchars`；CLI 现在在检测到 HTML 标签时会改走旧版控制器，从而保留原始富文本。`updateTask` 还支持 `comment`，并在旧版链路中先读取任务详情再 merge 回写，避免把未传字段清空。
-- **附件上传流程**（0.1.36 新增）：
+- 附件工作流：
   ```bash
-  # 1) 上传图片到 session album
   zentao uploadFile --uid task-attach-1 --file /path/to/screenshot.png
-  # → { "id": 12345, "url": "...", "path": "...", "title": "...", "size": ... }
-
-  # 2) 创建任务时把同一个 uid 传过去，禅道自动把该 uid 下的 fileID 绑定到新任务
   zentao createTask --execution 2140 --name "修复登录 bug" --type devel \
     --assignedTo dev --estStarted 2026-06-26 --deadline 2026-06-30 \
     --uid task-attach-1 --confirm true
   ```
-  同样适用于 `createBug` / `createStory` / `createTestCase` / `createTestTask` / `createBuild` / `createRelease` / `createProduct` / `createExecution`；更新时把 `uid` 传给 `updateXxx` 即可重新绑定附件；不再需要附件时传空 `uid` 即可解绑。限制：18.5 `fileEntry::post` 仅支持 jpg/jpeg/png/gif，非图片走对象级 `file-{type}-{id}` 控制器（CLI 暂未实现）。
-- **多人任务模式**（0.1.36 新增）：
+- URL 解析：
   ```bash
-  zentao createTask --execution 2140 --name "联调任务" --type devel \
-    --assignedTo dev --estStarted 2026-06-26 --deadline 2026-06-30 \
-    --multiple true \
-    --team '["dev1","dev2","dev3"]' \
-    --teamEstimate '[4,3,2]' \
-    --confirm true
+  zentao parseUrlIntent --url "https://your-zentao.example.com/zentao/bug-view-84362.html"
   ```
-- **`--output compact` 行为变化**：之前会静默裁剪数据（`items` 截到 20 条、长字符串截到 600 字符 + `…`），现在只控制 JSON 形态、不裁剪字段。AI / 脚本消费时如果想控制体积，请改用 `--limit` / `--page` 或在客户端裁剪。
-- **P0 修复之一**：HTTP GET 缓存不再命中 `finish` / `activate` / `start` / `close` 等写动词 URL；`downloadLegacy` 不再把请求引向非禅道 host；`askPassword` 在不支持密码隐藏的终端直接拒绝。
-- **新增 `design.md`**：项目级工程设计对齐文档（1040 行），方便其他 CLI / Agent Skill 项目复用约定。
-- **先解析再执行**：`zentao parseUrlIntent --url "https://your-zentao.example.com/zentao/bug-view-84362.html"` 会告诉你该 URL 对应哪个命令、哪些参数、是否可自动执行。
-- **直接贴 URL**：`zentao program-view-620.html`、`zentao todo-view-2319.html` 现在可以直接跳到详情命令；`zentao doc-view-12.html` 会返回 explain JSON 和候选命令。
-- **Skill 文档 2 级索引**：进 skill 后先看 `SKILL.md` 的 Reference 路由表，按场景跳到 `reference/<场景>.md`；批量 / 状态变更 / 管理员命令下沉到 `reference/<场景>-advanced.md`；不确定命令是否存在直接看 `reference/cheatsheet.md`。
+- 直接贴 URL：`zentao program-view-620.html`、`zentao todo-view-2319.html` 可直接跳到详情命令；`zentao doc-view-12.html` 会返回 explain JSON 和候选命令。
+- Skill 文档采用 2 级索引：先看 `SKILL.md` 的 Reference 路由表，按场景跳到 `reference/<场景>.md`；批量 / 状态变更 / 管理员命令下沉到 `reference/<场景>-advanced.md`；不确定命令是否存在直接看 `reference/cheatsheet.md`。
 
 ## 版本要求
 
@@ -313,7 +267,7 @@ pnpm release:smoke-query
 pnpm coverage
 ```
 
-`pnpm release:smoke-query` 现在会按命令检查返回内容（ID 命中、列表结构、统计计数、快照字段等），不再只校验退出码；可作为发布前和修复查询命令后的回归手段。
+`pnpm release:smoke-query` 会按命令检查返回内容（ID 命中、列表结构、统计计数、快照字段等），不只校验退出码；可作为发布前和修复查询命令后的回归手段。
 
 ## 可以这样问
 
@@ -425,17 +379,17 @@ Skill / Agent 处理禅道请求时，优先按下面格式路由：
 - 已拆分任务的调整不是重新拆任务：只有新增独立工作项时才补建任务；改时间、负责人、工时、状态、父子归属时优先更新原任务。
 - 最多只创建父子两层，不创建孙任务。
 
-## 查看更新记录
+## 查看 Changelog
 
 ```bash
 zentao changelog
 zentao changelog --limit 5
-zentao changelog --version 0.1.23
-zentao changelog --since 0.1.20
+zentao changelog --version 1.0.0
+zentao changelog --since 0.1.0
 zentao changelog --raw
 ```
 
-> 提示：`zentao help <command>` 现在对 `install`、`update`、`uninstall`、`changelog` 等内置命令也会输出完整参数说明；`zentao --help` 会按当前 role 推荐常用命令，并优先引导使用 `zentao list` 查看全部可用命令。
+> 提示：`zentao help <command>` 对 `install`、`update`、`uninstall`、`changelog` 等内置命令也会输出完整参数说明；`zentao --help` 会按当前 role 推荐常用命令，并优先引导使用 `zentao list` 查看全部可用命令。
 
 ## 常用命令示例
 
