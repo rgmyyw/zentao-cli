@@ -8,7 +8,7 @@ export function registerBugTools(server: CliRegistry): void {
   server.tool(
     'getMyBugs',
     {
-      productId: z.number().int().positive().optional().describe('可选。禅道产品 ID。不传时默认查询跨所有产品“指派给我的 Bug”；传入时只查该产品内我的 Bug。若用户问线上 / 生产 / 客户反馈 / 售后反馈问题，先判断来源：市场 / 售后 / 客户反馈查“市场和售后问题跟踪”，测试 / 开发自发现查“测试”，不要直接把业务产品名当成这里的 productId。'),
+      productId: z.number().int().positive().optional().describe('可选。禅道产品 ID。不传时默认查询跨所有产品“指派给我的 Bug”；传入时只查该产品内我的 Bug。若用户问线上 / 生产 / 客户反馈 / 售后反馈问题，先判断来源：市场 / 售后 / 客户反馈查“市场和售后问题跟踪”，测试 / 开发自发现查“测试”，不要直接把业务产品名当成这里的 productId。注意：本命令不支持 status 参数。'),
       page: z.number().int().positive().optional(),
       limit: z.number().int().positive().max(100).optional(),
       branch: optionalTrimmedText,

@@ -21,7 +21,8 @@ export function registerTaskTools(server: CliRegistry): void {
   server.tool(
     'getMyTasks',
     {
-      status: z.enum(['wait', 'doing', 'done', 'cancel', 'closed', 'all']).optional().default('all'),
+      status: z.enum(['wait', 'doing', 'done', 'cancel', 'closed', 'all']).optional().default('all')
+        .describe('任务状态过滤。注意：部分禅道部署的“我的任务”接口不会返回已完成任务；如果要查阶段内已完成任务，优先改用 getMyWeeklyActivity。'),
       page: z.number().int().positive().optional(),
       limit: z.number().int().positive().max(100).optional(),
     },

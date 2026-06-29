@@ -73,6 +73,11 @@ zentao getMyBugs --productId <productId>
 zentao getProductBugs --productId <productId>
 ```
 
+说明：
+
+- `getMyBugs` 不支持 `--status` 参数；如果直接传 `--status all` 会失败。
+- 需要按状态过滤时，改用 `getProductBugs --productId <productId> --status <status>`。
+
 ## 写入
 
 ```bash
@@ -148,6 +153,7 @@ zentao updateBug --bugId <bugId> --project <projectId> --execution <executionId>
 
 - `getMyBugs` 不传 `productId` 时，默认查跨所有产品“指派给我的 Bug”
 - 传 `productId` 时，只查指定产品内我的 Bug
+- `getMyBugs` 不支持 `status`；如果要看 `resolved` / `closed` / `all`，请切到 `getProductBugs`
 
 ## 线上 Bug 分流场景
 
