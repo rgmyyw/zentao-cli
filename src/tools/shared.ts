@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { JsonContentResult } from '../types/common.js';
+import { addMarkdownForAi } from '../utils/html.js';
 
 export type OutputMode = 'compact' | 'normal' | 'verbose';
 
@@ -12,11 +13,12 @@ export const optionalTrimmedText = z.preprocess(
 
 export function jsonResult(value: unknown, mode?: OutputMode): JsonContentResult {
   const effectiveMode = mode ?? currentOutputMode;
+  const aiReadyValue = addMarkdownForAi(value);
   const payload = effectiveMode === 'verbose'
-    ? value
+    ? aiReadyValue
     : effectiveMode === 'normal'
-      ? normalizeNormalPayload(value)
-      : normalizeCompactPayload(value);
+      ? normalizeNormalPayload(aiReadyValue)
+      : normalizeCompactPayload(aiReadyValue);
 
   return {
     content: [
