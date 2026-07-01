@@ -9,6 +9,20 @@
 - 正式版本起点切换到 `1.0.0`。
 - README 收敛为长期稳定说明；版本变更摘要继续记录在 CHANGELOG 和 Release notes。
 
+### 新增
+
+- **新增 AI HTML / Markdown 伴随输出能力**：补充面向 Agent/脚本消费的 HTML Markdown companion 输出链路，便于列表与详情结果在终端之外复用为富文本摘要。
+- **新增列表型结果的 agent-first 摘要字段**：列表命令输出补充 `summary` 与 `meta.processed`，让上层调用方优先消费稳定摘要，而不是自行二次聚合字段。
+
+### 文档
+
+- 更新发布同步检查说明，明确发布前需要同步核对版本、tag、Release、npm 与工作流状态。
+- 调整 `skills/zentao-cli` 参考文档，移除已不准确的 `getMyBugs` / `getMyTasks` 限制描述，并同步修正速查说明。
+
+### 验证
+
+- 发布前执行仓库既有校验：`pnpm check` 与 `pnpm release:smoke-query`。
+
 ## 0.1.37 - 2026-06-26
 
 ### 修复

@@ -16,7 +16,7 @@
 
 | 命令 | 简介 |
 | --- | --- |
-| `getMyBugs` | 可选。禅道产品 ID。不传时默认查询跨所有产品“指派给我的 Bug”；传入时只查该产品内我的 Bug。若用户问线上 / 生产 / 客户反馈 / 售后反馈问题，先判断来源：市场 / 售后 / 客户反馈查“市场和售后问题跟踪”，测试 / 开发自发现查“测试”，不要直接把业务产品名当成这里的 productId。注意：不支持 `status` 参数。 |
+| `getMyBugs` | 可选。禅道产品 ID。不传时默认查询跨所有产品“指派给我的 Bug”；传入时只查该产品内我的 Bug。若用户问线上 / 生产 / 客户反馈 / 售后反馈问题，先判断来源：市场 / 售后 / 客户反馈查“市场和售后问题跟踪”，测试 / 开发自发现查“测试”，不要直接把业务产品名当成这里的 productId。 |
 | `getProductBugs` | 禅道产品 ID。仅用于查询某个禅道产品下的 Bug。若用户问的是外部线上 / 生产 / 客户反馈问题，先查固定禅道产品 |
 | `getBugDetail` | 解决日期/时间，禅道 18.5 bugresolve 支持该字段 |
 | `getBugSnapshot` | 解决日期/时间，禅道 18.5 bugresolve 支持该字段 |
@@ -49,7 +49,7 @@
 
 | 命令 | 简介 |
 | --- | --- |
-| `getMyTasks` | 查看我的任务；部分部署查不到已完成任务，阶段内完成项优先用 `getMyWeeklyActivity`。 |
+| `getMyTasks` | 登记日期，推荐 YYYY-MM-DD。 |
 | `getTaskDetail` | 登记日期，推荐 YYYY-MM-DD。 |
 | `recordTaskEstimate` | 登记日期，推荐 YYYY-MM-DD。 |
 | `editTaskEstimate` | 工时记录 ID，对应 18.5 task/editEstimate 页面里的 estimateID/effortID |
