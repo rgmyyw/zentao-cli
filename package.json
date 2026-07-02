@@ -1,6 +1,6 @@
 {
   "name": "@cloudglab/zentao-cli",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "ZenTao CLI rebuilt for ZenTao 18.5 REST v1 API",
   "repository": {
     "type": "git",
@@ -14,7 +14,8 @@
     "zentao-cli": "dist/bin/zentao.js",
     "zentao-dev": "dist/bin/zentao-dev.js",
     "zentao-pm": "dist/bin/zentao-pm.js",
-    "zentao-qa": "dist/bin/zentao-qa.js"
+    "zentao-qa": "dist/bin/zentao-qa.js",
+    "zentao-mcp": "dist/bin/zentao-mcp.js"
   },
   "files": [
     "dist",
@@ -36,6 +37,7 @@
     "prepare": "lefthook install"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "axios": "1.13.2",
     "form-data": "^4.0.0",
     "turndown": "^7.2.4",

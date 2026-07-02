@@ -2,6 +2,25 @@
 
 所有值得注意的版本变更都会记录在本文件中。
 
+## 1.1.0 - 2026-07-02
+
+### 新增
+
+- **新增 MCP stdio 接入**：通过 `zentao-mcp` 命令提供 MCP（Model Context Protocol）服务端，支持 compact 和 native 两种模式。
+  - `compact` 模式（默认）：只注册 4 个入口工具（`zentao_list_tools` / `zentao_help` / `zentao_call_tool` / `zentao_parse_url`），最小化上下文占用。
+  - `native` 模式：按 role 全量注册禅道工具为独立 MCP tool，支持 `--tools` 白名单收窄。
+  - 支持 `--role` / `--mode` / `--tools` 启动参数和 `env` 配置注入。
+- **新增 Skill MCP/CLI 路由逻辑**：Skill 文档在会话中检测到 MCP 工具时自动走 MCP 链路，避免与 CLI shell 调用路径重复注入上下文。
+
+### 优化
+
+- **README 精简**：移除 Skill source 安装细节、更新/卸载详细说明、环境变量独立章节等重复内容；新增 MCP 接入方式章节，与安装方式同级。
+- **AGENTS.md 补充 MCP 说明**：记录 compact/native 模式和各 role 工具数量。
+
+### 修复
+
+- **fix-bin-mode.mjs 补充 zentao-mcp.js**：确保编译后 bin 文件具有可执行权限。
+
 ## 1.0.0 - 2026-06-29
 
 ### 发布

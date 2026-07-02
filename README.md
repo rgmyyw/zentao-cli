@@ -6,6 +6,8 @@
 
 除了标准 REST API，本工具还补充了部分扩展场景：会在必要时读取页面 JSON、详情页动作记录，或模拟禅道前端请求，把标准接口不好覆盖的查询、统计和流转动作封装成可调用命令。
 
+[文档](https://cloudglab.github.io/zentao-cli/)
+
 ## 核心能力
 
 - 覆盖禅道任务、Bug、需求、执行、测试、构建、发布、动态与统计等常见终端工作流。
@@ -42,7 +44,7 @@
 
 ## 安装方式
 
-### 推荐：一键安装 CLI + Skill
+### 一键安装 CLI + Skill
 
 ```bash
 npx -y @cloudglab/zentao-cli@latest install
@@ -61,90 +63,99 @@ npx -y @cloudglab/zentao-cli@latest install
   zentao getMyBugs --limit 10    查看我的 Bug
 ```
 
-如果需要强制重新下载 npm 静态包，可改用 npm 模式：
+后续更新可以运行 `zentao update`，卸载可以运行 `zentao uninstall`。
 
-```bash
-npx -y @cloudglab/zentao-cli@latest install --skill-source npm
+## MCP 接入方式
+
+除了 Skill + CLI 模式，zentao-cli 也支持 MCP（Model Context Protocol）接入，可直接在兼容 MCP 的客户端里使用禅道工具。
+
+### 安装和配置
+
+MCP server 随 npm 包一起发布，通过 `zentao-mcp` 命令启动。支持通过客户端 `env` 传入禅道配置，与 CLI 环境变量完全一致：
+
+```json
+{
+  "mcpServers": {
+    "zentao": {
+      "command": "zentao-mcp",
+      "args": ["--role=dev", "--mode=compact"],
+      "env": {
+        "ZENTAO_URL": "https://your-zentao.example.com",
+        "ZENTAO_USERNAME": "your-account",
+        "ZENTAO_PASSWORD": "your-password",
+        "ZENTAO_API_VERSION": "v1"
+      }
+    }
+  }
+}
 ```
 
-npm 模式会下载 `@cloudglab/zentao-cli` 包，解压其中的 `skills/` 目录，再通过本地路径安装 skill。
+如果本机尚未全局安装，也可以用 npx 启动：
 
-如果需要从 GitHub 仓库安装 skill，可显式指定：
-
-```bash
-npx -y @cloudglab/zentao-cli@latest install --skill-source git
+```json
+{
+  "mcpServers": {
+    "zentao": {
+      "command": "npx",
+      "args": ["-y", "@cloudglab/zentao-cli@latest", "zentao-mcp", "--role=dev", "--mode=compact"],
+      "env": {
+        "ZENTAO_URL": "https://your-zentao.example.com",
+        "ZENTAO_USERNAME": "your-account",
+        "ZENTAO_PASSWORD": "your-password"
+      }
+    }
+  }
+}
 ```
 
-如果已经提前下载并解压好了 npm 静态包，也可以直接指定本地目录：
+### 启动参数
 
-```bash
-zentao install --skill-local-path ./package
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--role` | `dev` | 工具角色：`full` / `dev` / `qa` / `pm` |
+| `--mode` | `compact` | 注册模式：`compact`（少量入口工具，省上下文） / `native`（全量注册） |
+| `--tools` | 无 | 工具白名单，逗号分隔。如 `--tools=getMyTasks,getBugDetail,updateTask` |
+
+### compact 模式（默认，推荐）
+
+只注册 4 个入口工具，最省上下文，适合 Agent 长会话：
+
+- **`zentao_list_tools`**：列出当前 role 下所有可用工具名称。
+- **`zentao_help`**：查看指定工具的参数说明和元信息。
+- **`zentao_call_tool`**：调用任意禅道工具（通过名称 + 参数字典）。
+- **`zentao_parse_url`**：解析禅道 URL / 文件路径，返回可调用命令建议。
+
+工作流：`zentao_list_tools` → 选工具 → `zentao_help` 了解参数 → `zentao_call_tool` 执行。
+
+### native 模式
+
+将当前 role 下的每个禅道工具注册为独立 MCP tool，体验好但上下文占用较高：
+
+- `--role=dev --mode=native`：~238 个工具（任务、Bug、需求、执行、构建等）。
+- `--role=qa --mode=native`：~225 个工具。
+- `--role=pm --mode=native`：~188 个工具。
+- `--role=full --mode=native`：~312 个工具。
+
+native 模式建议配合 `--tools` 白名单缩小范围，避免大量工具占用模型上下文。
+
+### 写操作保护
+
+与 CLI 一致，写操作仍需显式传入 `confirm: true`。在 compact 模式下通过 `zentao_call_tool` 的 `args` 传 `"confirm": true`：
+
+```json
+// compact 模式写操作示例
+{
+  "tool": "createBug",
+  "args": {
+    "product": 1,
+    "title": "页面按钮无响应",
+    "steps": "复现步骤",
+    "confirm": true
+  }
+}
 ```
 
-后续更新也可以直接运行：
-
-```bash
-zentao update
-```
-
-`zentao update` 会重新安装最新 CLI，然后从全局已安装的最新 CLI 包内安装 skill，最后校验禅道配置。普通命令每天首次运行时也会做一次轻量更新探针：如果 npm 上存在新版本，会提示可执行的更新命令，但不会自动修改本机环境。只是更新工具、不想被配置校验阻塞时可以跳过校验：
-
-```bash
-zentao update --skip-config-check
-```
-
-如果本机旧版 `zentao update` 行为异常，可用最新 npm 包自举更新：
-
-```bash
-npx -y @cloudglab/zentao-cli@latest update
-```
-
-> 提示：默认安装 / 更新会从 CLI 包内自带 skill 读取。如果个别旧版本 npm 包未正确包含 skill 文件，可临时用 `--skill-source git` 安装 skill。
-
-如果 npm 全局目录或 npx 缓存目录存在上次失败留下的残留目录，安装 / 更新会自动清理并重试一次；若仍失败，可按提示执行手动清理：
-
-```bash
-npm uninstall -g @cloudglab/zentao-cli
-rm -rf "$(npm root -g)/@cloudglab/zentao-cli" "$(npm root -g)/@cloudglab/.zentao-cli-"*
-rm -rf ~/.npm/_npx/
-npm install -g @cloudglab/zentao-cli@latest
-```
-
-只更新其中一部分时可使用：
-
-```bash
-zentao update --cli-only
-zentao update --skill-only
-```
-
-需要卸载时，默认先打印预览；真实卸载必须显式确认。`npx` 方式适合本机命令已损坏或不想依赖本地旧版 CLI 时使用：
-
-```bash
-zentao uninstall
-zentao uninstall --confirm true
-npx -y @cloudglab/zentao-cli@latest uninstall --confirm true
-npx -y @cloudglab/zentao-cli@latest uninstall --confirm true --keep-config true
-```
-
-卸载默认会移除 zentao skill、全局 CLI、npm 残留目录和 `~/.zentao/config.json`。如需保留配置请加 `--keep-config true`；也可以用 `--cli-only true` 或 `--skill-only true` 只卸载其中一部分。
-
-如果需要在脚本或 CI 中关闭每日更新探针，可以设置：
-
-```bash
-export ZENTAO_SKIP_UPDATE_CHECK=true
-```
-
-### 命令速查页
-
-项目提供极简命令速查页，适合复制安装、更新、角色入口、常用查询和环境变量命令：
-
-```text
-https://cloudglab.github.io/zentao-cli/
-```
-
-页面源码位于 `docs/index.html`，由 GitHub Pages 工作流自动部署。该页面不随 npm 包发布，npm 包只保留 CLI、Skill、README 和 CHANGELOG。
-
-### CI / 脚本里临时使用
+## CI / 脚本里临时使用
 
 ```bash
 npx -y @cloudglab/zentao-cli@latest --help
@@ -152,7 +163,7 @@ npx -y @cloudglab/zentao-cli@latest --role qa getMyTasks --status all --limit 20
 npx -y @cloudglab/zentao-cli@latest --output normal getExecutionSnapshot --executionId 2140
 ```
 
-### AI / 脚本推荐读法
+## AI / 脚本推荐读法
 
 ```bash
 zentao --output compact getBugSnapshot --bugId 84362
@@ -174,13 +185,13 @@ zentao parseUrlIntent --url "todo-view-2319.html"
 - 无直连命令、跨实例 URL 或明显是写页面时，会返回 `action: "explain"` 和候选命令，不会自动执行写操作。
 - 直接把 URL 当首参传给 CLI 时，也会复用同一套解析逻辑；能安全执行时自动跳到对应读命令，不能直达时直接输出解析 JSON。
 
+输出模式说明：
+
 - `compact`：默认模式，优先少返回，适合 Agent 首轮探测。
 - `normal`：保留 `source`、`page`、`total`、`scanned`、`durationMs`、`cacheHit` 等常用元信息。
 - `verbose`：保留原始 JSON，全字段排查时使用。
 
-### 批量写操作示例
-
-以下示例展示的是这次重新对齐 18.5 页面后的推荐写法：
+## 批量写操作示例
 
 ```bash
 zentao batchEditTasks \
@@ -202,72 +213,6 @@ zentao batchCreateTodos \
 ```
 
 如果某个写命令在禅道 18.5 下没有对应 controller，CLI 会在确认执行时直接报错，而不是继续请求一个必然 404 或语义错误的旧页面入口。
-
-### 全局安装
-
-```bash
-npm i -g @cloudglab/zentao-cli@latest
-zentao --version
-zentao version
-zentao help
-zentao whoami
-```
-
-### Skill 安装
-
-默认一键安装会使用 CLI 包内自带 skill。手动从 GitHub 仓库安装：
-
-```bash
-npx -y skills add cloudglab/zentao-cli --global --agent universal --yes
-```
-
-如果只能访问 npm，不能 clone `.git` 仓库：
-
-```bash
-npm pack @cloudglab/zentao-cli@latest
-tar -xzf cloudglab-zentao-cli-*.tgz
-npx -y skills add ./package --global --agent universal --yes
-```
-
-Skill / Agent 里推荐优先调用本地命令：
-
-```bash
-zentao --role qa getMyBugs --limit 50
-```
-
-本地没有安装时再退回：
-
-```bash
-npx -y @cloudglab/zentao-cli@latest --role qa getMyBugs --limit 50
-```
-
-## 环境变量
-
-```bash
-export ZENTAO_URL="https://your-zentao.example.com"
-export ZENTAO_USERNAME="your-account"
-export ZENTAO_PASSWORD="your-password"
-export ZENTAO_API_VERSION="v1"
-
-# 可选：非标准部署时指定完整 API 基础地址
-# export ZENTAO_API_BASE_URL="https://your-zentao.example.com/custom/api.php/v1"
-# 可选：非标准部署时指定旧版页面 JSON 基础地址
-# export ZENTAO_LEGACY_BASE_URL="https://your-zentao.example.com/custom"
-```
-
-`ZENTAO_URL` 传根域名即可，不要带 `/zentao`。
-
-CLI 参数支持 `--key value` 和 `--key=value` 两种写法；如果参数名拼错，会直接提示未知参数，避免写操作时静默忽略字段。需要确认某条命令参数时，可以运行 `zentao help <command>`，例如 `zentao help getExecutionDetail`。
-
-发布前建议至少执行：
-
-```bash
-pnpm check
-pnpm release:smoke-query
-pnpm coverage
-```
-
-`pnpm release:smoke-query` 会按命令检查返回内容（ID 命中、列表结构、统计计数、快照字段等），不只校验退出码；可作为发布前和修复查询命令后的回归手段。
 
 ## 可以这样问
 
@@ -471,5 +416,4 @@ zentao help
 zentao help getExecutionDetail
 zentao list
 zentao --role qa list
-pnpm release:smoke-query
 ```

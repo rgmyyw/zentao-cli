@@ -26,6 +26,15 @@
 
 角色只过滤 CLI 暴露命令，不改变禅道登录身份或服务端权限。
 
+## MCP 接入
+
+项目同时支持 MCP stdio 接入（`zentao-mcp` 命令），与 Skill + CLI 共用同一套 tool registry。
+
+- 默认 `compact` 模式只注册 3 个入口工具（`zentao_list_tools` / `zentao_help` / `zentao_call_tool` / `zentao_parse_url`），最小化上下文占用。
+- `native` 模式注册全部 role 工具（dev ~238 / qa ~225 / pm ~188 / full ~312）。
+- 写操作保护与 CLI 一致，仍需 `confirm: true`。
+- 支持 `--role` / `--mode` / `--tools` 参数和环境变量配置；详见 README MCP 章节。
+
 ## 当前核心能力
 
 - 登录和 token 管理：token 登录、token 失效后自动重试一次、明文密码失败时回退 MD5。

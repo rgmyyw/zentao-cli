@@ -17,10 +17,33 @@ argument-hint: "[command]"
 
 ## 入口优先级
 
-1. 本机已安装 `zentao` → 直接执行。
-2. 未安装 → `npx -y @cloudglab/zentao-cli@latest install` 一键安装 CLI + skill + 配置校验。
-3. 当前环境不方便安装 → 临时 `npx -y @cloudglab/zentao-cli@latest`。
-4. 旧版页面 URL → 先 `parseUrlIntent` 解析为对象类型和 ID，再调对应命令。
+MCP 和 CLI 两条链路二选一，**不要混用**，避免上下文重复注入。
+
+1. **MCP 链路优先**：如果当前会话中已注册 `zentao_call_tool` / `zentao_list_tools` / `zentao_help` 等 MCP 工具，**只走 MCP 链路**，不再通过 shell 执行 `zentao` 命令：
+   - 发现可用工具：调用 MCP `zentao_list_tools`（无参数）。
+   - 查看工具参数：调用 MCP `zentao_help({ tool: "命令名" })`。
+   - 执行操作：调用 MCP `zentao_call_tool({ tool: "命令名", args: { ... } })`，写操作 `args` 中需含 `confirm: true`。
+   - 解析 URL：调用 MCP `zentao_parse_url({ url: "..." })`。
+
+2. **CLI 链路回退**：当前会话中没有 MCP 工具时才走 CLI：
+   - 本机已安装 `zentao` → 直接执行。
+   - 未安装 → `npx -y @cloudglab/zentao-cli@latest install` 一键安装。
+   - 当前环境不方便安装 → 临时 `npx -y @cloudglab/zentao-cli@latest`。
+
+3. 旧版页面 URL → 先 `parseUrlIntent` 解析为对象类型和 ID，再调对应命令。
+
+### 调用方式切换
+
+| 场景 | MCP 可用时 | CLI 回退时 |
+|------|-----------|-----------|
+| 列出工具 | `zentao_list_tools` | `zentao list` |
+| 查看帮助 | `zentao_help({ tool: "getMyTasks" })` | `zentao help getMyTasks` |
+| 查我的任务 | `zentao_call_tool({ tool: "getMyTasks", args: { limit: 10 } })` | `zentao getMyTasks --limit 10` |
+| 查 Bug 详情 | `zentao_call_tool({ tool: "getBugDetail", args: { bugId: 123 } })` | `zentao getBugDetail --bugId 123` |
+| 创建 Bug | `zentao_call_tool({ tool: "createBug", args: { product: 1, title: "...", confirm: true } })` | `zentao createBug --product 1 --title "..." --confirm true` |
+| 解析 URL | `zentao_parse_url({ url: "https://..." })` | `zentao parseUrlIntent --url "https://..."` |
+| 查执行统计 | `zentao_call_tool({ tool: "getExecutionDailyBugStats", args: { executionId: 123, iterationName: "..." } })` | `zentao getExecutionDailyBugStats --executionId 123 --iterationName "..."` |
+| 查周报 | `zentao_call_tool({ tool: "getMyWeeklyActivity", args: { week: "this" } })` | `zentao getMyWeeklyActivity --week this` |
 
 ## 写保护
 
@@ -78,6 +101,14 @@ argument-hint: "[command]"
 
 ## 启动
 
+**MCP 模式（有 MCP 工具时自动走此链路）**：
+```
+zentao_list_tools              # 列出可用工具
+zentao_help({ tool: "..." })   # 查看工具参数
+zentao_call_tool({ ... })      # 执行操作
+```
+
+**CLI 模式（无 MCP 工具时回退）**：
 ```bash
 zentao help
 zentao list
