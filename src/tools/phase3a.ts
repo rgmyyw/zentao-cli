@@ -315,6 +315,7 @@ export function registerTaskDerivedTools(server: CliRegistry): void {
     deadline: z.string().optional(),
     desc: z.string().optional(),
     story: z.number().int().positive().optional(),
+    parent: z.number().int().positive().optional().describe('父任务 ID；指定后创建的是该任务的子任务，对应禅道 18.5 task::create 的 parent 字段'),
     module: z.number().int().min(0).optional(),
     estimate: z.number().optional(),
     mailto: z.array(z.string().trim().min(1)).optional().describe('抄送人禅道账号列表，对应 18.5 task::create mailto 字段，逗号或数组形式'),

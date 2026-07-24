@@ -397,7 +397,7 @@ export class TaskApi {
 
   async createTask(task: Record<string, unknown> & { execution: number }): Promise<unknown> {
     const normalizedTask = this.normalizeTaskInput(task, ['name', 'assignedTo', 'estStarted', 'deadline']);
-    if (containsHtmlMarkup(normalizedTask.desc)) {
+    if (containsHtmlMarkup(normalizedTask.desc) || (typeof task.parent === 'number' && task.parent > 0)) {
       const legacyTask = this.normalizeTaskLegacyInput({ ...task });
       legacyTask.name = requireNonBlank(legacyTask.name as string | undefined, 'name 不能为空');
       legacyTask.assignedTo = requireNonBlank(legacyTask.assignedTo as string | undefined, 'assignedTo 不能为空');
@@ -427,6 +427,7 @@ export class TaskApi {
       if (legacyTask.teamEstimate !== undefined) formData.teamEstimate = legacyTask.teamEstimate;
       if (legacyTask.multiple !== undefined) formData.multiple = legacyTask.multiple;
       if (legacyTask.uid !== undefined) formData.uid = legacyTask.uid;
+      if (typeof task.parent === 'number' && task.parent > 0) formData.parent = task.parent;
 
       return this.http.legacyRequest('POST', `/task-create-${task.execution}-${storyId}-${moduleId}.json`, {
         data: toFormUrlEncoded(formData),
