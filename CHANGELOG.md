@@ -2,6 +2,12 @@
 
 所有值得注意的版本变更都会记录在本文件中。
 
+## 1.1.1 - 2026-07-27
+
+### 新增
+
+- **`createTask` 支持 `parent` 参数直接创建子任务**：指定 `parent`（父任务 ID）时自动走 legacy `task-create` 控制器，对应禅道 18.5 `task::create` 的 `parent` 字段；REST POST `/executions/{id}/tasks` 创建时忽略该字段，故强制走 legacy 保证子任务关系正确写入。
+
 ## 1.1.0 - 2026-07-02
 
 ### 新增
