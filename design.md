@@ -98,7 +98,7 @@
 ```json
 {
   "scripts": {
-    "build": "rm -rf dist && tsx scripts/generate-manifest.ts && node scripts/copy-skills.mjs && tsc -p tsconfig.json && node scripts/fix-bin-mode.mjs",
+    "build": "node scripts/clean.mjs && tsx scripts/generate-manifest.ts && node scripts/copy-skills.mjs && tsc -p tsconfig.json && node scripts/fix-bin-mode.mjs",
     "dev": "tsx src/bin/<cli>.ts",
     "lint": "oxlint src",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -835,7 +835,7 @@ import type { Role } from './types/common.js';
 
 构建必须按固定顺序执行，任何一步失败即构建失败：
 
-1. `rm -rf dist`。
+1. `node scripts/clean.mjs`：删除 `dist` 目录（跨平台，等价于 `rm -rf dist`）。
 2. `tsx scripts/generate-manifest.ts`：生成 `src/core/command-groups.generated.ts` 和 `dist/manifest.json`。
 3. `node scripts/copy-skills.mjs`：把 `.agents/skills/<skill-name>` 复制到 `skills/<skill-name>`。
 4. `tsc -p tsconfig.json`。

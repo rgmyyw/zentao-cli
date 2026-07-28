@@ -1,6 +1,6 @@
 {
   "name": "@cloudglab/zentao-cli",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "ZenTao CLI rebuilt for ZenTao 18.5 REST v1 API",
   "repository": {
     "type": "git",
@@ -25,7 +25,7 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "rm -rf dist && tsx scripts/generate-manifest.ts && node scripts/copy-skills.mjs && tsc -p tsconfig.json && node scripts/fix-bin-mode.mjs && node scripts/guard-sensitive.mjs",
+    "build": "node scripts/clean.mjs && tsx scripts/generate-manifest.ts && node scripts/copy-skills.mjs && tsc -p tsconfig.json && node scripts/fix-bin-mode.mjs && node scripts/guard-sensitive.mjs",
     "dev": "tsx src/bin/zentao.ts",
     "lint": "oxlint src",
     "typecheck": "tsc -p tsconfig.json --noEmit",

@@ -2,6 +2,12 @@
 
 所有值得注意的版本变更都会记录在本文件中。
 
+## 1.1.2 - 2026-07-28
+
+### 修复
+
+- **构建脚本跨平台兼容**：`build` 脚本中 `rm -rf dist` 改为 `node scripts/clean.mjs`（新增 `scripts/clean.mjs`，使用 `fs.rmSync` 删除 `dist`），修复 Windows 下 `rm` 命令不可用导致构建失败的问题。`design.md` 中构建示例同步更新。
+
 ## 1.1.1 - 2026-07-27
 
 ### 新增
