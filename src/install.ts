@@ -586,21 +586,17 @@ async function promptForConfig(defaults?: ZentaoConfig): Promise<ZentaoConfig> {
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   try {
-    const url = await ask(rl, '禅道地址', defaults?.url);
+    const url = await ask(rl, '禅道地址', defaults?.url ?? 'https://zentao.cloudglab.cn/');
     const username = await ask(rl, '禅道用户名', defaults?.username);
     const password = await askPassword(rl, defaults?.password ? '禅道密码（直接回车保留原密码）' : '禅道密码');
-    const defaultApiVersion = defaults?.apiVersion === 'legacy' ? 'v1' : defaults?.apiVersion ?? 'v1';
-    const apiVersion = await ask(rl, 'API 版本', defaultApiVersion);
-    const apiBaseUrl = await ask(rl, 'API 基础地址（可选，直接回车跳过）', defaults?.apiBaseUrl ?? '');
-    const legacyBaseUrl = await ask(rl, '旧版页面 JSON 基础地址（可选，直接回车跳过）', defaults?.legacyBaseUrl ?? '');
 
     return normalizeConfig({
       url,
       username,
       password: password || defaults?.password,
-      apiVersion,
-      apiBaseUrl: apiBaseUrl || undefined,
-      legacyBaseUrl: legacyBaseUrl || undefined,
+      apiVersion: defaults?.apiVersion,
+      apiBaseUrl: defaults?.apiBaseUrl,
+      legacyBaseUrl: defaults?.legacyBaseUrl,
     });
   } finally {
     rl.close();
@@ -639,11 +635,13 @@ function askPassword(rl: readline.Interface, label: string): Promise<string> {
   mutableRl.on('close', restore);
 
   return new Promise<string>((resolve) => {
+    // 先用原始 write 输出提示文字，避免被 mute hook 替换成 *
+    originalWrite(`${label}: `);
     mutableRl.stdoutMuted = true;
     mutableRl._writeToOutput = (value: string) => {
       originalWrite(mutableRl.stdoutMuted ? '*' : value);
     };
-    mutableRl.question(`${label}: `, (answer) => {
+    mutableRl.question('', (answer) => {
       restore();
       process.stdout.write('\n');
       resolve(answer.trim());

@@ -2,6 +2,18 @@
 
 所有值得注意的版本变更都会记录在本文件中。
 
+## 1.1.3 - 2026-07-28
+
+### 修复
+
+- **install 交互流程简化**：promptForConfig 只提示 3 个字段（地址、用户名、密码），删除 API 版本/API 基础地址/旧版 JSON 地址的交互提示，用默认值填充。
+- **密码提示显示修复**：askPassword 先用 originalWrite 输出提示文字再开启 mute，避免提示文字被替换成 `*`。
+- **URL origin 提取**：normalizeServerUrl 已有 origin 提取逻辑，无需改动。
+
+### 新增
+
+- **统一命令别名**：`init` → initZentao、`urlParse` → parseUrlIntent、`configShow` 新增命令（输出脱敏配置 JSON）。
+
 ## 1.1.2 - 2026-07-28
 
 ### 修复

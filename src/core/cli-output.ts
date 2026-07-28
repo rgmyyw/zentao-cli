@@ -84,7 +84,7 @@ interface CommandListGroup {
 
 function buildCommandGroups(commandNames: string[]): CommandListGroup[] {
   const groups: CommandListGroup[] = [
-    { title: '开始使用', match: (name) => ['help', 'list', 'version', 'changelog', 'install', 'update', 'upgrade', 'uninstall', 'remove', 'initZentao', 'whoami', 'who-am-i', 'getMyProfile'].includes(name), commands: [] },
+    { title: '开始使用', match: (name) => ['help', 'list', 'version', 'changelog', 'configShow', 'install', 'update', 'upgrade', 'uninstall', 'remove', 'initZentao', 'whoami', 'who-am-i', 'getMyProfile'].includes(name), commands: [] },
     { title: '我的工作', match: (name) => ['getMyTasks', 'getMyBugs', 'getMyTaskStatistics', 'getMyBugStatistics', 'getMyWeeklyActivity'].includes(name), commands: [] },
     { title: '测试 / 构建 / 发布', match: (name) => /Test|Case|Build|Release/.test(name), commands: [] },
     { title: '任务 / Bug / 需求', match: (name) => /Task|Bug|Story|Stories/.test(name), commands: [] },
@@ -121,6 +121,7 @@ function describeCommand(commandName: string): string {
     list: '按场景列出可用命令',
     version: '查看 CLI 版本',
     changelog: '查看 CLI 更新日志',
+    configShow: '查看当前禅道配置（密码脱敏）',
     install: '安装 CLI 和 zentao skill',
     update: '更新 CLI 和 zentao skill',
     upgrade: 'update 的别名',
@@ -590,6 +591,17 @@ export function getBuiltinCommandHelp(commandName: string): string | undefined {
       '  --version <string> （可选）：只展示指定版本的更新内容。',
       '  --since <string> （可选）：展示从指定版本到当前最新的所有更新。',
       '  --raw （可选）：输出完整 CHANGELOG.md 原文。',
+      '',
+    ].join('\n'),
+    configShow: [
+      'zentao configShow',
+      '',
+      '用法：',
+      '  zentao configShow',
+      '  zentao config show',
+      '',
+      '说明：',
+      '  查看当前禅道配置（密码脱敏）。等价于其他 CLI 的 configShow 命令。',
       '',
     ].join('\n'),
     install: [

@@ -8,7 +8,7 @@ import {
   renderChangelog,
   type ChangelogOptions,
 } from './core/cli-output.js';
-import { loadConfig } from './core/config.js';
+import { loadConfig, maskConfig } from './core/config.js';
 import { buildRegistryForCommand, buildRegistryForRole, getAvailableCommandNames } from './core/manifest.js';
 import { getRequestCount, getLastRequestDurationMs } from './core/http-metrics.js';
 import { looksLikeUrlIntentInput, parseUrlIntent, resolveExecutableUrlIntent, type ParsedUrlIntent } from './core/url-intent.js';
@@ -21,7 +21,7 @@ import { CLI_VERSION } from './version.js';
 
 const VALID_ROLES = new Set<Role>(['full', 'dev', 'pm', 'qa']);
 
-const BUILTIN_COMMAND_NAMES = ['help', 'list', 'version', 'changelog', 'install', 'uninstall', 'remove', 'update', 'upgrade'];
+const BUILTIN_COMMAND_NAMES = ['help', 'list', 'version', 'changelog', 'configShow', 'install', 'uninstall', 'remove', 'update', 'upgrade'];
 
 export async function runCli(rawArgs: string[]): Promise<void> {
   const { role, commandName, commandArgs, outputMode, directIntent, recommend } = parseCliArgs(rawArgs);
@@ -107,6 +107,21 @@ export async function runCli(rawArgs: string[]): Promise<void> {
     }
     const options = parseChangelogOptions(commandArgs);
     process.stdout.write(`${await renderChangelog(options)}\n`);
+    return;
+  }
+
+  if (commandName === 'configShow') {
+    if (hasHelpFlag(commandArgs)) {
+      ensureNoUnexpectedBuiltinArgs('configShow', commandArgs);
+      process.stdout.write(`${getBuiltinCommandHelp('configShow')}\n`);
+      return;
+    }
+    const config = loadConfig();
+    if (!config) {
+      process.stdout.write('未找到配置。请先运行 zentao init 配置。\n');
+      return;
+    }
+    process.stdout.write(`${JSON.stringify(maskConfig(config), null, 2)}\n`);
     return;
   }
 
@@ -381,6 +396,17 @@ function normalizeCommandAlias(
 ): { commandName?: string; consumedArgs: number } {
   if (commandName === 'who' && args[0] === 'am' && args[1] === 'i') {
     return { commandName: 'whoami', consumedArgs: 2 };
+  }
+
+  if (commandName === 'config' && args[0] === 'show') {
+    return { commandName: 'configShow', consumedArgs: 1 };
+  }
+
+  if (commandName === 'init') {
+    return { commandName: 'initZentao', consumedArgs: 0 };
+  }
+  if (commandName === 'urlParse') {
+    return { commandName: 'parseUrlIntent', consumedArgs: 0 };
   }
 
   return { commandName, consumedArgs: 0 };
