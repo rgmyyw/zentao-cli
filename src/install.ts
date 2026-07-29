@@ -611,40 +611,6 @@ function ask(rl: readline.Interface, label: string, defaultValue = ''): Promise<
 }
 
 function askPassword(rl: readline.Interface, label: string): Promise<string> {
-  const mutableRl = rl as readline.Interface & { stdoutMuted?: boolean; _writeToOutput?: (value: string) => void };
-
-  // 检测 _writeToOutput 缺失时拒绝输入，避免密码明文回显；并提示用环境变量。
-  if (typeof mutableRl._writeToOutput !== 'function') {
-    return Promise.reject(
-      new Error('当前终端不支持密码隐藏输入，无法安全读取密码。请改用环境变量 ZENTAO_URL、ZENTAO_USERNAME、ZENTAO_PASSWORD 配置后重试。'),
-    );
-  }
-
-  // 保存原函数，hook 后在回调中还原；并兜底监听 close 事件（Ctrl+D/EOF/SIGTERM 场景下
-  // question 回调可能不触发，readline 直接 emit close，需确保任何路径都还原输出行为）。
-  const originalWrite = mutableRl._writeToOutput.bind(rl);
-  let restored = false;
-  const restore = (): void => {
-    if (restored) return;
-    restored = true;
-    mutableRl._writeToOutput = originalWrite;
-    mutableRl.stdoutMuted = false;
-    mutableRl.off('close', restore);
-  };
-  // 兜底：readline 发出 close 而未触发 question 回调时，由 close 事件还原。
-  mutableRl.on('close', restore);
-
-  return new Promise<string>((resolve) => {
-    // 先用原始 write 输出提示文字，避免被 mute hook 替换成 *
-    originalWrite(`${label}: `);
-    mutableRl.stdoutMuted = true;
-    mutableRl._writeToOutput = (value: string) => {
-      originalWrite(mutableRl.stdoutMuted ? '*' : value);
-    };
-    mutableRl.question('', (answer) => {
-      restore();
-      process.stdout.write('\n');
-      resolve(answer.trim());
-    });
-  });
+  // 明文输入：密码可见，不做掩码隐藏。
+  return ask(rl, label);
 }
