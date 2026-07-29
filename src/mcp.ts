@@ -6,6 +6,7 @@ import { loadConfig } from './core/config.js';
 import { setGlobalOutputMode } from './tools/shared.js';
 import type { Role } from './types/common.js';
 import type { CliCommandDefinition } from './core/cli-registry.js';
+import { CLI_VERSION } from './version.js';
 
 export type McpMode = 'compact' | 'native';
 
@@ -155,7 +156,7 @@ export async function runMcp(options: McpOptions): Promise<void> {
 
   const server = new McpServer({
     name: 'zentao-cli',
-    version: '1.0.0',
+    version: CLI_VERSION,
   });
 
   if (mode === 'compact') {
