@@ -2,6 +2,12 @@
 
 所有值得注意的版本变更都会记录在本文件中。
 
+## 1.1.8 - 2026-07-30
+
+### 修复
+
+- **skill agent 数组化支持 claude-code + universal**：`install.ts` 的 `GLOBAL_SKILL_AGENTS` 从单个 `universal` 改为 `['claude-code', 'universal']`，`createSkillAddArgs` 用 `flatMap` 展开为多个 `--agent` 参数，确保 skill 同时注册到 claude-code 和 universal agent。
+
 ## 1.1.7 - 2026-07-30
 
 ### 修复
