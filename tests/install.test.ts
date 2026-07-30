@@ -83,6 +83,47 @@ describe('install command', () => {
     vi.restoreAllMocks();
   });
 
+  it('quotes win32 skill path with spaces before passing to npx', async () => {
+    const origPlatform = Object.getOwnPropertyDescriptor(process, 'platform');
+    try {
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+      const winPath = 'C:\\Program Files\\nodejs\\node_modules';
+      mockSpawn(new Map([['npm root -g', winPath + '\n']]));
+      mockInstallDependencies();
+      const { runInstallCommand } = await import('../src/install.js');
+
+      await runInstallCommand(['--skip-config-check']);
+
+      const expectedSource = path.join(winPath, '@cloudglab/zentao-cli', 'skills', 'zentao-cli');
+      expect(commandCalls).toEqual([
+        { command: 'npm', args: ['root', '-g'] },
+        { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
+        { command: 'npm', args: ['root', '-g'] },
+        { command: 'npx', args: ['-y', 'skills', 'add', `"${expectedSource}"`, '--global', '--agent', 'universal', '--yes'] },
+      ]);
+    } finally {
+      Object.defineProperty(process, 'platform', origPlatform ?? { value: 'darwin', configurable: true, writable: false });
+    }
+  });
+
+  it('rejects EPERM on npm install -g with actionable error and stops before skill install', async () => {
+    mockSpawn(
+      new Map([['npm root -g', '/usr/local/lib/node_modules\n']]),
+      new Map([['npm install -g @cloudglab/zentao-cli@latest', 'EPERM: operation not permitted']]),
+    );
+    mockInstallDependencies();
+    const { runInstallCommand } = await import('../src/install.js');
+
+    await expect(runInstallCommand(['--skip-config-check'])).rejects.toThrow(
+      /EPERM[\s\S]*npm config set prefix/,
+    );
+
+    expect(commandCalls).toEqual([
+      { command: 'npm', args: ['root', '-g'] },
+      { command: 'npm', args: ['install', '-g', '@cloudglab/zentao-cli@latest'] },
+    ]);
+  });
+
   it('installs the globally installed package skill by default', async () => {
     mockSpawn(new Map([['npm root -g', '/usr/local/lib/node_modules\n']]));
     mockInstallDependencies();

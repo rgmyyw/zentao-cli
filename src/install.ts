@@ -297,13 +297,44 @@ async function installGlobalCli(action: '安装' | '更新'): Promise<void> {
   try {
     await runStep(`${action} zentao CLI`, 'npm', args);
   } catch (error) {
+    if (isNpmEPERMError(error)) {
+      throw createEPERMError(action);
+    }
     if (!isNpmDirectoryNotEmptyError(error)) {
       throw error;
     }
     process.stdout.write('\n检测到 npm 全局安装目录残留，正在清理后重试...\n');
     await cleanupGlobalPackageResidues();
-    await runStep(`${action} zentao CLI`, 'npm', args);
+    try {
+      await runStep(`${action} zentao CLI`, 'npm', args);
+    } catch (retryError) {
+      if (isNpmEPERMError(retryError)) {
+        throw createEPERMError(action);
+      }
+      throw retryError;
+    }
   }
+}
+
+function isNpmEPERMError(error: unknown): boolean {
+  if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'EPERM') {
+    return true;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('EPERM') || message.toLowerCase().includes('operation not permitted');
+}
+
+function createEPERMError(action: '安装' | '更新'): Error {
+  return new Error(
+    `${action} zentao CLI 失败：npm 全局安装目录没有写权限（EPERM）。\n`
+    + '可能原因：npm prefix 指向了 Program Files 等 Windows 受保护目录。\n'
+    + '解决方法（任选其一）：\n'
+    + '  1. 以管理员身份重新运行安装命令\n'
+    + '  2. 将 npm prefix 改到用户可写目录后重试：\n'
+    + '     PowerShell: npm config set prefix "$env:APPDATA\\npm"\n'
+    + '     CMD:        npm config set prefix "%APPDATA%\\npm"\n'
+    + '     Git Bash:   npm config set prefix "$APPDATA/npm"',
+  );
 }
 
 function isNpmDirectoryNotEmptyError(error: unknown): boolean {
@@ -452,7 +483,7 @@ async function runStep(title: string, command: string, args: string[]): Promise<
 
 function runCommand(command: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { shell: process.platform === 'win32' });
+    const child = spawn(command, quoteArgsForShell(args), { shell: process.platform === 'win32' });
     let stderr = '';
 
     child.stdout?.on('data', (chunk: Buffer) => {
@@ -481,9 +512,23 @@ function createCommandFailedError(command: string, args: string[], code: number 
   return new Error(baseMessage + tail);
 }
 
+function quoteArgsForShell(args: string[]): string[] {
+  // Windows 下 spawn({ shell: true }) 会把 args 用空格拼接后交给 cmd.exe，
+  // 不会自动给单个参数加引号或转义。含空格或 cmd 元字符的路径
+  // （如 C:\Program Files\...）会被 cmd.exe 拆分或解释，导致命令解析错误。
+  if (process.platform !== 'win32') return args;
+  return args.map(quoteWindowsShellArg);
+}
+
+function quoteWindowsShellArg(arg: string): string {
+  if (arg === '') return '""';
+  if (!/[\s"&|<>^()%!]/.test(arg)) return arg;
+  return `"${arg.replace(/"/g, '""')}"`;
+}
+
 function runCommandOutput(command: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { shell: process.platform === 'win32' });
+    const child = spawn(command, quoteArgsForShell(args), { shell: process.platform === 'win32' });
     let stdout = '';
     let stderr = '';
 

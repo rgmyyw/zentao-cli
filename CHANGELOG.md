@@ -2,6 +2,13 @@
 
 所有值得注意的版本变更都会记录在本文件中。
 
+## 1.1.7 - 2026-07-30
+
+### 修复
+
+- **Windows 安装路径含空格导致 skills add 失败**：`install.ts` 的 `runCommand`/`runCommandOutput` 在 Windows 下 `spawn({ shell: true })` 不会自动给含空格的参数加引号，导致 `C:\Program Files\...` 被 cmd.exe 拆成多个参数。新增 `quoteArgsForShell` + `quoteWindowsShellArg`，按 cmd.exe 规则转义空格和元字符。
+- **EPERM 权限错误友好提示**：`npm install -g` 返回 EPERM 时不再抛原始 npm 错误堆栈，改为给出可操作提示（以管理员身份运行或改 npm prefix 到用户可写目录）。
+
 ## 1.1.6 - 2026-07-29
 
 ### 修复
